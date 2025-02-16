@@ -843,7 +843,6 @@ struct AlbumDetailView: View {
     }
 }
 
-// Testing Git Source Control
 
 #Preview {
     ContentView()
