@@ -11,6 +11,25 @@ import AVFoundation
 
 // MARK: - Main ContentView
 
+struct AlbumWithTracks {
+    var album: Album
+    var tracks: [Song]
+}
+
+// Define a custom environment key
+struct NavigationPathKey: EnvironmentKey {
+    static let defaultValue: Binding<NavigationPath>? = nil
+}
+
+// Extend EnvironmentValues to include the custom key
+extension EnvironmentValues {
+    var navigationPath: Binding<NavigationPath>? {
+        get { self[NavigationPathKey.self] }
+        set { self[NavigationPathKey.self] = newValue }
+    }
+}
+
+
 struct ContentView: View {
     // Existing song/player state
     @State private var musicAuthorized = false
@@ -26,12 +45,19 @@ struct ContentView: View {
     
     // New album-related state
     @State private var albums: [Album] = []
+    @State private var albumsWithTracks: [AlbumWithTracks] = []
     @State private var selectedAlbum: Album? = nil
     @State private var showAlbumDetail = false
     @State private var isPlayingFromAlbum: Bool = false // Track if playing from album
     
+    // Custom array to track albums in the navigation stack
+    @State private var albumsInNavigationPath: [Album] = []
+    
+    
+    @State private var navigationPath = NavigationPath()
+    
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ZStack(alignment: .bottom) {
                 // Main Content
                 ScrollView {
@@ -48,8 +74,7 @@ struct ContentView: View {
                                         if albums.count > 5 {
                                             NavigationLink("View More") {
                                                 FullAlbumGridView(albums: albums) { album in
-                                                    selectedAlbum = album
-                                                    showAlbumDetail = true
+                                                    selectAlbum(album)
                                                 }
                                             }
                                             .foregroundColor(.blue)
@@ -116,27 +141,32 @@ struct ContentView: View {
                         // Bottom Player View
                         BottomPlayerView(song: song, isPlaying: $isPlaying, togglePlayPause: togglePlayPause)
                             .onTapGesture {
-                                if isPlayingFromAlbum {
-                                    showAlbumDetail = true
-                                } else {
-                                    showTrackDetail = true
-                                }
+                                showTrackDetail = true
                             }
                     }
                     .background(Color(.systemBackground)) // Ensure the background covers the BottomPlayerView and message
                 }
             }
-            .sheet(item: $selectedAlbum) { album in
-                            NavigationStack {
-                                AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum)
-                                    .onAppear {
-                                        print("Showing details for album: \(album.title)")
-                                    }
-                            }
-                        }
+            .navigationDestination(for: Album.self) { album in
+                AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum)
+                    .onAppear {
+                        print("Showing details for album: \(album.title)")
+                    }
+            }
             .sheet(isPresented: $showTrackDetail) {
                 if let song = currentlyPlayingSong {
-                    TrackDetailView(song: song, isPlaying: $isPlaying, togglePlayPause: togglePlayPause, subscriptionMessage: $subscriptionMessage)
+                    TrackDetailView(
+                        song: song,
+                        isPlaying: $isPlaying,
+                        togglePlayPause: togglePlayPause,
+                        subscriptionMessage: $subscriptionMessage,
+                        isPlayingFromAlbum: $isPlayingFromAlbum,
+                        albumsWithTracks: $albumsWithTracks,
+                        albums: albums,
+                        playSong: playSong, // Pass the playSong function
+                        songs: $songs // Pass the songs array as a binding
+                    )
+                    .environment(\.navigationPath, $navigationPath)
                 }
             }
             .task {
@@ -239,8 +269,63 @@ struct ContentView: View {
             // Extract albums from the charts
             albums = albumCharts.flatMap { $0.items }
             
+            print("albums \(albums.count)")
+            
+            // Iterate through each album and fetch its tracks
+            for album in albums {
+                let tracks = await fetchTracksForAlbum(album: album)
+                let albumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
+                albumsWithTracks.append(albumWithTracks)
+            }
+            
+            // Now `albumsWithTracks` contains albums and their associated tracks
+            print("Fetched \(albumsWithTracks.count) albums with tracks.")
+            
         } catch {
             print("Error fetching top Christian albums: \(error)")
+        }
+    }
+    
+    
+    func fetchTracksForAlbum(album: Album) async -> [Song] {
+        do {
+            // Ensure tracks are explicitly requested
+            var albumRequest = MusicCatalogResourceRequest<Album>(matching: \.id, equalTo: album.id)
+            albumRequest.properties = [.tracks] // Request track details
+            
+            let albumResponse = try await albumRequest.response()
+            
+            // Check if we received an album
+            guard let albumWithTracks = albumResponse.items.first else {
+                print("Error: Album not found.")
+                return []
+            }
+            
+            // Check if the album contains tracks
+            guard let albumTracks = albumWithTracks.tracks, !albumTracks.isEmpty else {
+                print("Error: Album has no tracks.")
+                return []
+            }
+            
+            // Extract track IDs
+            let trackIDs = albumTracks.compactMap { $0.id }
+            
+            // Check if track IDs are available
+            guard !trackIDs.isEmpty else {
+                print("Error: No valid track IDs available.")
+                return []
+            }
+            
+            // Fetch the actual song objects using track IDs
+            let songsRequest = MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: trackIDs)
+            let songResponse = try await songsRequest.response()
+            
+            // Return fetched songs
+            return Array(songResponse.items)
+            
+        } catch {
+            print("Error fetching album tracks: \(error)")
+            return []
         }
     }
     
@@ -316,15 +401,26 @@ struct ContentView: View {
     }
     
     private func selectAlbum(_ album: Album) {
-            if selectedAlbum?.id == album.id {
-                // Same album selected, showing detail view
-                selectedAlbum = album // Ensure the sheet is presented
-                return
-            }
+        selectedAlbum = album
         
-            selectedAlbum = album
+        // Check if the album is already in the navigation path
+        if albumsInNavigationPath.contains(where: { $0.id == album.id }) {
+            // If the album is already in the path, remove it and re-append it
+            if !navigationPath.isEmpty {
+                navigationPath.removeLast()
+            }
+            if !albumsInNavigationPath.isEmpty {
+                albumsInNavigationPath.removeLast()
+            }
         }
+        
+        // Append the album to the navigation path and the custom array
+        navigationPath.append(album)
+        albumsInNavigationPath.append(album)
+    }
 }
+
+
 // MARK: - Full Track List View
 
 struct FullTrackListView: View {
@@ -451,12 +547,23 @@ struct SongRowView: View {
     }
 }
 
+
 struct TrackDetailView: View {
     let song: Song
     @Binding var isPlaying: Bool
     let togglePlayPause: () -> Void
     @Binding var subscriptionMessage: String?
-
+    @Binding var isPlayingFromAlbum: Bool
+    @Binding var albumsWithTracks: [AlbumWithTracks]
+    let albums: [Album]
+    let playSong: (Song) -> Void
+    @Binding var songs: [Song] // Add this line
+    
+    
+    @State private var selectedAlbum: Album? = nil
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.navigationPath) private var navigationPath // Access the navigation path
+    
     var body: some View {
         VStack(spacing: 16) {
             // Album Artwork
@@ -483,41 +590,138 @@ struct TrackDetailView: View {
                     }
                 }
             }
-
+            
             // Song Title (smaller font)
             Text(song.title)
-                .font(.headline) // Smaller font size
+                .font(.headline)
                 .multilineTextAlignment(.center)
-                .lineLimit(2) // Allow up to 2 lines for longer titles
-
+                .lineLimit(2)
+            
             // Artist Name
             Text(song.artistName)
                 .font(.subheadline)
                 .foregroundColor(.gray)
-
-            // Play/Pause Button
-            Button(action: togglePlayPause) {
-                Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 48)) // Large play/pause button
-                    .foregroundColor(.blue)
+            
+            // Play/Pause Button with Previous and Next Buttons
+            HStack {
+                // Previous Button
+                Button(action: {
+                    playPreviousSong()
+                }) {
+                    Image(systemName: "backward.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.blue)
+                }
+                
+                // Play/Pause Button
+                Button(action: togglePlayPause) {
+                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(.blue)
+                }
+                
+                // Next Button
+                Button(action: {
+                    playNextSong()
+                }) {
+                    Image(systemName: "forward.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.blue)
+                }
             }
-
+            
+            // View Album Button (only show if playing from an album)
+            if isPlayingFromAlbum {
+                Button(action: {
+                    // Find the selected album
+                    selectedAlbum = albumsWithTracks.first(where: { albumWithTracks in
+                        albumWithTracks.tracks.contains(where: { $0.id == song.id })
+                    })?.album
+                    
+                    // Dismiss the sheet
+                    dismiss()
+                    
+                    // Push the selected album onto the navigation stack
+                    if let selectedAlbum = selectedAlbum {
+                        navigationPath?.wrappedValue.append(selectedAlbum)
+                    }
+                }) {
+                    Text("View Album")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
+                }
+            }
+            
             // Spacer to push content up
             Spacer()
-
-            // Subscription Message (at the bottom, below the main content)
+            
+            // Subscription Message
             if let message = subscriptionMessage {
                 Text(message)
                     .font(.caption)
                     .foregroundColor(.red)
                     .padding(.horizontal)
-                    .padding(.bottom, 8) // Add some padding below the message
+                    .padding(.bottom, 8)
                     .frame(maxWidth: .infinity)
-                    .background(Color(.systemBackground)) // Ensure the background covers the message
+                    .background(Color(.systemBackground))
             }
         }
         .padding()
-        .frame(maxHeight: .infinity) // Ensure the VStack takes up the full height
+        .frame(maxHeight: .infinity)
+    }
+    
+    // Function to play the previous song
+    private func playPreviousSong() {
+        if isPlayingFromAlbum {
+            // Logic to play the previous song in the album
+            if let album = albumsWithTracks.first(where: { $0.tracks.contains(where: { $0.id == song.id }) }) {
+                if let currentIndex = album.tracks.firstIndex(where: { $0.id == song.id }) {
+                    let previousIndex = currentIndex - 1
+                    if previousIndex >= 0 {
+                        let previousSong = album.tracks[previousIndex]
+                        playSong(previousSong)
+                    }
+                }
+            }
+        } else {
+            // Logic to play the previous song in the general song list
+            if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
+                let previousIndex = currentIndex - 1
+                if previousIndex >= 0 {
+                    let previousSong = songs[previousIndex]
+                    playSong(previousSong)
+                }
+            }
+        }
+    }
+    
+    // Function to play the next song
+    private func playNextSong() {
+        if isPlayingFromAlbum {
+            // Logic to play the next song in the album
+            if let album = albumsWithTracks.first(where: { $0.tracks.contains(where: { $0.id == song.id }) }) {
+                if let currentIndex = album.tracks.firstIndex(where: { $0.id == song.id }) {
+                    let nextIndex = currentIndex + 1
+                    if nextIndex < album.tracks.count {
+                        let nextSong = album.tracks[nextIndex]
+                        playSong(nextSong)
+                    }
+                }
+            }
+        } else {
+            // Logic to play the next song in the general song list
+            if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
+                let nextIndex = currentIndex + 1
+                if nextIndex < songs.count {
+                    let nextSong = songs[nextIndex]
+                    playSong(nextSong)
+                }
+            }
+        }
     }
 }
 
@@ -669,6 +873,7 @@ struct FullAlbumGridView: View {
                             }
                             .onTapGesture {
                                 onAlbumSelected(album)
+                                
                             }
                         }
                     }
@@ -732,8 +937,8 @@ struct AlbumDetailView: View {
     @State private var tracks: [Song] = []
     @State private var isLoadingTracks: Bool = true
     @Binding var isPlayingFromAlbum: Bool // Added binding
-
-   
+    
+    
     var body: some View {
         VStack {
             if let artworkURL = album.artwork?.url(width: 250, height: 250) {
