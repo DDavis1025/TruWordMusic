@@ -56,6 +56,9 @@ struct ContentView: View {
     
     @State private var navigationPath = NavigationPath()
     
+    // Add scenePhase to detect app lifestyle changes
+    @Environment(\.scenePhase) private var scenePhase
+    
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack(alignment: .bottom) {
@@ -177,8 +180,36 @@ struct ContentView: View {
                     await checkAppleMusicStatus()
                 }
             }
+            .onChange(of: scenePhase) { oldPhase, newPhase in
+                if newPhase == .active {
+                    // App has entered the foreground
+                    onAppForeground()
+                }
+            }
         }
     }
+    
+    // Function to call when the app enters the foreground
+    private func onAppForeground() {
+        refreshCurrentSong()
+    }
+    
+    private func refreshCurrentSong() {
+        if appleMusicSubscription {
+            if let item = ApplicationMusicPlayer.shared.queue.currentEntry?.item {
+                switch item {
+                case .song(let song):
+                    currentlyPlayingSong = song
+                default:
+                    currentlyPlayingSong = nil // Handle other cases if needed
+                }
+            } else {
+                currentlyPlayingSong = nil
+            }
+        }
+    }
+    
+    
     
     // MARK: - Authorization & Fetching
     
@@ -337,8 +368,28 @@ struct ContentView: View {
             if appleMusicSubscription {
                 do {
                     let player = ApplicationMusicPlayer.shared
-                    player.queue = [song]
+                    let queueSongs: [Song]
+                    
+                    // Check if the song is from an album
+                    if let albumWithTracks = albumsWithTracks.first(where: { $0.tracks.contains(song) }), isPlayingFromAlbum {
+                        queueSongs = albumWithTracks.tracks
+                    } else {
+                        queueSongs = songs
+                    }
+                    
+                    // Ensure the queue is set correctly
+                    guard let startIndex = queueSongs.firstIndex(of: song) else {
+                        print("Error: Song not found in queue list.")
+                        return
+                    }
+                    
+                    // Set the queue with the selected song first, then the rest of the queue
+                    let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
+                    player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
+                    
+                    // Start playback immediately
                     try await player.play()
+                    
                     currentlyPlayingSong = song
                     isPlaying = true
                     subscriptionMessage = nil
@@ -351,15 +402,17 @@ struct ContentView: View {
                 audioPlayer?.pause()
                 if let currentItem = audioPlayer?.currentItem {
                     NotificationCenter.default.removeObserver(self,
-                                                              name: .AVPlayerItemDidPlayToEndTime,
-                                                              object: currentItem)
+                                                            name: .AVPlayerItemDidPlayToEndTime,
+                                                            object: currentItem)
                 }
                 // Create a new AVPlayer for the preview.
                 audioPlayer = AVPlayer(url: previewURL)
                 if let playerItem = audioPlayer?.currentItem {
                     NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
-                                                           object: playerItem,
-                                                           queue: .main) { _ in
+                                                         object: playerItem,
+                                                         queue: .main) { _ in
+                        // When the preview ends, reset the player to the beginning
+                        self.audioPlayer?.seek(to: .zero)
                         self.isPlaying = false
                         self.subscriptionMessage = "Preview ended. Log in or subscribe to Apple Music to play the full song."
                     }
@@ -394,7 +447,9 @@ struct ContentView: View {
             if isPlaying {
                 audioPlayer?.pause()
             } else {
+                // If the preview has ended and the user presses play, restart the preview
                 audioPlayer?.play()
+                self.subscriptionMessage = nil
             }
         }
         isPlaying.toggle()
