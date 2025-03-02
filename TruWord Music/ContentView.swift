@@ -59,6 +59,9 @@ struct ContentView: View {
     // Add scenePhase to detect app lifestyle changes
     @Environment(\.scenePhase) private var scenePhase
     
+    // Task to observe playback state
+    @State private var playbackTask: Task<Void, Never>?
+    
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack(alignment: .bottom) {
@@ -185,6 +188,10 @@ struct ContentView: View {
                     // App has entered the foreground
                     onAppForeground()
                 }
+            }
+            .onDisappear {
+                // Cancel the playback task when the view disappears
+                playbackTask?.cancel()
             }
         }
     }
@@ -393,12 +400,16 @@ struct ContentView: View {
                     currentlyPlayingSong = song
                     isPlaying = true
                     subscriptionMessage = nil
+                    
+                    // Start observing playback state
+                    observePlaybackState()
                 } catch {
                     print("Error playing full song: \(error.localizedDescription)")
                     showSignInAlert = true
                 }
             } else if let previewURL = song.previewAssets?.first?.url {
                 // Prevent overlapping previews.
+                print("preview play \(previewURL)")
                 audioPlayer?.pause()
                 if let currentItem = audioPlayer?.currentItem {
                     NotificationCenter.default.removeObserver(self,
@@ -411,13 +422,14 @@ struct ContentView: View {
                     NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
                                                          object: playerItem,
                                                          queue: .main) { _ in
-                        // When the preview ends, reset the player to the beginning
+                        previewDidEnd()
                         self.audioPlayer?.seek(to: .zero)
                         self.isPlaying = false
                         self.subscriptionMessage = "Preview ended. Log in or subscribe to Apple Music to play the full song."
                     }
                 }
                 audioPlayer?.play()
+                print("audioPlayer \(audioPlayer!)")
                 currentlyPlayingSong = song
                 isPlaying = true
                 subscriptionMessage = nil
@@ -427,6 +439,35 @@ struct ContentView: View {
         }
     }
     
+    func previewDidEnd() {
+        guard let currentSong = currentlyPlayingSong else { return }
+        
+        let nextSong: Song?
+        
+        if isPlayingFromAlbum, let albumWithTracks = albumsWithTracks.first(where: { $0.tracks.contains(currentSong) }) {
+            // Playing from an album, get the next track
+            if let currentIndex = albumWithTracks.tracks.firstIndex(of: currentSong), currentIndex < albumWithTracks.tracks.count - 1 {
+                nextSong = albumWithTracks.tracks[currentIndex + 1]
+            } else {
+                nextSong = nil // No more tracks in the album
+            }
+        } else {
+            // Playing from the songs list, get the next song
+            if let currentIndex = songs.firstIndex(of: currentSong), currentIndex < songs.count - 1 {
+                nextSong = songs[currentIndex + 1]
+            } else {
+                nextSong = nil // No more songs in the list
+            }
+        }
+        
+        if let nextSongToPlay = nextSong {
+            playSong(nextSongToPlay)
+        } else {
+            isPlaying = false
+            subscriptionMessage = "End of queue reached."
+        }
+    }
+
     // MARK: - Settings & Toggle
     
     func togglePlayPause() {
@@ -472,6 +513,53 @@ struct ContentView: View {
         // Append the album to the navigation path and the custom array
         navigationPath.append(album)
         albumsInNavigationPath.append(album)
+    }
+    
+    private func observePlaybackState() {
+        Task {
+            let player = ApplicationMusicPlayer.shared
+            var previousSong: Song? = currentlyPlayingSong
+            
+            while true {
+                // Check the current song every second
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                
+                if let currentEntry = player.queue.currentEntry {
+                    switch currentEntry.item {
+                    case .song(let song):
+                        // Extract the song from the current entry
+                        if isPlayingFromAlbum {
+                            // Find the song in the album's track list
+                            if let albumWithTracks = albumsWithTracks.first(where: { $0.tracks.contains(where: { $0.id == song.id }) }),
+                               let currentSong = albumWithTracks.tracks.first(where: { $0.id == song.id }) {
+                                if currentSong != previousSong {
+                                    // Song has changed
+                                    previousSong = currentSong
+                                    currentlyPlayingSong = currentSong
+                                    isPlaying = true
+                                }
+                            }
+                        } else {
+                            // Find the song in the general songs list
+                            if let currentSong = songs.first(where: { $0.id == song.id }) {
+                                if currentSong != previousSong {
+                                    // Song has changed
+                                    previousSong = currentSong
+                                    currentlyPlayingSong = currentSong
+                                    isPlaying = true
+                                }
+                            }
+                        }
+                    default:
+                        // Handle other cases (e.g., album, playlist)
+                        break
+                    }
+                } else {
+                    // No song is playing
+                    isPlaying = false
+                }
+            }
+        }
     }
 }
 
