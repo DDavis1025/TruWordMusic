@@ -59,9 +59,6 @@ struct ContentView: View {
     // Add scenePhase to detect app lifestyle changes
     @Environment(\.scenePhase) private var scenePhase
     
-    // Task to observe playback state
-    @State private var playbackTask: Task<Void, Never>?
-    
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack(alignment: .bottom) {
@@ -188,10 +185,6 @@ struct ContentView: View {
                     // App has entered the foreground
                     onAppForeground()
                 }
-            }
-            .onDisappear {
-                // Cancel the playback task when the view disappears
-                playbackTask?.cancel()
             }
         }
     }
@@ -377,6 +370,8 @@ struct ContentView: View {
                     let player = ApplicationMusicPlayer.shared
                     let queueSongs: [Song]
                     
+                    print("application music player play")
+                    
                     // Check if the song is from an album
                     if let albumWithTracks = albumsWithTracks.first(where: { $0.tracks.contains(song) }), isPlayingFromAlbum {
                         queueSongs = albumWithTracks.tracks
@@ -418,28 +413,29 @@ struct ContentView: View {
                 }
                 // Create a new AVPlayer for the preview.
                 audioPlayer = AVPlayer(url: previewURL)
+                if audioPlayer == nil {
+                        print("Error: AVPlayer failed to initialize.")
+                    }
                 if let playerItem = audioPlayer?.currentItem {
                     NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
                                                          object: playerItem,
                                                          queue: .main) { _ in
-                        previewDidEnd()
-                        self.audioPlayer?.seek(to: .zero)
-                        self.isPlaying = false
-                        self.subscriptionMessage = "Preview ended. Log in or subscribe to Apple Music to play the full song."
+                        if let audioPlayer = audioPlayer {
+                            previewDidEnd(player: audioPlayer)
+                        }
+                        showSubscriptionMessage()
                     }
                 }
                 audioPlayer?.play()
-                print("audioPlayer \(audioPlayer!)")
                 currentlyPlayingSong = song
                 isPlaying = true
-                subscriptionMessage = nil
             } else {
                 print("No preview available and user is not subscribed.")
             }
         }
     }
     
-    func previewDidEnd() {
+    func previewDidEnd(player: AVPlayer) {
         guard let currentSong = currentlyPlayingSong else { return }
         
         let nextSong: Song?
@@ -452,11 +448,12 @@ struct ContentView: View {
                 nextSong = nil // No more tracks in the album
             }
         } else {
-            // Playing from the songs list, get the next song
-            if let currentIndex = songs.firstIndex(of: currentSong), currentIndex < songs.count - 1 {
-                nextSong = songs[currentIndex + 1]
-            } else {
-                nextSong = nil // No more songs in the list
+            nextSong = nil // No more songs in the list
+            let timeZero = CMTime(seconds: 0, preferredTimescale: 1)
+            player.seek(to: timeZero) { finished in
+                if finished {
+                    print("Seek to 0 completed")
+                }
             }
         }
         
@@ -464,7 +461,25 @@ struct ContentView: View {
             playSong(nextSongToPlay)
         } else {
             isPlaying = false
-            subscriptionMessage = "End of queue reached."
+            let timeZero = CMTime(seconds: 0, preferredTimescale: 1)
+            player.seek(to: timeZero) { finished in
+                if finished {
+                    print("Seek to 0 completed")
+                }
+            }
+        }
+    }
+    
+    func showSubscriptionMessage() {
+        withAnimation {
+            subscriptionMessage = "Preview ended. Log in or subscribe to Apple Music to play the full song."
+        }
+        if isPlayingFromAlbum {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                withAnimation {
+                    subscriptionMessage = nil
+                }
+            }
         }
     }
 
@@ -837,6 +852,9 @@ struct TrackDetailView: View {
                 if previousIndex >= 0 {
                     let previousSong = songs[previousIndex]
                     playSong(previousSong)
+                    if !isPlayingFromAlbum {
+                        subscriptionMessage = nil
+                    }
                 }
             }
         }
@@ -862,6 +880,9 @@ struct TrackDetailView: View {
                 if nextIndex < songs.count {
                     let nextSong = songs[nextIndex]
                     playSong(nextSong)
+                    if !isPlayingFromAlbum {
+                        subscriptionMessage = nil
+                    }
                 }
             }
         }
@@ -874,21 +895,43 @@ struct BottomPlayerView: View {
     let song: Song
     @Binding var isPlaying: Bool
     let togglePlayPause: () -> Void
-    
+
     var body: some View {
         HStack {
             if let artworkURL = song.artwork?.url(width: 50, height: 50) {
-                AsyncImage(url: artworkURL) { image in
-                    image
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 50, height: 50)
-                        .cornerRadius(8)
-                } placeholder: {
-                    ProgressView()
-                        .frame(width: 50, height: 50)
+                Text("Artwork URL: \(artworkURL)")
+                AsyncImage(url: artworkURL) { phase in
+                    switch phase {
+                    case .empty:
+                        Image(systemName: "music.note")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 50, height: 50)
+                            .foregroundColor(.gray)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 50, height: 50)
+                            .cornerRadius(8)
+                    case .failure:
+                        Image(systemName: "photo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 50, height: 50)
+                            .foregroundColor(.gray)
+                    @unknown default:
+                        EmptyView()
+                    }
                 }
+            } else {
+                Image(systemName: "music.note")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 50, height: 50)
+                    .foregroundColor(.gray)
             }
+
             VStack(alignment: .leading) {
                 Text(song.title)
                     .font(.headline)
