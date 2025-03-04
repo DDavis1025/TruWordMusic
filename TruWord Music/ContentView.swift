@@ -143,6 +143,7 @@ struct ContentView: View {
                         
                         // Bottom Player View
                         BottomPlayerView(song: song, isPlaying: $isPlaying, togglePlayPause: togglePlayPause)
+                            .id(song.id) // Force re-render when song changes
                             .onTapGesture {
                                 showTrackDetail = true
                             }
@@ -151,7 +152,7 @@ struct ContentView: View {
                 }
             }
             .navigationDestination(for: Album.self) { album in
-                AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum)
+                AlbumDetailView(album: album, playSong: playSong, albumsWithTracks: albumsWithTracks, isPlayingFromAlbum: $isPlayingFromAlbum)
                     .onAppear {
                         print("Showing details for album: \(album.title)")
                     }
@@ -299,18 +300,13 @@ struct ContentView: View {
             
             // Extract albums from the charts
             albums = albumCharts.flatMap { $0.items }
-            
-            print("albums \(albums.count)")
-            
+           
             // Iterate through each album and fetch its tracks
             for album in albums {
                 let tracks = await fetchTracksForAlbum(album: album)
                 let albumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
                 albumsWithTracks.append(albumWithTracks)
             }
-            
-            // Now `albumsWithTracks` contains albums and their associated tracks
-            print("Fetched \(albumsWithTracks.count) albums with tracks.")
             
         } catch {
             print("Error fetching top Christian albums: \(error)")
@@ -369,9 +365,7 @@ struct ContentView: View {
                 do {
                     let player = ApplicationMusicPlayer.shared
                     let queueSongs: [Song]
-                    
-                    print("application music player play")
-                    
+                  
                     // Check if the song is from an album
                     if let albumWithTracks = albumsWithTracks.first(where: { $0.tracks.contains(song) }), isPlayingFromAlbum {
                         queueSongs = albumWithTracks.tracks
@@ -404,7 +398,6 @@ struct ContentView: View {
                 }
             } else if let previewURL = song.previewAssets?.first?.url {
                 // Prevent overlapping previews.
-                print("preview play \(previewURL)")
                 audioPlayer?.pause()
                 if let currentItem = audioPlayer?.currentItem {
                     NotificationCenter.default.removeObserver(self,
@@ -899,33 +892,14 @@ struct BottomPlayerView: View {
     var body: some View {
         HStack {
             if let artworkURL = song.artwork?.url(width: 50, height: 50) {
-                Text("Artwork URL: \(artworkURL)")
-                AsyncImage(url: artworkURL) { phase in
-                    switch phase {
-                    case .empty:
-                        Image(systemName: "music.note")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 50, height: 50)
-                            .foregroundColor(.gray)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 50, height: 50)
-                            .cornerRadius(8)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 50, height: 50)
-                            .foregroundColor(.gray)
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
+                CustomAsyncImage(
+                    url: artworkURL,
+                    placeholder: Image(systemName: "music.note") // Fallback placeholder
+                )
+                .frame(width: 50, height: 50)
+                .cornerRadius(8)
             } else {
-                Image(systemName: "music.note")
+                Image(systemName: "music.note") // Fallback icon if artwork is nil
                     .resizable()
                     .scaledToFit()
                     .frame(width: 50, height: 50)
@@ -1119,11 +1093,9 @@ struct AlbumCarouselItemView: View {
 struct AlbumDetailView: View {
     let album: Album
     let playSong: (Song) -> Void
+    let albumsWithTracks: [AlbumWithTracks] // Add this parameter
     
-    @State private var tracks: [Song] = []
-    @State private var isLoadingTracks: Bool = true
-    @Binding var isPlayingFromAlbum: Bool // Added binding
-    
+    @Binding var isPlayingFromAlbum: Bool
     
     var body: some View {
         VStack {
@@ -1151,18 +1123,13 @@ struct AlbumDetailView: View {
                 }
             }
             Text(album.title)
-                .font(.headline) // Smaller font size
+                .font(.headline)
                 .padding(.top)
             
-            if isLoadingTracks {
-                ProgressView("Loading tracks...")
-                    .padding()
-            } else if tracks.isEmpty {
-                Text("No tracks available")
-                    .padding()
-            } else {
+            // Find the tracks for the selected album
+            if let albumWithTracks = albumsWithTracks.first(where: { $0.album.id == album.id }) {
                 List {
-                    ForEach(tracks, id: \.id) { song in
+                    ForEach(albumWithTracks.tracks, id: \.id) { song in
                         Button {
                             playSong(song)
                             isPlayingFromAlbum = true
@@ -1177,60 +1144,13 @@ struct AlbumDetailView: View {
                         }
                     }
                 }
+            } else {
+                Text("No tracks available")
+                    .padding()
             }
         }
         .navigationTitle("Album")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await fetchAlbumTracks()
-        }
-    }
-    
-    func fetchAlbumTracks() async {
-        do {
-            // Ensure tracks are explicitly requested
-            var albumRequest = MusicCatalogResourceRequest<Album>(matching: \.id, equalTo: album.id)
-            albumRequest.properties = [.tracks] // Request track details
-            
-            let albumResponse = try await albumRequest.response()
-            
-            // Debug: Check if we received an album
-            guard let albumWithTracks = albumResponse.items.first else {
-                print("Error: Album not found.")
-                tracks = []
-                return
-            }
-            
-            // Debug: Check if the album contains tracks
-            guard let albumTracks = albumWithTracks.tracks, !albumTracks.isEmpty else {
-                print("Error: Album has no tracks.")
-                tracks = []
-                return
-            }
-            
-            // Extract track IDs
-            let trackIDs = albumTracks.compactMap { $0.id }
-            
-            // Debug: Check if track IDs are available
-            guard !trackIDs.isEmpty else {
-                print("Error: No valid track IDs available.")
-                return
-            }
-            
-            // Fetch the actual song objects using track IDs
-            let songsRequest = MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: trackIDs)
-            let songResponse = try await songsRequest.response()
-            
-            // Assign fetched songs to the tracks array
-            tracks = Array(songResponse.items)
-            
-            
-        } catch {
-            print("Error fetching album tracks: \(error)")
-            tracks = []
-        }
-        
-        isLoadingTracks = false
     }
 }
 

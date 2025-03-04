@@ -72,12 +72,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		513767C52D77ADF000D96EE8 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		517A0B032D4D8820004F0A45 = {
 			isa = PBXGroup;
 			children = (
 				517A0B0E2D4D8820004F0A45 /* TruWord Music */,
 				517A0B1F2D4D8824004F0A45 /* TruWord MusicTests */,
 				517A0B292D4D8824004F0A45 /* TruWord MusicUITests */,
+				513767C52D77ADF000D96EE8 /* Frameworks */,
 				517A0B0D2D4D8820004F0A45 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -195,6 +203,8 @@
 			);
 			mainGroup = 517A0B032D4D8820004F0A45;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 517A0B0D2D4D8820004F0A45 /* Products */;
 			projectDirPath = "";
