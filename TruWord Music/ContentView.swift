@@ -708,123 +708,124 @@ struct TrackDetailView: View {
     @Binding var albumsWithTracks: [AlbumWithTracks]
     let albums: [Album]
     let playSong: (Song) -> Void
-    @Binding var songs: [Song] // Add this line
-    
-    
+    @Binding var songs: [Song]
+
     @State private var selectedAlbum: Album? = nil
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.navigationPath) private var navigationPath // Access the navigation path
-    
+    @Environment(\.navigationPath) private var navigationPath
+
+    @State private var animateTitle: Bool = false
+    @State private var animateArtist: Bool = false
+
     var body: some View {
-        VStack(spacing: 16) {
-            // Album Artwork
-            if let artworkURL = song.artwork?.url(width: 250, height: 250) {
-                AsyncImage(url: artworkURL) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                            .frame(width: 250, height: 250)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 250, height: 250)
-                            .cornerRadius(12)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 250, height: 250)
-                            .foregroundColor(.gray)
-                    @unknown default:
-                        EmptyView()
+        GeometryReader { geometry in
+            VStack {
+                Spacer().frame(height: 10) // Small space at the top
+
+                // Album Artwork (Increased size)
+                if let artworkURL = song.artwork?.url(width: 500, height: 500) {
+                    AsyncImage(url: artworkURL) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                                .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
+                                .cornerRadius(12)
+                        case .failure:
+                            Image(systemName: "photo")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
+                                .foregroundColor(.gray)
+                        @unknown default:
+                            EmptyView()
+                        }
                     }
                 }
-            }
-            
-            // Song Title (smaller font)
-            Text(song.title)
-                .font(.headline)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-            
-            // Artist Name
-            Text(song.artistName)
-                .font(.subheadline)
-                .foregroundColor(.gray)
-            
-            // Play/Pause Button with Previous and Next Buttons
-            HStack {
-                // Previous Button
-                Button(action: {
-                    playPreviousSong()
-                }) {
-                    Image(systemName: "backward.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(.blue)
-                }
-                
-                // Play/Pause Button
-                Button(action: togglePlayPause) {
-                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 48))
-                        .foregroundColor(.blue)
-                }
-                
-                // Next Button
-                Button(action: {
-                    playNextSong()
-                }) {
-                    Image(systemName: "forward.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(.blue)
-                }
-            }
-            
-            // View Album Button (only show if playing from an album)
-            if isPlayingFromAlbum {
-                Button(action: {
-                    // Find the selected album
-                    selectedAlbum = albumsWithTracks.first(where: { albumWithTracks in
-                        albumWithTracks.tracks.contains(where: { $0.id == song.id })
-                    })?.album
-                    
-                    // Dismiss the sheet
-                    dismiss()
-                    
-                    // Push the selected album onto the navigation stack
-                    if let selectedAlbum = selectedAlbum {
-                        navigationPath?.wrappedValue.append(selectedAlbum)
+
+                Spacer().frame(height: 14) // More space between image and title
+
+                // Song Title
+                ScrollableText(text: song.title, isAnimating: $animateTitle, scrollDuration: 3.0)
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
+
+                Spacer().frame(height: 12) // More space between title and artist name
+
+                // Artist Name
+                ScrollableText(text: song.artistName, isAnimating: $animateArtist, scrollDuration: 3.0)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+
+                Spacer().frame(height: 30) // Ensures artist name is ~20 pts above play button
+
+                // Controls (Previous, Play/Pause, Next)
+                HStack(spacing: 40) {
+                    Button(action: playPreviousSong) {
+                        Image(systemName: "backward.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(.primary)
                     }
-                }) {
-                    Text("View Album")
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 16)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(8)
+
+                    Button(action: togglePlayPause) {
+                        Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.primary)
+                    }
+
+                    Button(action: playNextSong) {
+                        Image(systemName: "forward.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(.primary)
+                    }
+                }
+                .padding(.bottom, 10)
+
+                // View Album Button
+                if isPlayingFromAlbum {
+                    Button(action: {
+                        selectedAlbum = albumsWithTracks.first(where: { albumWithTracks in
+                            albumWithTracks.tracks.contains(where: { $0.id == song.id })
+                        })?.album
+
+                        dismiss()
+
+                        if let selectedAlbum = selectedAlbum {
+                            navigationPath?.wrappedValue.append(selectedAlbum)
+                        }
+                    }) {
+                        Text("View Album")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(10)
+                    }
+                    .padding(.top, 5)
+                }
+
+                Spacer()
+
+                // Subscription Message at the Bottom
+                if let message = subscriptionMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color(.systemBackground))
                 }
             }
-            
-            // Spacer to push content up
-            Spacer()
-            
-            // Subscription Message
-            if let message = subscriptionMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundColor(.red)
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(Color(.systemBackground))
-            }
+            .padding(.horizontal)
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
-        .padding()
-        .frame(maxHeight: .infinity)
     }
-    
+
     // Function to play the previous song
     private func playPreviousSong() {
         if isPlayingFromAlbum {
@@ -881,6 +882,86 @@ struct TrackDetailView: View {
         }
     }
 }
+
+struct ScrollableText: View {
+    let text: String
+    @Binding var isAnimating: Bool
+    let scrollDuration: Double // Added parameter for controlling speed
+
+    @State private var textWidth: CGFloat = 0
+    @State private var containerWidth: CGFloat = 0
+    @State private var phase: AnimationPhase = .idle
+
+    enum AnimationPhase {
+        case idle
+        case scrollingLeft
+        case paused
+        case scrollingRight
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Measure text width
+                Text(text)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .background(GeometryReader { textGeometry in
+                        Color.clear
+                            .onAppear {
+                                textWidth = textGeometry.size.width
+                                containerWidth = geometry.size.width
+                            }
+                    })
+                    .hidden() // Hide measuring text
+                
+                // Visible scrolling text
+                Text(text)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .offset(x: calculateOffset())
+                    .animation(.linear(duration: scrollDuration), value: phase) // Use dynamic duration
+                    .onChange(of: phase) { _, _ in handleAnimationState() }
+            }
+        }
+        .frame(height: 25) // Constrain height to avoid excessive spacing
+        .clipped()
+        .onTapGesture {
+            if textWidth > containerWidth && !isAnimating {
+                isAnimating = true
+                phase = .scrollingLeft
+            }
+        }
+    }
+
+    private func calculateOffset() -> CGFloat {
+        switch phase {
+        case .idle:
+            return 0
+        case .scrollingLeft:
+            return -textWidth + containerWidth
+        case .paused:
+            return -textWidth + containerWidth
+        case .scrollingRight:
+            return 0
+        }
+    }
+
+    private func handleAnimationState() {
+        switch phase {
+        case .scrollingLeft:
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { phase = .paused }
+        case .paused:
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { phase = .scrollingRight }
+        case .scrollingRight:
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                phase = .idle
+                isAnimating = false
+            }
+        case .idle:
+            break
+        }
+    }
+}
+
 
 // MARK: - Bottom Player View
 
@@ -1146,11 +1227,14 @@ struct AlbumDetailView: View {
                         } label: {
                             VStack(alignment: .leading) {
                                 Text(song.title)
-                                    .font(.headline)
-                                Text(song.artistName)
                                     .font(.subheadline)
+                                    .lineLimit(1)
+                                Text(song.artistName)
+                                    .font(.caption)
+                                    .lineLimit(1)
                                     .foregroundColor(.gray)
                             }
+                            .padding(.vertical, 3) // Increase vertical padding
                         }
                     }
                 }
