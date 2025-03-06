@@ -35,7 +35,6 @@ struct ContentView: View {
     @State private var musicAuthorized = false
     @State private var songs: [Song] = []
     @State private var currentlyPlayingSong: Song?
-    @State private var showSignInAlert = false
     @State private var appleMusicSubscription = false
     @State private var audioPlayer: AVPlayer?
     @State private var userAuthorized = false
@@ -49,10 +48,6 @@ struct ContentView: View {
     @State private var selectedAlbum: Album? = nil
     @State private var showAlbumDetail = false
     @State private var isPlayingFromAlbum: Bool = false // Track if playing from album
-    
-    // Custom array to track albums in the navigation stack
-    @State private var albumsInNavigationPath: [Album] = []
-    
     
     @State private var navigationPath = NavigationPath()
     
@@ -75,11 +70,7 @@ struct ContentView: View {
                                             .bold()
                                         Spacer()
                                         if albums.count > 5 {
-                                            NavigationLink("View More") {
-                                                FullAlbumGridView(albums: albums) { album in
-                                                    selectAlbum(album)
-                                                }
-                                            }
+                                            NavigationLink("View More", value: "fullAlbumGrid")
                                             .foregroundColor(.blue)
                                         }
                                     }
@@ -117,7 +108,11 @@ struct ContentView: View {
                                 
                                 // Show only 5 songs initially
                                 ForEach(songs.prefix(5), id: \.id) { song in
-                                    SongRowView(song: song, playSong: playSong, currentlyPlayingSong: $currentlyPlayingSong, isPlayingFromAlbum: $isPlayingFromAlbum)
+                                    SongRowView(song: song, currentlyPlayingSong: $currentlyPlayingSong)
+                                        .onTapGesture {
+                                            playSong(song)
+                                            isPlayingFromAlbum = false
+                                        }
                                 }
                             }
                         } else {
@@ -151,8 +146,15 @@ struct ContentView: View {
                     .background(Color(.systemBackground)) // Ensure the background covers the BottomPlayerView and message
                 }
             }
+            .navigationDestination(for: String.self) { value in
+                            if value == "fullAlbumGrid" {
+                                FullAlbumGridView(albums: albums) { album in
+                                    selectAlbum(album)
+                                }
+                            }
+                        }
             .navigationDestination(for: Album.self) { album in
-                AlbumDetailView(album: album, playSong: playSong, albumsWithTracks: albumsWithTracks, isPlayingFromAlbum: $isPlayingFromAlbum)
+                AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum)
                     .onAppear {
                         print("Showing details for album: \(album.title)")
                     }
@@ -178,7 +180,6 @@ struct ContentView: View {
                 if musicAuthorized {
                     await fetchChristianSongs()
                     await fetchChristianAlbums()
-                    await checkAppleMusicStatus()
                 }
             }
             .onChange(of: scenePhase) { oldPhase, newPhase in
@@ -233,7 +234,6 @@ struct ContentView: View {
         } catch {
             print("Error checking Apple Music subscription: \(error)")
             appleMusicSubscription = false
-            showSignInAlert = true
         }
     }
     
@@ -300,7 +300,7 @@ struct ContentView: View {
             
             // Extract albums from the charts
             albums = albumCharts.flatMap { $0.items }
-           
+            
             // Iterate through each album and fetch its tracks
             for album in albums {
                 let tracks = await fetchTracksForAlbum(album: album)
@@ -365,7 +365,7 @@ struct ContentView: View {
                 do {
                     let player = ApplicationMusicPlayer.shared
                     let queueSongs: [Song]
-                  
+                    
                     // Check if the song is from an album
                     if let albumWithTracks = albumsWithTracks.first(where: { $0.tracks.contains(song) }), isPlayingFromAlbum {
                         queueSongs = albumWithTracks.tracks
@@ -394,25 +394,24 @@ struct ContentView: View {
                     observePlaybackState()
                 } catch {
                     print("Error playing full song: \(error.localizedDescription)")
-                    showSignInAlert = true
                 }
             } else if let previewURL = song.previewAssets?.first?.url {
                 // Prevent overlapping previews.
                 audioPlayer?.pause()
                 if let currentItem = audioPlayer?.currentItem {
                     NotificationCenter.default.removeObserver(self,
-                                                            name: .AVPlayerItemDidPlayToEndTime,
-                                                            object: currentItem)
+                                                              name: .AVPlayerItemDidPlayToEndTime,
+                                                              object: currentItem)
                 }
                 // Create a new AVPlayer for the preview.
                 audioPlayer = AVPlayer(url: previewURL)
                 if audioPlayer == nil {
-                        print("Error: AVPlayer failed to initialize.")
-                    }
+                    print("Error: AVPlayer failed to initialize.")
+                }
                 if let playerItem = audioPlayer?.currentItem {
                     NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
-                                                         object: playerItem,
-                                                         queue: .main) { _ in
+                                                           object: playerItem,
+                                                           queue: .main) { _ in
                         if let audioPlayer = audioPlayer {
                             previewDidEnd(player: audioPlayer)
                         }
@@ -475,7 +474,7 @@ struct ContentView: View {
             }
         }
     }
-
+    
     // MARK: - Settings & Toggle
     
     func togglePlayPause() {
@@ -506,21 +505,8 @@ struct ContentView: View {
     
     private func selectAlbum(_ album: Album) {
         selectedAlbum = album
-        
-        // Check if the album is already in the navigation path
-        if albumsInNavigationPath.contains(where: { $0.id == album.id }) {
-            // If the album is already in the path, remove it and re-append it
-            if !navigationPath.isEmpty {
-                navigationPath.removeLast()
-            }
-            if !albumsInNavigationPath.isEmpty {
-                albumsInNavigationPath.removeLast()
-            }
-        }
-        
-        // Append the album to the navigation path and the custom array
-        navigationPath.append(album)
-        albumsInNavigationPath.append(album)
+        print("album \(album)")
+        navigationPath.append(album) // Simply append the album to the navigation path
     }
     
     private func observePlaybackState() {
@@ -580,20 +566,10 @@ struct FullTrackListView: View {
     @Binding var currentlyPlayingSong: Song?
     @Binding var isPlayingFromAlbum: Bool
     
-    @State private var searchQuery: String = "" // State for search query
-    @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
-    
-    // Filtered songs based on search query (title or artist name)
-    var filteredSongs: [Song] {
-        if searchQuery.isEmpty {
-            return songs // Return all songs if search query is empty
-        } else {
-            return songs.filter { song in
-                song.title.localizedCaseInsensitiveContains(searchQuery) ||
-                song.artistName.localizedCaseInsensitiveContains(searchQuery)
-            }
-        }
-    }
+    @State private var searchQuery: String = ""
+    @State private var debouncedSearchQuery: String = ""
+    @State private var filteredSongs: [Song] = []
+    @FocusState private var isSearchBarFocused: Bool
     
     var body: some View {
         VStack {
@@ -603,10 +579,9 @@ struct FullTrackListView: View {
                     .padding(10)
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
-                    .focused($isSearchBarFocused) // Track focus state
-                    .onSubmit {
-                        // Dismiss keyboard when user presses return
-                        isSearchBarFocused = false
+                    .focused($isSearchBarFocused)
+                    .onChange(of: searchQuery) { oldValue, newValue in
+                        debounceSearchQuery()
                     }
                 
                 // Clear Search Button
@@ -631,12 +606,24 @@ struct FullTrackListView: View {
                     .foregroundColor(.gray)
                     .padding(.top, 50)
             } else {
-                List {
-                    ForEach(filteredSongs, id: \.id) { song in
-                        SongRowView(song: song, playSong: playSong, currentlyPlayingSong: $currentlyPlayingSong, isPlayingFromAlbum: $isPlayingFromAlbum)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(filteredSongs, id: \.id) { song in
+                            SongRowView(
+                                        song: song,
+                                        currentlyPlayingSong: $currentlyPlayingSong,
+                                        leftPadding: 8,
+                                        rightPadding: 8
+                                    )
+                                .onTapGesture {
+                                    playSong(song)
+                                    isPlayingFromAlbum = false
+                                }
+                                .padding(.vertical, 5)
+                                .background(Color(.systemBackground)) // Ensure the background covers the row
+                        }
                     }
                 }
-                .listStyle(.plain) // Use plain list style for better appearance
             }
         }
         .navigationTitle("Top Songs")
@@ -645,6 +632,29 @@ struct FullTrackListView: View {
             // Dismiss keyboard when tapping outside the search bar
             isSearchBarFocused = false
         }
+        .onAppear {
+            filteredSongs = songs // Initialize filteredSongs with all songs
+        }
+    }
+    
+    private func debounceSearchQuery() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            debouncedSearchQuery = searchQuery
+            updateFilteredSongs()
+        }
+    }
+    
+    private func updateFilteredSongs() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let filtered = songs.filter { song in
+                debouncedSearchQuery.isEmpty ||
+                song.title.localizedCaseInsensitiveContains(debouncedSearchQuery) ||
+                song.artistName.localizedCaseInsensitiveContains(debouncedSearchQuery)
+            }
+            DispatchQueue.main.async {
+                filteredSongs = filtered
+            }
+        }
     }
 }
 
@@ -652,52 +662,42 @@ struct FullTrackListView: View {
 
 struct SongRowView: View {
     let song: Song
-    let playSong: (Song) -> Void
     @Binding var currentlyPlayingSong: Song?
-    @Binding var isPlayingFromAlbum: Bool // Added binding
+    var leftPadding: CGFloat = 0 // Default left padding
+    var rightPadding: CGFloat = 0 // Default right padding
     
     var body: some View {
         HStack {
-            if let artworkURL = song.artwork?.url(width: 100, height: 100) {
-                AsyncImage(url: artworkURL) { phase in
-                    switch phase {
-                    case .empty:
-                        Color.clear
-                            .frame(width: 50, height: 50)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 50, height: 50)
-                            .cornerRadius(8)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 50, height: 50)
-                            .foregroundColor(.gray)
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
+            // Album Artwork with configurable left padding
+            if let artworkURL = song.artwork?.url(width: 150, height: 150) {
+                CustomAsyncImage(url: artworkURL, placeholder: Image(systemName: "photo"))
+                    .frame(width: 50, height: 50)
+                    .clipped()
+                    .cornerRadius(8)
+                    .padding(.leading, leftPadding) // Use configurable left padding
             }
-            VStack(alignment: .leading) {
+            
+            // Song Title and Artist Name with configurable right padding
+            VStack(alignment: .leading, spacing: 4) {
                 Text(song.title)
-                    .font(.headline)
-                Text(song.artistName)
                     .font(.subheadline)
+                    .lineLimit(1)
+                    .multilineTextAlignment(.leading)
+                
+                Text(song.artistName)
+                    .font(.caption)
                     .foregroundColor(.gray)
+                    .lineLimit(1)
+                    .multilineTextAlignment(.leading)
             }
+            .padding(.trailing, rightPadding) // Use configurable right padding
+            
             Spacer()
+            
         }
         .padding(.vertical, 5)
-        .onTapGesture {
-            playSong(song)
-            isPlayingFromAlbum = false
-        }
     }
 }
-
 
 struct TrackDetailView: View {
     let song: Song
@@ -888,7 +888,7 @@ struct BottomPlayerView: View {
     let song: Song
     @Binding var isPlaying: Bool
     let togglePlayPause: () -> Void
-
+    
     var body: some View {
         HStack {
             if let artworkURL = song.artwork?.url(width: 50, height: 50) {
@@ -905,7 +905,7 @@ struct BottomPlayerView: View {
                     .frame(width: 50, height: 50)
                     .foregroundColor(.gray)
             }
-
+            
             VStack(alignment: .leading) {
                 Text(song.title)
                     .font(.headline)
@@ -932,26 +932,14 @@ struct BottomPlayerView: View {
     }
 }
 
-// MARK: - Full Album Grid View
-
 struct FullAlbumGridView: View {
     let albums: [Album]
     let onAlbumSelected: (Album) -> Void
     
-    @State private var searchQuery: String = "" // State for search query
-    @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
-    
-    // Filtered albums based on search query (title or artist name)
-    var filteredAlbums: [Album] {
-        if searchQuery.isEmpty {
-            return albums // Return all albums if search query is empty
-        } else {
-            return albums.filter { album in
-                album.title.localizedCaseInsensitiveContains(searchQuery) ||
-                album.artistName.localizedCaseInsensitiveContains(searchQuery)
-            }
-        }
-    }
+    @State private var searchQuery: String = ""
+    @State private var debouncedSearchQuery: String = ""
+    @State private var filteredAlbums: [Album] = []
+    @FocusState private var isSearchBarFocused: Bool
     
     let columns = [
         GridItem(.flexible()),
@@ -960,22 +948,21 @@ struct FullAlbumGridView: View {
     
     var body: some View {
         VStack {
-            // Search Bar with Clear Button
+            // Search Bar
             HStack {
                 TextField("Search albums...", text: $searchQuery)
                     .padding(10)
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
-                    .focused($isSearchBarFocused) // Track focus state
-                    .onSubmit {
-                        // Dismiss keyboard when user presses return
-                        isSearchBarFocused = false
+                    .focused($isSearchBarFocused)
+                    .onChange(of: searchQuery) { _, _ in
+                        debounceSearchQuery()
                     }
                 
-                // Clear Search Button
                 if !searchQuery.isEmpty {
                     Button(action: {
-                        searchQuery = "" // Clear the search query
+                        searchQuery = ""
+                        updateFilteredAlbums() // Reset list when cleared
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.gray)
@@ -988,7 +975,6 @@ struct FullAlbumGridView: View {
             
             // Album Grid or Empty State
             if filteredAlbums.isEmpty {
-                // Empty State Message
                 Text("No albums found")
                     .font(.subheadline)
                     .foregroundColor(.gray)
@@ -999,29 +985,10 @@ struct FullAlbumGridView: View {
                         ForEach(filteredAlbums, id: \.id) { album in
                             VStack {
                                 if let artworkURL = album.artwork?.url(width: 150, height: 150) {
-                                    AsyncImage(url: artworkURL) { phase in
-                                        switch phase {
-                                        case .empty:
-                                            Color.gray.opacity(0.3)
-                                                .frame(width: 150, height: 150)
-                                        case .success(let image):
-                                            image
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(width: 150, height: 150)
-                                                .clipped()
-                                                .cornerRadius(8)
-                                        case .failure:
-                                            Image(systemName: "photo")
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(width: 150, height: 150)
-                                                .clipped()
-                                                .foregroundColor(.gray)
-                                        @unknown default:
-                                            EmptyView()
-                                        }
-                                    }
+                                    CustomAsyncImage(url: artworkURL, placeholder: Image(systemName: "photo"))
+                                        .frame(width: 150, height: 150)
+                                        .clipped()
+                                        .cornerRadius(8)
                                 }
                                 Text(album.title)
                                     .font(.caption)
@@ -1032,8 +999,7 @@ struct FullAlbumGridView: View {
                                     .lineLimit(1)
                             }
                             .onTapGesture {
-                                onAlbumSelected(album)
-                                
+                                onAlbumSelected(album) // Call the onAlbumSelected closure
                             }
                         }
                     }
@@ -1044,8 +1010,45 @@ struct FullAlbumGridView: View {
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
         .onTapGesture {
-            // Dismiss keyboard when tapping outside the search bar
             isSearchBarFocused = false
+        }
+        .task {
+            await loadAlbums()
+        }
+    }
+    
+    /// Optimized search debounce
+    private func debounceSearchQuery() {
+        let searchText = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if searchText == searchQuery { // Ensure latest input is used
+                debouncedSearchQuery = searchText
+                updateFilteredAlbums()
+            }
+        }
+    }
+    
+    /// Efficient album filtering
+    private func updateFilteredAlbums() {
+        let searchText = debouncedSearchQuery.lowercased()
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            let filtered = albums.filter { album in
+                searchText.isEmpty ||
+                album.title.lowercased().contains(searchText) ||
+                album.artistName.lowercased().contains(searchText)
+            }
+            DispatchQueue.main.async {
+                filteredAlbums = filtered
+            }
+        }
+    }
+    
+    /// Loads albums efficiently on first appearance
+    private func loadAlbums() async {
+        let initialAlbums = albums
+        await MainActor.run {
+            filteredAlbums = initialAlbums
         }
     }
 }
@@ -1093,9 +1096,11 @@ struct AlbumCarouselItemView: View {
 struct AlbumDetailView: View {
     let album: Album
     let playSong: (Song) -> Void
-    let albumsWithTracks: [AlbumWithTracks] // Add this parameter
     
-    @Binding var isPlayingFromAlbum: Bool
+    @State private var tracks: [Song] = []
+    @State private var isLoadingTracks: Bool = true
+    @Binding var isPlayingFromAlbum: Bool // Added binding
+    
     
     var body: some View {
         VStack {
@@ -1123,13 +1128,18 @@ struct AlbumDetailView: View {
                 }
             }
             Text(album.title)
-                .font(.headline)
+                .font(.headline) // Smaller font size
                 .padding(.top)
             
-            // Find the tracks for the selected album
-            if let albumWithTracks = albumsWithTracks.first(where: { $0.album.id == album.id }) {
+            if isLoadingTracks {
+                ProgressView("Loading tracks...")
+                    .padding()
+            } else if tracks.isEmpty {
+                Text("No tracks available")
+                    .padding()
+            } else {
                 List {
-                    ForEach(albumWithTracks.tracks, id: \.id) { song in
+                    ForEach(tracks, id: \.id) { song in
                         Button {
                             playSong(song)
                             isPlayingFromAlbum = true
@@ -1144,13 +1154,60 @@ struct AlbumDetailView: View {
                         }
                     }
                 }
-            } else {
-                Text("No tracks available")
-                    .padding()
             }
         }
         .navigationTitle("Album")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await fetchAlbumTracks()
+        }
+    }
+    
+    func fetchAlbumTracks() async {
+        do {
+            // Ensure tracks are explicitly requested
+            var albumRequest = MusicCatalogResourceRequest<Album>(matching: \.id, equalTo: album.id)
+            albumRequest.properties = [.tracks] // Request track details
+            
+            let albumResponse = try await albumRequest.response()
+            
+            // Debug: Check if we received an album
+            guard let albumWithTracks = albumResponse.items.first else {
+                print("Error: Album not found.")
+                tracks = []
+                return
+            }
+            
+            // Debug: Check if the album contains tracks
+            guard let albumTracks = albumWithTracks.tracks, !albumTracks.isEmpty else {
+                print("Error: Album has no tracks.")
+                tracks = []
+                return
+            }
+            
+            // Extract track IDs
+            let trackIDs = albumTracks.compactMap { $0.id }
+            
+            // Debug: Check if track IDs are available
+            guard !trackIDs.isEmpty else {
+                print("Error: No valid track IDs available.")
+                return
+            }
+            
+            // Fetch the actual song objects using track IDs
+            let songsRequest = MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: trackIDs)
+            let songResponse = try await songsRequest.response()
+            
+            // Assign fetched songs to the tracks array
+            tracks = Array(songResponse.items)
+            
+            
+        } catch {
+            print("Error fetching album tracks: \(error)")
+            tracks = []
+        }
+        
+        isLoadingTracks = false
     }
 }
 

@@ -6,6 +6,23 @@
 //
 
 import SwiftUI
+import UIKit
+
+// Create a global cache for images
+class ImageCache {
+    static let shared = ImageCache()
+    private let cache = NSCache<NSURL, UIImage>()
+    
+    private init() {}
+    
+    func getImage(for url: URL) -> UIImage? {
+        return cache.object(forKey: url as NSURL)
+    }
+    
+    func setImage(_ image: UIImage, for url: URL) {
+        cache.setObject(image, forKey: url as NSURL)
+    }
+}
 
 struct CustomAsyncImage: View {
     let url: URL?
@@ -34,10 +51,20 @@ struct CustomAsyncImage: View {
     
     private func loadImage() {
         guard let url = url else { return }
+        
+        // Check if the image is already cached
+        if let cachedImage = ImageCache.shared.getImage(for: url) {
+            self.image = cachedImage
+            return
+        }
+        
         isLoading = true
         
         URLSession.shared.dataTask(with: url) { data, response, error in
             if let data = data, let uiImage = UIImage(data: data) {
+                // Cache the image
+                ImageCache.shared.setImage(uiImage, for: url)
+                
                 DispatchQueue.main.async {
                     self.image = uiImage
                     self.isLoading = false
@@ -50,4 +77,3 @@ struct CustomAsyncImage: View {
         }.resume()
     }
 }
-
