@@ -65,13 +65,14 @@ struct ContentView: View {
                             if !albums.isEmpty {
                                 VStack(alignment: .leading) {
                                     HStack {
-                                        Text("Top Albums")
-                                            .font(.title2)
+                                        Text("Top Christian Albums")
+                                            .font(.system(size: 18))
                                             .bold()
                                         Spacer()
                                         if albums.count > 5 {
                                             NavigationLink("View More", value: "fullAlbumGrid")
                                             .foregroundColor(.blue)
+                                            .font(.system(size: 15))
                                         }
                                     }
                                     .padding(.vertical, 5)
@@ -88,13 +89,14 @@ struct ContentView: View {
                                         .padding(.horizontal)
                                     }
                                 }
+                                .padding(.bottom, 16) // Add padding to the bottom of the first VStack
                             }
                             
                             // MARK: Tracks Section
                             VStack(alignment: .leading) {
                                 HStack {
-                                    Text("Top Songs")
-                                        .font(.title2)
+                                    Text("Top Christian Songs")
+                                        .font(.system(size: 18)) // Smaller than .title2 (22pt)
                                         .bold()
                                     Spacer()
                                     if songs.count > 5 {
@@ -102,6 +104,7 @@ struct ContentView: View {
                                             FullTrackListView(songs: songs, playSong: playSong, currentlyPlayingSong: $currentlyPlayingSong, isPlayingFromAlbum: $isPlayingFromAlbum)
                                         }
                                         .foregroundColor(.blue)
+                                        .font(.system(size: 15)) // Smaller than .title2 (22pt)
                                     }
                                 }
                                 .padding(.vertical, 5)
@@ -750,16 +753,18 @@ struct TrackDetailView: View {
                 Spacer().frame(height: 14) // More space between image and title
 
                 // Song Title
-                ScrollableText(text: song.title, isAnimating: $animateTitle, scrollDuration: 3.0)
+                ScrollableText(text: song.title, isAnimating: $animateTitle, scrollSpeed: 47.0)
                     .font(.title3)
                     .multilineTextAlignment(.center)
+                    .id("title-\(song.id)") // Unique ID for the title
 
                 Spacer().frame(height: 12) // More space between title and artist name
 
                 // Artist Name
-                ScrollableText(text: song.artistName, isAnimating: $animateArtist, scrollDuration: 3.0)
+                ScrollableText(text: song.artistName, isAnimating: $animateArtist, scrollSpeed: 47.0)
                     .font(.subheadline)
                     .foregroundColor(.gray)
+                    .id("artist-\(song.id)") // Unique ID for the artist
 
                 Spacer().frame(height: 30) // Ensures artist name is ~20 pts above play button
 
@@ -826,10 +831,12 @@ struct TrackDetailView: View {
         }
     }
 
-    // Function to play the previous song
     private func playPreviousSong() {
+        // Reset the animation state
+           animateTitle = false
+           animateArtist = false
+        
         if isPlayingFromAlbum {
-            // Logic to play the previous song in the album
             if let album = albumsWithTracks.first(where: { $0.tracks.contains(where: { $0.id == song.id }) }) {
                 if let currentIndex = album.tracks.firstIndex(where: { $0.id == song.id }) {
                     let previousIndex = currentIndex - 1
@@ -840,7 +847,6 @@ struct TrackDetailView: View {
                 }
             }
         } else {
-            // Logic to play the previous song in the general song list
             if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
                 let previousIndex = currentIndex - 1
                 if previousIndex >= 0 {
@@ -853,11 +859,13 @@ struct TrackDetailView: View {
             }
         }
     }
-    
-    // Function to play the next song
+
     private func playNextSong() {
+        // Reset the animation state
+           animateTitle = false
+           animateArtist = false
+        
         if isPlayingFromAlbum {
-            // Logic to play the next song in the album
             if let album = albumsWithTracks.first(where: { $0.tracks.contains(where: { $0.id == song.id }) }) {
                 if let currentIndex = album.tracks.firstIndex(where: { $0.id == song.id }) {
                     let nextIndex = currentIndex + 1
@@ -868,7 +876,6 @@ struct TrackDetailView: View {
                 }
             }
         } else {
-            // Logic to play the next song in the general song list
             if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
                 let nextIndex = currentIndex + 1
                 if nextIndex < songs.count {
@@ -886,7 +893,7 @@ struct TrackDetailView: View {
 struct ScrollableText: View {
     let text: String
     @Binding var isAnimating: Bool
-    let scrollDuration: Double // Added parameter for controlling speed
+    let scrollSpeed: CGFloat
 
     @State private var textWidth: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
@@ -908,8 +915,10 @@ struct ScrollableText: View {
                     .background(GeometryReader { textGeometry in
                         Color.clear
                             .onAppear {
-                                textWidth = textGeometry.size.width
-                                containerWidth = geometry.size.width
+                                updateWidths(textGeometry: textGeometry, containerWidth: geometry.size.width)
+                            }
+                            .onChange(of: text) { _ in
+                                updateWidths(textGeometry: textGeometry, containerWidth: geometry.size.width)
                             }
                     })
                     .hidden() // Hide measuring text
@@ -918,7 +927,7 @@ struct ScrollableText: View {
                 Text(text)
                     .fixedSize(horizontal: true, vertical: false)
                     .offset(x: calculateOffset())
-                    .animation(.linear(duration: scrollDuration), value: phase) // Use dynamic duration
+                    .animation(.linear(duration: calculateDuration()), value: phase) // Use calculated duration
                     .onChange(of: phase) { _, _ in handleAnimationState() }
             }
         }
@@ -930,6 +939,11 @@ struct ScrollableText: View {
                 phase = .scrollingLeft
             }
         }
+    }
+
+    private func updateWidths(textGeometry: GeometryProxy, containerWidth: CGFloat) {
+        textWidth = textGeometry.size.width
+        self.containerWidth = containerWidth
     }
 
     private func calculateOffset() -> CGFloat {
@@ -945,14 +959,19 @@ struct ScrollableText: View {
         }
     }
 
+    private func calculateDuration() -> Double {
+        let distance = textWidth - containerWidth
+        return Double(distance / scrollSpeed)
+    }
+
     private func handleAnimationState() {
         switch phase {
         case .scrollingLeft:
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { phase = .paused }
+            DispatchQueue.main.asyncAfter(deadline: .now() + calculateDuration()) { phase = .paused }
         case .paused:
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { phase = .scrollingRight }
         case .scrollingRight:
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + calculateDuration()) {
                 phase = .idle
                 isAnimating = false
             }
@@ -960,8 +979,12 @@ struct ScrollableText: View {
             break
         }
     }
-}
 
+    // Method to reset the phase
+    func resetPhase() {
+        phase = .idle
+    }
+}
 
 // MARK: - Bottom Player View
 
