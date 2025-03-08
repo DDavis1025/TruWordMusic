@@ -364,64 +364,59 @@ struct ContentView: View {
     func playSong(_ song: Song) {
         Task {
             await checkAppleMusicStatus()
+            
             if appleMusicSubscription {
                 do {
                     let player = ApplicationMusicPlayer.shared
                     let queueSongs: [Song]
                     
-                    // Check if the song is from an album
                     if let albumWithTracks = albumsWithTracks.first(where: { $0.tracks.contains(song) }), isPlayingFromAlbum {
                         queueSongs = albumWithTracks.tracks
                     } else {
                         queueSongs = songs
                     }
                     
-                    // Ensure the queue is set correctly
                     guard let startIndex = queueSongs.firstIndex(of: song) else {
                         print("Error: Song not found in queue list.")
                         return
                     }
                     
-                    // Set the queue with the selected song first, then the rest of the queue
                     let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
                     player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
                     
-                    // Start playback immediately
                     try await player.play()
                     
                     currentlyPlayingSong = song
                     isPlaying = true
                     subscriptionMessage = nil
                     
-                    // Start observing playback state
                     observePlaybackState()
                 } catch {
                     print("Error playing full song: \(error.localizedDescription)")
                 }
             } else if let previewURL = song.previewAssets?.first?.url {
-                // Prevent overlapping previews.
+                // Ensure no overlapping previews
                 audioPlayer?.pause()
                 if let currentItem = audioPlayer?.currentItem {
-                    NotificationCenter.default.removeObserver(self,
-                                                              name: .AVPlayerItemDidPlayToEndTime,
-                                                              object: currentItem)
+                    NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: currentItem)
                 }
-                // Create a new AVPlayer for the preview.
+                
+                // Initialize AVPlayer safely
                 audioPlayer = AVPlayer(url: previewURL)
-                if audioPlayer == nil {
+                
+                guard let audioPlayer = audioPlayer else {
                     print("Error: AVPlayer failed to initialize.")
+                    return
                 }
-                if let playerItem = audioPlayer?.currentItem {
-                    NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
-                                                           object: playerItem,
-                                                           queue: .main) { _ in
-                        if let audioPlayer = audioPlayer {
-                            previewDidEnd(player: audioPlayer)
-                        }
+                
+                if let playerItem = audioPlayer.currentItem {
+                    NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: playerItem, queue: .main) { _ in
+                        previewDidEnd(player: audioPlayer)
                         showSubscriptionMessage()
                     }
                 }
-                audioPlayer?.play()
+                
+                audioPlayer.play()
                 currentlyPlayingSong = song
                 isPlaying = true
             } else {
@@ -429,6 +424,8 @@ struct ContentView: View {
             }
         }
     }
+
+
     
     func previewDidEnd(player: AVPlayer) {
         guard let currentSong = currentlyPlayingSong else { return }
@@ -917,7 +914,7 @@ struct ScrollableText: View {
                             .onAppear {
                                 updateWidths(textGeometry: textGeometry, containerWidth: geometry.size.width)
                             }
-                            .onChange(of: text) { _ in
+                            .onChange(of: text) {
                                 updateWidths(textGeometry: textGeometry, containerWidth: geometry.size.width)
                             }
                     })
