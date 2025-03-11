@@ -419,6 +419,7 @@ struct ContentView: View {
                 audioPlayer.play()
                 currentlyPlayingSong = song
                 isPlaying = true
+                subscriptionMessage = nil
             } else {
                 print("No preview available and user is not subscribed.")
             }
@@ -849,9 +850,6 @@ struct TrackDetailView: View {
                 if previousIndex >= 0 {
                     let previousSong = songs[previousIndex]
                     playSong(previousSong)
-                    if !isPlayingFromAlbum {
-                        subscriptionMessage = nil
-                    }
                 }
             }
         }
@@ -878,9 +876,6 @@ struct TrackDetailView: View {
                 if nextIndex < songs.count {
                     let nextSong = songs[nextIndex]
                     playSong(nextSong)
-                    if !isPlayingFromAlbum {
-                        subscriptionMessage = nil
-                    }
                 }
             }
         }
@@ -992,7 +987,7 @@ struct BottomPlayerView: View {
     
     var body: some View {
         HStack {
-            if let artworkURL = song.artwork?.url(width: 50, height: 50) {
+            if let artworkURL = song.artwork?.url(width: 150, height: 150) {
                 CustomAsyncImage(
                     url: artworkURL,
                     placeholder: Image(systemName: "music.note") // Fallback placeholder
@@ -1049,7 +1044,7 @@ struct FullAlbumGridView: View {
     
     var body: some View {
         VStack {
-            // Search Bar
+            // Search Bar (Always at the top)
             HStack {
                 TextField("Search albums...", text: $searchQuery)
                     .padding(10)
@@ -1073,19 +1068,20 @@ struct FullAlbumGridView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-            
+
             // Album Grid or Empty State
             if filteredAlbums.isEmpty {
+                Spacer()
                 Text("No albums found")
                     .font(.subheadline)
                     .foregroundColor(.gray)
-                    .padding(.top, 50)
+                Spacer()
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(filteredAlbums, id: \.id) { album in
                             VStack {
-                                if let artworkURL = album.artwork?.url(width: 150, height: 150) {
+                                if let artworkURL = album.artwork?.url(width: 250, height: 250) {
                                     CustomAsyncImage(url: artworkURL, placeholder: Image(systemName: "photo"))
                                         .frame(width: 150, height: 150)
                                         .clipped()
@@ -1100,7 +1096,7 @@ struct FullAlbumGridView: View {
                                     .lineLimit(1)
                             }
                             .onTapGesture {
-                                onAlbumSelected(album) // Call the onAlbumSelected closure
+                                onAlbumSelected(album)
                             }
                         }
                     }
@@ -1108,6 +1104,7 @@ struct FullAlbumGridView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity) // Ensures full screen usage
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
         .onTapGesture {
@@ -1154,13 +1151,14 @@ struct FullAlbumGridView: View {
     }
 }
 
+
 // MARK: - Album Carousel Item View
 
 struct AlbumCarouselItemView: View {
     let album: Album
     var body: some View {
         VStack {
-            if let artworkURL = album.artwork?.url(width: 150, height: 150) {
+            if let artworkURL = album.artwork?.url(width: 250, height: 250) {
                 AsyncImage(url: artworkURL) { phase in
                     switch phase {
                     case .empty:
@@ -1205,7 +1203,7 @@ struct AlbumDetailView: View {
     
     var body: some View {
         VStack {
-            if let artworkURL = album.artwork?.url(width: 250, height: 250) {
+            if let artworkURL = album.artwork?.url(width: 350, height: 350) {
                 AsyncImage(url: artworkURL) { phase in
                     switch phase {
                     case .empty:
