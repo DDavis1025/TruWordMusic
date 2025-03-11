@@ -120,6 +120,7 @@ struct ContentView: View {
                             }
                         } else {
                             Text("Requesting Apple Music access...")
+                                .foregroundColor(.gray)
                         }
                     }
                     .padding(.horizontal, 16) // Add horizontal padding to the ScrollView
@@ -566,30 +567,25 @@ struct FullTrackListView: View {
     let playSong: (Song) -> Void
     @Binding var currentlyPlayingSong: Song?
     @Binding var isPlayingFromAlbum: Bool
-    
+
     @State private var searchQuery: String = ""
     @State private var debouncedSearchQuery: String = ""
     @State private var filteredSongs: [Song] = []
     @FocusState private var isSearchBarFocused: Bool
-    
+
     var body: some View {
         VStack {
-            // Search Bar with Clear Button
+            // Search Bar (Always at the top)
             HStack {
                 TextField("Search tracks...", text: $searchQuery)
                     .padding(10)
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
                     .focused($isSearchBarFocused)
-                    .onChange(of: searchQuery) { oldValue, newValue in
-                        debounceSearchQuery()
-                    }
-                
-                // Clear Search Button
+                    .onChange(of: searchQuery) { _, _ in debounceSearchQuery() }
+
                 if !searchQuery.isEmpty {
-                    Button(action: {
-                        searchQuery = "" // Clear the search query
-                    }) {
+                    Button(action: { searchQuery = "" }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.gray)
                             .padding(.trailing, 8)
@@ -598,30 +594,30 @@ struct FullTrackListView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-            
+
             // Track List or Empty State
             if filteredSongs.isEmpty {
-                // Empty State Message
+                Spacer()
                 Text("No tracks found")
                     .font(.subheadline)
                     .foregroundColor(.gray)
-                    .padding(.top, 50)
+                Spacer()
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 0) {
+                    VStack(spacing: 0) {
                         ForEach(filteredSongs, id: \.id) { song in
                             SongRowView(
-                                        song: song,
-                                        currentlyPlayingSong: $currentlyPlayingSong,
-                                        leftPadding: 8,
-                                        rightPadding: 8
-                                    )
-                                .onTapGesture {
-                                    playSong(song)
-                                    isPlayingFromAlbum = false
-                                }
-                                .padding(.vertical, 5)
-                                .background(Color(.systemBackground)) // Ensure the background covers the row
+                                song: song,
+                                currentlyPlayingSong: $currentlyPlayingSong,
+                                leftPadding: 8,
+                                rightPadding: 8
+                            )
+                            .onTapGesture {
+                                playSong(song)
+                                isPlayingFromAlbum = false
+                            }
+                            .padding(.vertical, 5)
+                            .background(Color(.systemBackground))
                         }
                     }
                 }
@@ -629,22 +625,34 @@ struct FullTrackListView: View {
         }
         .navigationTitle("Top Songs")
         .navigationBarTitleDisplayMode(.inline)
-        .onTapGesture {
-            // Dismiss keyboard when tapping outside the search bar
-            isSearchBarFocused = false
-        }
+        .onTapGesture { isSearchBarFocused = false }
         .onAppear {
-            filteredSongs = songs // Initialize filteredSongs with all songs
+            // Delay setting filteredSongs to avoid UI freeze
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                filteredSongs = songs
+            }
+            
+            // Preload keyboard system
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isSearchBarFocused = true
+                isSearchBarFocused = false
+            }
+
+            // Preload the font
+            DispatchQueue.global(qos: .background).async {
+                _ = UIFont(name: "Futura", size: 16)
+            }
         }
     }
-    
+
     private func debounceSearchQuery() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 sec delay
             debouncedSearchQuery = searchQuery
             updateFilteredSongs()
         }
     }
-    
+
     private func updateFilteredSongs() {
         DispatchQueue.global(qos: .userInitiated).async {
             let filtered = songs.filter { song in
@@ -658,6 +666,7 @@ struct FullTrackListView: View {
         }
     }
 }
+
 
 // MARK: - Song Row View
 
@@ -724,7 +733,7 @@ struct TrackDetailView: View {
                 Spacer().frame(height: 10) // Small space at the top
 
                 // Album Artwork (Increased size)
-                if let artworkURL = song.artwork?.url(width: 500, height: 500) {
+                if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 0.95), height: Int(geometry.size.width * 0.95)) {
                     AsyncImage(url: artworkURL) { phase in
                         switch phase {
                         case .empty:
