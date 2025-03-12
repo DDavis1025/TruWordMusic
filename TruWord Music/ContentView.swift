@@ -49,6 +49,8 @@ struct ContentView: View {
     @State private var showAlbumDetail = false
     @State private var isPlayingFromAlbum: Bool = false // Track if playing from album
     
+    @State private var isLoading = false // Track loading state
+    
     @State private var navigationPath = NavigationPath()
     
     // Add scenePhase to detect app lifestyle changes
@@ -57,75 +59,81 @@ struct ContentView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack(alignment: .bottom) {
-                // Main Content
-                ScrollView {
-                    VStack {
-                        if musicAuthorized {
-                            // MARK: Albums Section
-                            if !albums.isEmpty {
+                if isLoading {
+                    ProgressView("Loading...")
+                        .progressViewStyle(CircularProgressViewStyle())
+                        .scaleEffect(1.5)
+                } else {
+                    // Main Content
+                    ScrollView {
+                        VStack {
+                            if musicAuthorized {
+                                // MARK: Albums Section
+                                if !albums.isEmpty {
+                                    VStack(alignment: .leading) {
+                                        HStack {
+                                            Text("Top Christian Albums")
+                                                .font(.system(size: 18))
+                                                .bold()
+                                            Spacer()
+                                            if albums.count > 5 {
+                                                NavigationLink("View More", value: "fullAlbumGrid")
+                                                    .foregroundColor(.blue)
+                                                    .font(.system(size: 15))
+                                            }
+                                        }
+                                        .padding(.vertical, 5)
+                                        
+                                        ScrollView(.horizontal, showsIndicators: false) {
+                                            HStack(spacing: 16) {
+                                                ForEach(albums.prefix(5), id: \.id) { album in
+                                                    AlbumCarouselItemView(album: album)
+                                                        .onTapGesture {
+                                                            selectAlbum(album)
+                                                        }
+                                                }
+                                            }
+                                            .padding(.horizontal)
+                                        }
+                                    }
+                                    .padding(.bottom, 16) // Add padding to the bottom of the first VStack
+                                }
+                                
+                                // MARK: Tracks Section
                                 VStack(alignment: .leading) {
                                     HStack {
-                                        Text("Top Christian Albums")
-                                            .font(.system(size: 18))
+                                        Text("Top Christian Songs")
+                                            .font(.system(size: 18)) // Smaller than .title2 (22pt)
                                             .bold()
                                         Spacer()
-                                        if albums.count > 5 {
-                                            NavigationLink("View More", value: "fullAlbumGrid")
+                                        if songs.count > 5 {
+                                            NavigationLink("View More") {
+                                                FullTrackListView(songs: songs, playSong: playSong, currentlyPlayingSong: $currentlyPlayingSong, isPlayingFromAlbum: $isPlayingFromAlbum, subscriptionMessage: $subscriptionMessage)
+                                            }
                                             .foregroundColor(.blue)
-                                            .font(.system(size: 15))
+                                            .font(.system(size: 15)) // Smaller than .title2 (22pt)
                                         }
                                     }
                                     .padding(.vertical, 5)
                                     
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 16) {
-                                            ForEach(albums.prefix(5), id: \.id) { album in
-                                                AlbumCarouselItemView(album: album)
-                                                    .onTapGesture {
-                                                        selectAlbum(album)
-                                                    }
+                                    // Show only 5 songs initially
+                                    ForEach(songs.prefix(5), id: \.id) { song in
+                                        SongRowView(song: song, currentlyPlayingSong: $currentlyPlayingSong)
+                                            .onTapGesture {
+                                                playSong(song)
+                                                isPlayingFromAlbum = false
+                                                subscriptionMessage = nil
                                             }
-                                        }
-                                        .padding(.horizontal)
                                     }
                                 }
-                                .padding(.bottom, 16) // Add padding to the bottom of the first VStack
+                            } else {
+                                Text("Requesting Apple Music access...")
+                                    .foregroundColor(.gray)
                             }
-                            
-                            // MARK: Tracks Section
-                            VStack(alignment: .leading) {
-                                HStack {
-                                    Text("Top Christian Songs")
-                                        .font(.system(size: 18)) // Smaller than .title2 (22pt)
-                                        .bold()
-                                    Spacer()
-                                    if songs.count > 5 {
-                                        NavigationLink("View More") {
-                                            FullTrackListView(songs: songs, playSong: playSong, currentlyPlayingSong: $currentlyPlayingSong, isPlayingFromAlbum: $isPlayingFromAlbum, subscriptionMessage: $subscriptionMessage)
-                                        }
-                                        .foregroundColor(.blue)
-                                        .font(.system(size: 15)) // Smaller than .title2 (22pt)
-                                    }
-                                }
-                                .padding(.vertical, 5)
-                                
-                                // Show only 5 songs initially
-                                ForEach(songs.prefix(5), id: \.id) { song in
-                                    SongRowView(song: song, currentlyPlayingSong: $currentlyPlayingSong)
-                                        .onTapGesture {
-                                            playSong(song)
-                                            isPlayingFromAlbum = false
-                                            subscriptionMessage = nil
-                                        }
-                                }
-                            }
-                        } else {
-                            Text("Requesting Apple Music access...")
-                                .foregroundColor(.gray)
                         }
+                        .padding(.horizontal, 16) // Add horizontal padding to the ScrollView
+                        .padding(.bottom, 80) // Add padding to avoid overlap with BottomPlayerView
                     }
-                    .padding(.horizontal, 16) // Add horizontal padding to the ScrollView
-                    .padding(.bottom, 80) // Add padding to avoid overlap with BottomPlayerView
                 }
                 
                 // MARK: Bottom Player View and Subscription Message
@@ -152,12 +160,12 @@ struct ContentView: View {
                 }
             }
             .navigationDestination(for: String.self) { value in
-                            if value == "fullAlbumGrid" {
-                                FullAlbumGridView(albums: albums) { album in
-                                    selectAlbum(album)
-                                }
-                            }
-                        }
+                if value == "fullAlbumGrid" {
+                    FullAlbumGridView(albums: albums) { album in
+                        selectAlbum(album)
+                    }
+                }
+            }
             .navigationDestination(for: Album.self) { album in
                 AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum, subscriptionMessage: $subscriptionMessage)
                     .onAppear {
@@ -181,11 +189,13 @@ struct ContentView: View {
                 }
             }
             .task {
+                isLoading = true
                 await requestMusicAuthorization()
                 if musicAuthorized {
                     await fetchChristianSongs()
                     await fetchChristianAlbums()
                 }
+                isLoading = false
             }
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 if newPhase == .active {
@@ -426,8 +436,8 @@ struct ContentView: View {
             }
         }
     }
-
-
+    
+    
     
     func previewDidEnd(player: AVPlayer) {
         guard let currentSong = currentlyPlayingSong else { return }
@@ -593,7 +603,7 @@ struct FullTrackListView: View {
                     .cornerRadius(8)
                     .focused($isSearchBarFocused)
                     .onSubmit { isSearchBarFocused = false }
-
+                
                 if !searchQuery.isEmpty {
                     Button(action: { searchQuery = "" }) {
                         Image(systemName: "xmark.circle.fill")
@@ -603,7 +613,7 @@ struct FullTrackListView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-
+            
             // Content Section (List or Empty State)
             if filteredSongs.isEmpty {
                 Spacer()
@@ -694,19 +704,19 @@ struct TrackDetailView: View {
     let albums: [Album]
     let playSong: (Song) -> Void
     @Binding var songs: [Song]
-
+    
     @State private var selectedAlbum: Album? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.navigationPath) private var navigationPath
-
+    
     @State private var animateTitle: Bool = false
     @State private var animateArtist: Bool = false
-
+    
     var body: some View {
         GeometryReader { geometry in
             VStack {
                 Spacer().frame(height: 10) // Small space at the top
-
+                
                 // Album Artwork (Increased size)
                 if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 0.95), height: Int(geometry.size.width * 0.95)) {
                     AsyncImage(url: artworkURL) { phase in
@@ -731,25 +741,25 @@ struct TrackDetailView: View {
                         }
                     }
                 }
-
+                
                 Spacer().frame(height: 14) // More space between image and title
-
+                
                 // Song Title
                 ScrollableText(text: song.title, isAnimating: $animateTitle, scrollSpeed: 47.0)
                     .font(.title3)
                     .multilineTextAlignment(.center)
                     .id("title-\(song.id)") // Unique ID for the title
-
+                
                 Spacer().frame(height: 12) // More space between title and artist name
-
+                
                 // Artist Name
                 ScrollableText(text: song.artistName, isAnimating: $animateArtist, scrollSpeed: 47.0)
                     .font(.subheadline)
                     .foregroundColor(.gray)
                     .id("artist-\(song.id)") // Unique ID for the artist
-
+                
                 Spacer().frame(height: 30) // Ensures artist name is ~20 pts above play button
-
+                
                 // Controls (Previous, Play/Pause, Next)
                 HStack(spacing: 40) {
                     Button(action: playPreviousSong) {
@@ -757,13 +767,13 @@ struct TrackDetailView: View {
                             .font(.system(size: 28))
                             .foregroundColor(.primary)
                     }
-
+                    
                     Button(action: togglePlayPause) {
                         Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
                             .font(.system(size: 60))
                             .foregroundColor(.primary)
                     }
-
+                    
                     Button(action: playNextSong) {
                         Image(systemName: "forward.fill")
                             .font(.system(size: 28))
@@ -771,16 +781,16 @@ struct TrackDetailView: View {
                     }
                 }
                 .padding(.bottom, 10)
-
+                
                 // View Album Button
                 if isPlayingFromAlbum {
                     Button(action: {
                         selectedAlbum = albumsWithTracks.first(where: { albumWithTracks in
                             albumWithTracks.tracks.contains(where: { $0.id == song.id })
                         })?.album
-
+                        
                         dismiss()
-
+                        
                         if let selectedAlbum = selectedAlbum {
                             navigationPath?.wrappedValue.append(selectedAlbum)
                         }
@@ -795,9 +805,9 @@ struct TrackDetailView: View {
                     }
                     .padding(.top, 5)
                 }
-
+                
                 Spacer()
-
+                
                 // Subscription Message at the Bottom
                 if let message = subscriptionMessage {
                     Text(message)
@@ -812,11 +822,11 @@ struct TrackDetailView: View {
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
     }
-
+    
     private func playPreviousSong() {
         // Reset the animation state
-           animateTitle = false
-           animateArtist = false
+        animateTitle = false
+        animateArtist = false
         
         if isPlayingFromAlbum {
             if let album = albumsWithTracks.first(where: { $0.tracks.contains(where: { $0.id == song.id }) }) {
@@ -839,11 +849,11 @@ struct TrackDetailView: View {
             }
         }
     }
-
+    
     private func playNextSong() {
         // Reset the animation state
-           animateTitle = false
-           animateArtist = false
+        animateTitle = false
+        animateArtist = false
         
         if isPlayingFromAlbum {
             if let album = albumsWithTracks.first(where: { $0.tracks.contains(where: { $0.id == song.id }) }) {
@@ -872,18 +882,18 @@ struct ScrollableText: View {
     let text: String
     @Binding var isAnimating: Bool
     let scrollSpeed: CGFloat
-
+    
     @State private var textWidth: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
     @State private var phase: AnimationPhase = .idle
-
+    
     enum AnimationPhase {
         case idle
         case scrollingLeft
         case paused
         case scrollingRight
     }
-
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -918,12 +928,12 @@ struct ScrollableText: View {
             }
         }
     }
-
+    
     private func updateWidths(textGeometry: GeometryProxy, containerWidth: CGFloat) {
         textWidth = textGeometry.size.width
         self.containerWidth = containerWidth
     }
-
+    
     private func calculateOffset() -> CGFloat {
         switch phase {
         case .idle:
@@ -936,12 +946,12 @@ struct ScrollableText: View {
             return 0
         }
     }
-
+    
     private func calculateDuration() -> Double {
         let distance = textWidth - containerWidth
         return Double(distance / scrollSpeed)
     }
-
+    
     private func handleAnimationState() {
         switch phase {
         case .scrollingLeft:
@@ -957,7 +967,7 @@ struct ScrollableText: View {
             break
         }
     }
-
+    
     // Method to reset the phase
     func resetPhase() {
         phase = .idle
@@ -1049,7 +1059,7 @@ struct FullAlbumGridView: View {
                     .cornerRadius(8)
                     .focused($isSearchBarFocused)
                     .onSubmit { isSearchBarFocused = false }
-
+                
                 if !searchQuery.isEmpty {
                     Button(action: { searchQuery = "" }) {
                         Image(systemName: "xmark.circle.fill")
@@ -1059,7 +1069,7 @@ struct FullAlbumGridView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-
+            
             // Content Section (Grid or Empty State)
             if filteredAlbums.isEmpty {
                 // Keeps the message below the search bar
