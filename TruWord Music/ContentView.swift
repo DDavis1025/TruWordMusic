@@ -101,7 +101,7 @@ struct ContentView: View {
                                     Spacer()
                                     if songs.count > 5 {
                                         NavigationLink("View More") {
-                                            FullTrackListView(songs: songs, playSong: playSong, currentlyPlayingSong: $currentlyPlayingSong, isPlayingFromAlbum: $isPlayingFromAlbum)
+                                            FullTrackListView(songs: songs, playSong: playSong, currentlyPlayingSong: $currentlyPlayingSong, isPlayingFromAlbum: $isPlayingFromAlbum, subscriptionMessage: $subscriptionMessage)
                                         }
                                         .foregroundColor(.blue)
                                         .font(.system(size: 15)) // Smaller than .title2 (22pt)
@@ -115,6 +115,7 @@ struct ContentView: View {
                                         .onTapGesture {
                                             playSong(song)
                                             isPlayingFromAlbum = false
+                                            subscriptionMessage = nil
                                         }
                                 }
                             }
@@ -158,7 +159,7 @@ struct ContentView: View {
                             }
                         }
             .navigationDestination(for: Album.self) { album in
-                AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum)
+                AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum, subscriptionMessage: $subscriptionMessage)
                     .onAppear {
                         print("Showing details for album: \(album.title)")
                     }
@@ -420,7 +421,6 @@ struct ContentView: View {
                 audioPlayer.play()
                 currentlyPlayingSong = song
                 isPlaying = true
-                subscriptionMessage = nil
             } else {
                 print("No preview available and user is not subscribed.")
             }
@@ -559,7 +559,6 @@ struct ContentView: View {
     }
 }
 
-
 // MARK: - Full Track List View
 
 struct FullTrackListView: View {
@@ -567,40 +566,51 @@ struct FullTrackListView: View {
     let playSong: (Song) -> Void
     @Binding var currentlyPlayingSong: Song?
     @Binding var isPlayingFromAlbum: Bool
-
-    @State private var searchQuery: String = ""
-    @State private var debouncedSearchQuery: String = ""
-    @State private var filteredSongs: [Song] = []
-    @FocusState private var isSearchBarFocused: Bool
-
+    @Binding var subscriptionMessage: String?
+    
+    @State private var searchQuery: String = "" // State for search query
+    @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
+    
+    // Filtered songs based on search query (title or artist name)
+    var filteredSongs: [Song] {
+        if searchQuery.isEmpty {
+            return songs
+        } else {
+            return songs.filter { song in
+                song.title.localizedCaseInsensitiveContains(searchQuery) ||
+                song.artistName.localizedCaseInsensitiveContains(searchQuery)
+            }
+        }
+    }
+    
     var body: some View {
-        VStack {
-            // Search Bar (Always at the top)
+        VStack(alignment: .leading, spacing: 10) {
+            // Search Bar at the Top
             HStack {
                 TextField("Search tracks...", text: $searchQuery)
                     .padding(10)
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
                     .focused($isSearchBarFocused)
-                    .onChange(of: searchQuery) { _, _ in debounceSearchQuery() }
+                    .onSubmit { isSearchBarFocused = false }
 
                 if !searchQuery.isEmpty {
                     Button(action: { searchQuery = "" }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.gray)
-                            .padding(.trailing, 8)
                     }
                 }
             }
             .padding(.horizontal)
             .padding(.top, 8)
 
-            // Track List or Empty State
+            // Content Section (List or Empty State)
             if filteredSongs.isEmpty {
                 Spacer()
                 Text("No tracks found")
                     .font(.subheadline)
                     .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 Spacer()
             } else {
                 ScrollView {
@@ -615,6 +625,7 @@ struct FullTrackListView: View {
                             .onTapGesture {
                                 playSong(song)
                                 isPlayingFromAlbum = false
+                                subscriptionMessage = nil
                             }
                             .padding(.vertical, 5)
                             .background(Color(.systemBackground))
@@ -623,49 +634,13 @@ struct FullTrackListView: View {
                 }
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top) // Ensures the search bar stays at the top
         .navigationTitle("Top Songs")
         .navigationBarTitleDisplayMode(.inline)
-        .onTapGesture { isSearchBarFocused = false }
-        .onAppear {
-            // Delay setting filteredSongs to avoid UI freeze
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                filteredSongs = songs
-            }
-            
-            // Preload keyboard system
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isSearchBarFocused = true
-                isSearchBarFocused = false
-            }
-
-            // Preload the font
-            DispatchQueue.global(qos: .background).async {
-                _ = UIFont(name: "Futura", size: 16)
-            }
-        }
-    }
-
-    private func debounceSearchQuery() {
-        Task {
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 sec delay
-            debouncedSearchQuery = searchQuery
-            updateFilteredSongs()
-        }
-    }
-
-    private func updateFilteredSongs() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let filtered = songs.filter { song in
-                debouncedSearchQuery.isEmpty ||
-                song.title.localizedCaseInsensitiveContains(debouncedSearchQuery) ||
-                song.artistName.localizedCaseInsensitiveContains(debouncedSearchQuery)
-            }
-            DispatchQueue.main.async {
-                filteredSongs = filtered
-            }
-        }
+        .onTapGesture { isSearchBarFocused = false } // Dismiss keyboard on tap
     }
 }
+
 
 
 // MARK: - Song Row View
@@ -859,6 +834,7 @@ struct TrackDetailView: View {
                 if previousIndex >= 0 {
                     let previousSong = songs[previousIndex]
                     playSong(previousSong)
+                    subscriptionMessage = nil
                 }
             }
         }
@@ -885,6 +861,7 @@ struct TrackDetailView: View {
                 if nextIndex < songs.count {
                     let nextSong = songs[nextIndex]
                     playSong(nextSong)
+                    subscriptionMessage = nil
                 }
             }
         }
@@ -1037,14 +1014,25 @@ struct BottomPlayerView: View {
     }
 }
 
+
 struct FullAlbumGridView: View {
     let albums: [Album]
     let onAlbumSelected: (Album) -> Void
     
-    @State private var searchQuery: String = ""
-    @State private var debouncedSearchQuery: String = ""
-    @State private var filteredAlbums: [Album] = []
-    @FocusState private var isSearchBarFocused: Bool
+    @State private var searchQuery: String = "" // State for search query
+    @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
+    
+    // Filtered albums based on search query (title or artist name)
+    var filteredAlbums: [Album] {
+        if searchQuery.isEmpty {
+            return albums
+        } else {
+            return albums.filter { album in
+                album.title.localizedCaseInsensitiveContains(searchQuery) ||
+                album.artistName.localizedCaseInsensitiveContains(searchQuery)
+            }
+        }
+    }
     
     let columns = [
         GridItem(.flexible()),
@@ -1052,49 +1040,64 @@ struct FullAlbumGridView: View {
     ]
     
     var body: some View {
-        VStack {
-            // Search Bar (Always at the top)
+        VStack(alignment: .leading, spacing: 10) {
+            // Search Bar at the Top
             HStack {
                 TextField("Search albums...", text: $searchQuery)
                     .padding(10)
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
                     .focused($isSearchBarFocused)
-                    .onChange(of: searchQuery) { _, _ in
-                        debounceSearchQuery()
-                    }
-                
+                    .onSubmit { isSearchBarFocused = false }
+
                 if !searchQuery.isEmpty {
-                    Button(action: {
-                        searchQuery = ""
-                        updateFilteredAlbums() // Reset list when cleared
-                    }) {
+                    Button(action: { searchQuery = "" }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.gray)
-                            .padding(.trailing, 8)
                     }
                 }
             }
             .padding(.horizontal)
             .padding(.top, 8)
 
-            // Album Grid or Empty State
+            // Content Section (Grid or Empty State)
             if filteredAlbums.isEmpty {
+                // Keeps the message below the search bar
                 Spacer()
                 Text("No albums found")
                     .font(.subheadline)
                     .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 Spacer()
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(filteredAlbums, id: \.id) { album in
                             VStack {
-                                if let artworkURL = album.artwork?.url(width: 250, height: 250) {
-                                    CustomAsyncImage(url: artworkURL, placeholder: Image(systemName: "photo"))
-                                        .frame(width: 150, height: 150)
-                                        .clipped()
-                                        .cornerRadius(8)
+                                if let artworkURL = album.artwork?.url(width: 150, height: 150) {
+                                    AsyncImage(url: artworkURL) { phase in
+                                        switch phase {
+                                        case .empty:
+                                            Color.gray.opacity(0.3)
+                                                .frame(width: 150, height: 150)
+                                        case .success(let image):
+                                            image
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(width: 150, height: 150)
+                                                .clipped()
+                                                .cornerRadius(8)
+                                        case .failure:
+                                            Image(systemName: "photo")
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(width: 150, height: 150)
+                                                .clipped()
+                                                .foregroundColor(.gray)
+                                        @unknown default:
+                                            EmptyView()
+                                        }
+                                    }
                                 }
                                 Text(album.title)
                                     .font(.caption)
@@ -1113,52 +1116,14 @@ struct FullAlbumGridView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity) // Ensures full screen usage
+        .frame(maxHeight: .infinity, alignment: .top) // Ensures the search bar stays at the top
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
-        .onTapGesture {
-            isSearchBarFocused = false
-        }
-        .task {
-            await loadAlbums()
-        }
-    }
-    
-    /// Optimized search debounce
-    private func debounceSearchQuery() {
-        let searchText = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            if searchText == searchQuery { // Ensure latest input is used
-                debouncedSearchQuery = searchText
-                updateFilteredAlbums()
-            }
-        }
-    }
-    
-    /// Efficient album filtering
-    private func updateFilteredAlbums() {
-        let searchText = debouncedSearchQuery.lowercased()
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            let filtered = albums.filter { album in
-                searchText.isEmpty ||
-                album.title.lowercased().contains(searchText) ||
-                album.artistName.lowercased().contains(searchText)
-            }
-            DispatchQueue.main.async {
-                filteredAlbums = filtered
-            }
-        }
-    }
-    
-    /// Loads albums efficiently on first appearance
-    private func loadAlbums() async {
-        let initialAlbums = albums
-        await MainActor.run {
-            filteredAlbums = initialAlbums
-        }
+        .onTapGesture { isSearchBarFocused = false } // Dismiss keyboard on tap
     }
 }
+
+
 
 
 // MARK: - Album Carousel Item View
@@ -1208,6 +1173,7 @@ struct AlbumDetailView: View {
     @State private var tracks: [Song] = []
     @State private var isLoadingTracks: Bool = true
     @Binding var isPlayingFromAlbum: Bool // Added binding
+    @Binding var subscriptionMessage: String?
     
     
     var body: some View {
@@ -1251,6 +1217,7 @@ struct AlbumDetailView: View {
                         Button {
                             playSong(song)
                             isPlayingFromAlbum = true
+                            subscriptionMessage = nil
                         } label: {
                             VStack(alignment: .leading) {
                                 Text(song.title)
