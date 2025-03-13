@@ -44,7 +44,7 @@ struct ContentView: View {
     
     // New album-related state
     @State private var albums: [Album] = []
-    @State private var albumsWithTracks: [AlbumWithTracks] = []
+    @State private var albumWithTracks: AlbumWithTracks? = nil
     @State private var selectedAlbum: Album? = nil
     @State private var showAlbumDetail = false
     @State private var isPlayingFromAlbum: Bool = false // Track if playing from album
@@ -126,37 +126,34 @@ struct ContentView: View {
                                             }
                                     }
                                 }
-                            } else {
-                                Text("Requesting Apple Music access...")
-                                    .foregroundColor(.gray)
                             }
                         }
                         .padding(.horizontal, 16) // Add horizontal padding to the ScrollView
                         .padding(.bottom, 80) // Add padding to avoid overlap with BottomPlayerView
                     }
-                }
-                
-                // MARK: Bottom Player View and Subscription Message
-                if let song = currentlyPlayingSong {
-                    VStack(spacing: 0) {
-                        // Subscription Message (above BottomPlayerView)
-                        if let message = subscriptionMessage {
-                            Text(message)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                                .padding(.horizontal)
-                                .padding(.bottom, 4) // Add some padding below the message
-                                .background(Color(.systemBackground)) // Ensure the background covers the message
-                        }
-                        
-                        // Bottom Player View
-                        BottomPlayerView(song: song, isPlaying: $isPlaying, togglePlayPause: togglePlayPause)
-                            .id(song.id) // Force re-render when song changes
-                            .onTapGesture {
-                                showTrackDetail = true
+                    
+                    // MARK: Bottom Player View and Subscription Message
+                    if let song = currentlyPlayingSong {
+                        VStack(spacing: 0) {
+                            // Subscription Message (above BottomPlayerView)
+                            if let message = subscriptionMessage {
+                                Text(message)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                    .padding(.horizontal)
+                                    .padding(.bottom, 4) // Add some padding below the message
+                                    .background(Color(.systemBackground)) // Ensure the background covers the message
                             }
+                            
+                            // Bottom Player View
+                            BottomPlayerView(song: song, isPlaying: $isPlaying, togglePlayPause: togglePlayPause)
+                                .id(song.id) // Force re-render when song changes
+                                .onTapGesture {
+                                    showTrackDetail = true
+                                }
+                        }
+                        .background(Color(.systemBackground)) // Ensure the background covers the BottomPlayerView and message
                     }
-                    .background(Color(.systemBackground)) // Ensure the background covers the BottomPlayerView and message
                 }
             }
             .navigationDestination(for: String.self) { value in
@@ -167,7 +164,7 @@ struct ContentView: View {
                 }
             }
             .navigationDestination(for: Album.self) { album in
-                AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum, subscriptionMessage: $subscriptionMessage)
+                AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum, subscriptionMessage: $subscriptionMessage, albumWithTracks: $albumWithTracks)
                     .onAppear {
                         print("Showing details for album: \(album.title)")
                     }
@@ -180,7 +177,7 @@ struct ContentView: View {
                         togglePlayPause: togglePlayPause,
                         subscriptionMessage: $subscriptionMessage,
                         isPlayingFromAlbum: $isPlayingFromAlbum,
-                        albumsWithTracks: $albumsWithTracks,
+                        albumWithTracks: $albumWithTracks,
                         albums: albums,
                         playSong: playSong, // Pass the playSong function
                         songs: $songs // Pass the songs array as a binding
@@ -191,12 +188,18 @@ struct ContentView: View {
             .task {
                 isLoading = true
                 await requestMusicAuthorization()
+
                 if musicAuthorized {
-                    await fetchChristianSongs()
-                    await fetchChristianAlbums()
+                    await withTaskGroup(of: Void.self) { group in
+                        group.addTask { await fetchChristianSongs() }
+                        group.addTask { await fetchChristianAlbums() }
+                    }
                 }
+                
                 isLoading = false
             }
+
+
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 if newPhase == .active {
                     // App has entered the foreground
@@ -315,59 +318,9 @@ struct ContentView: View {
             
             // Extract albums from the charts
             albums = albumCharts.flatMap { $0.items }
-            
-            // Iterate through each album and fetch its tracks
-            for album in albums {
-                let tracks = await fetchTracksForAlbum(album: album)
-                let albumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
-                albumsWithTracks.append(albumWithTracks)
-            }
-            
+    
         } catch {
             print("Error fetching top Christian albums: \(error)")
-        }
-    }
-    
-    
-    func fetchTracksForAlbum(album: Album) async -> [Song] {
-        do {
-            // Ensure tracks are explicitly requested
-            var albumRequest = MusicCatalogResourceRequest<Album>(matching: \.id, equalTo: album.id)
-            albumRequest.properties = [.tracks] // Request track details
-            
-            let albumResponse = try await albumRequest.response()
-            
-            // Check if we received an album
-            guard let albumWithTracks = albumResponse.items.first else {
-                print("Error: Album not found.")
-                return []
-            }
-            
-            // Check if the album contains tracks
-            guard let albumTracks = albumWithTracks.tracks, !albumTracks.isEmpty else {
-                print("Error: Album has no tracks.")
-                return []
-            }
-            
-            // Extract track IDs
-            let trackIDs = albumTracks.compactMap { $0.id }
-            
-            // Check if track IDs are available
-            guard !trackIDs.isEmpty else {
-                print("Error: No valid track IDs available.")
-                return []
-            }
-            
-            // Fetch the actual song objects using track IDs
-            let songsRequest = MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: trackIDs)
-            let songResponse = try await songsRequest.response()
-            
-            // Return fetched songs
-            return Array(songResponse.items)
-            
-        } catch {
-            print("Error fetching album tracks: \(error)")
-            return []
         }
     }
     
@@ -382,7 +335,7 @@ struct ContentView: View {
                     let player = ApplicationMusicPlayer.shared
                     let queueSongs: [Song]
                     
-                    if let albumWithTracks = albumsWithTracks.first(where: { $0.tracks.contains(song) }), isPlayingFromAlbum {
+                    if let albumWithTracks, albumWithTracks.tracks.contains(song), isPlayingFromAlbum {
                         queueSongs = albumWithTracks.tracks
                     } else {
                         queueSongs = songs
@@ -444,8 +397,8 @@ struct ContentView: View {
         
         let nextSong: Song?
         
-        if isPlayingFromAlbum, let albumWithTracks = albumsWithTracks.first(where: { $0.tracks.contains(currentSong) }) {
-            // Playing from an album, get the next track
+        if isPlayingFromAlbum, let albumWithTracks, albumWithTracks.tracks.contains(currentSong) {
+            // Find the current song's index in the album's track list
             if let currentIndex = albumWithTracks.tracks.firstIndex(of: currentSong), currentIndex < albumWithTracks.tracks.count - 1 {
                 nextSong = albumWithTracks.tracks[currentIndex + 1]
             } else {
@@ -534,16 +487,15 @@ struct ContentView: View {
                     switch currentEntry.item {
                     case .song(let song):
                         // Extract the song from the current entry
-                        if isPlayingFromAlbum {
-                            // Find the song in the album's track list
-                            if let albumWithTracks = albumsWithTracks.first(where: { $0.tracks.contains(where: { $0.id == song.id }) }),
-                               let currentSong = albumWithTracks.tracks.first(where: { $0.id == song.id }) {
-                                if currentSong != previousSong {
-                                    // Song has changed
-                                    previousSong = currentSong
-                                    currentlyPlayingSong = currentSong
-                                    isPlaying = true
-                                }
+                        if isPlayingFromAlbum,
+                           let albumWithTracks, // Unwrap optional AlbumWithTracks
+                           let currentSong = albumWithTracks.tracks.first(where: { $0.id == song.id }) {
+                            
+                            if currentSong != previousSong {
+                                // Song has changed
+                                previousSong = currentSong
+                                currentlyPlayingSong = currentSong
+                                isPlaying = true
                             }
                         } else {
                             // Find the song in the general songs list
@@ -700,7 +652,7 @@ struct TrackDetailView: View {
     let togglePlayPause: () -> Void
     @Binding var subscriptionMessage: String?
     @Binding var isPlayingFromAlbum: Bool
-    @Binding var albumsWithTracks: [AlbumWithTracks]
+    @Binding var albumWithTracks: AlbumWithTracks?
     let albums: [Album]
     let playSong: (Song) -> Void
     @Binding var songs: [Song]
@@ -785,9 +737,9 @@ struct TrackDetailView: View {
                 // View Album Button
                 if isPlayingFromAlbum {
                     Button(action: {
-                        selectedAlbum = albumsWithTracks.first(where: { albumWithTracks in
-                            albumWithTracks.tracks.contains(where: { $0.id == song.id })
-                        })?.album
+                        if let albumWithTracks, albumWithTracks.tracks.contains(where: { $0.id == song.id }) {
+                            selectedAlbum = albumWithTracks.album
+                        }
                         
                         dismiss()
                         
@@ -828,15 +780,14 @@ struct TrackDetailView: View {
         animateTitle = false
         animateArtist = false
         
-        if isPlayingFromAlbum {
-            if let album = albumsWithTracks.first(where: { $0.tracks.contains(where: { $0.id == song.id }) }) {
-                if let currentIndex = album.tracks.firstIndex(where: { $0.id == song.id }) {
-                    let previousIndex = currentIndex - 1
-                    if previousIndex >= 0 {
-                        let previousSong = album.tracks[previousIndex]
-                        playSong(previousSong)
-                    }
-                }
+        if isPlayingFromAlbum,
+           let albumWithTracks, // Unwrap single album
+           let currentIndex = albumWithTracks.tracks.firstIndex(where: { $0.id == song.id }) {
+            
+            let previousIndex = currentIndex - 1
+            if previousIndex >= 0 {
+                let previousSong = albumWithTracks.tracks[previousIndex]
+                playSong(previousSong)
             }
         } else {
             if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
@@ -856,13 +807,14 @@ struct TrackDetailView: View {
         animateArtist = false
         
         if isPlayingFromAlbum {
-            if let album = albumsWithTracks.first(where: { $0.tracks.contains(where: { $0.id == song.id }) }) {
-                if let currentIndex = album.tracks.firstIndex(where: { $0.id == song.id }) {
-                    let nextIndex = currentIndex + 1
-                    if nextIndex < album.tracks.count {
-                        let nextSong = album.tracks[nextIndex]
-                        playSong(nextSong)
-                    }
+            if isPlayingFromAlbum,
+               let albumWithTracks,
+               let currentIndex = albumWithTracks.tracks.firstIndex(where: { $0.id == song.id }) {
+                
+                let nextIndex = currentIndex + 1
+                if nextIndex < albumWithTracks.tracks.count {
+                    let nextSong = albumWithTracks.tracks[nextIndex]
+                    playSong(nextSong)
                 }
             }
         } else {
@@ -1133,9 +1085,6 @@ struct FullAlbumGridView: View {
     }
 }
 
-
-
-
 // MARK: - Album Carousel Item View
 
 struct AlbumCarouselItemView: View {
@@ -1184,6 +1133,8 @@ struct AlbumDetailView: View {
     @State private var isLoadingTracks: Bool = true
     @Binding var isPlayingFromAlbum: Bool // Added binding
     @Binding var subscriptionMessage: String?
+    @Binding var albumWithTracks: AlbumWithTracks?
+    
     
     
     var body: some View {
@@ -1247,11 +1198,11 @@ struct AlbumDetailView: View {
         .navigationTitle("Album")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            await fetchAlbumTracks()
+            await fetchAlbumTracks(album: album)
         }
     }
     
-    func fetchAlbumTracks() async {
+    func fetchAlbumTracks(album: Album) async {
         do {
             // Ensure tracks are explicitly requested
             var albumRequest = MusicCatalogResourceRequest<Album>(matching: \.id, equalTo: album.id)
@@ -1260,14 +1211,14 @@ struct AlbumDetailView: View {
             let albumResponse = try await albumRequest.response()
             
             // Debug: Check if we received an album
-            guard let albumWithTracks = albumResponse.items.first else {
+            guard let fetchedAlbum = albumResponse.items.first else {
                 print("Error: Album not found.")
                 tracks = []
                 return
             }
             
             // Debug: Check if the album contains tracks
-            guard let albumTracks = albumWithTracks.tracks, !albumTracks.isEmpty else {
+            guard let albumTracks = fetchedAlbum.tracks, !albumTracks.isEmpty else {
                 print("Error: Album has no tracks.")
                 tracks = []
                 return
@@ -1288,6 +1239,8 @@ struct AlbumDetailView: View {
             
             // Assign fetched songs to the tracks array
             tracks = Array(songResponse.items)
+            
+            albumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
             
             
         } catch {
