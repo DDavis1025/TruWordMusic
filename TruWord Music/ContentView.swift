@@ -169,7 +169,7 @@ struct ContentView: View {
                         print("Showing details for album: \(album.title)")
                     }
             }
-            .sheet(isPresented: $showTrackDetail) {
+            .fullScreenCover(isPresented: $showTrackDetail) {
                 if let song = currentlyPlayingSong {
                     TrackDetailView(
                         song: song,
@@ -179,11 +179,12 @@ struct ContentView: View {
                         isPlayingFromAlbum: $isPlayingFromAlbum,
                         albumWithTracks: $albumWithTracks,
                         albums: albums,
-                        playSong: playSong, // Pass the playSong function
-                        songs: $songs // Pass the songs array as a binding
+                        playSong: playSong,
+                        songs: $songs
                     )
                     .environment(\.navigationPath, $navigationPath)
-                }
+
+              }
             }
             .task {
                 isLoading = true
@@ -666,108 +667,126 @@ struct TrackDetailView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            VStack {
-                Spacer().frame(height: 10) // Small space at the top
-                
-                // Album Artwork (Increased size)
-                if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 0.95), height: Int(geometry.size.width * 0.95)) {
-                    AsyncImage(url: artworkURL) { phase in
-                        switch phase {
-                        case .empty:
-                            ProgressView()
-                                .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
-                                .cornerRadius(12)
-                        case .failure:
-                            Image(systemName: "photo")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
-                                .foregroundColor(.gray)
-                        @unknown default:
-                            EmptyView()
+            ZStack {
+                VStack {
+                    Spacer().frame(height: 40) // Adjust the space for the image and button
+                    
+                    // Album Artwork (Increased size)
+                    if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 0.95), height: Int(geometry.size.width * 0.95)) {
+                        AsyncImage(url: artworkURL) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
+                                    .cornerRadius(12)
+                            case .failure:
+                                Image(systemName: "photo")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
+                                    .foregroundColor(.gray)
+                            @unknown default:
+                                EmptyView()
+                            }
                         }
-                    }
-                }
-                
-                Spacer().frame(height: 14) // More space between image and title
-                
-                // Song Title
-                ScrollableText(text: song.title, isAnimating: $animateTitle, scrollSpeed: 47.0)
-                    .font(.title3)
-                    .multilineTextAlignment(.center)
-                    .id("title-\(song.id)") // Unique ID for the title
-                
-                Spacer().frame(height: 12) // More space between title and artist name
-                
-                // Artist Name
-                ScrollableText(text: song.artistName, isAnimating: $animateArtist, scrollSpeed: 47.0)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                    .id("artist-\(song.id)") // Unique ID for the artist
-                
-                Spacer().frame(height: 30) // Ensures artist name is ~20 pts above play button
-                
-                // Controls (Previous, Play/Pause, Next)
-                HStack(spacing: 40) {
-                    Button(action: playPreviousSong) {
-                        Image(systemName: "backward.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(.primary)
                     }
                     
-                    Button(action: togglePlayPause) {
-                        Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.primary)
+                    Spacer().frame(height: 14) // More space between image and title
+                    
+                    // Song Title
+                    ScrollableText(text: song.title, isAnimating: $animateTitle, scrollSpeed: 47.0)
+                        .font(.title3)
+                        .multilineTextAlignment(.center)
+                        .id("title-\(song.id)") // Unique ID for the title
+                    
+                    Spacer().frame(height: 12) // More space between title and artist name
+                    
+                    // Artist Name
+                    ScrollableText(text: song.artistName, isAnimating: $animateArtist, scrollSpeed: 47.0)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .id("artist-\(song.id)") // Unique ID for the artist
+                    
+                    Spacer().frame(height: 30) // Ensures artist name is ~20 pts above play button
+                    
+                    // Controls (Previous, Play/Pause, Next)
+                    HStack(spacing: 40) {
+                        Button(action: playPreviousSong) {
+                            Image(systemName: "backward.fill")
+                                .font(.system(size: 28))
+                                .foregroundColor(.primary)
+                        }
+                        
+                        Button(action: togglePlayPause) {
+                            Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(.primary)
+                        }
+                        
+                        Button(action: playNextSong) {
+                            Image(systemName: "forward.fill")
+                                .font(.system(size: 28))
+                                .foregroundColor(.primary)
+                        }
+                    }
+                    .padding(.bottom, 10)
+                    
+                    // View Album Button
+                    if isPlayingFromAlbum {
+                        Button(action: {
+                            if let albumWithTracks, albumWithTracks.tracks.contains(where: { $0.id == song.id }) {
+                                selectedAlbum = albumWithTracks.album
+                            }
+                            
+                            dismiss()
+                            
+                            if let selectedAlbum = selectedAlbum {
+                                navigationPath?.wrappedValue.append(selectedAlbum)
+                            }
+                        }) {
+                            Text("View Album")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 16)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(10)
+                        }
+                        .padding(.top, 5)
                     }
                     
-                    Button(action: playNextSong) {
-                        Image(systemName: "forward.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(.primary)
+                    Spacer()
+                    
+                    // Subscription Message at the Bottom
+                    if let message = subscriptionMessage {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color(.systemBackground))
                     }
                 }
-                .padding(.bottom, 10)
                 
-                // View Album Button
-                if isPlayingFromAlbum {
-                    Button(action: {
-                        if let albumWithTracks, albumWithTracks.tracks.contains(where: { $0.id == song.id }) {
-                            selectedAlbum = albumWithTracks.album
+                // Close Button
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            dismiss()
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 28))
+                                .foregroundColor(.primary)
+                                .padding()
                         }
-                        
-                        dismiss()
-                        
-                        if let selectedAlbum = selectedAlbum {
-                            navigationPath?.wrappedValue.append(selectedAlbum)
-                        }
-                    }) {
-                        Text("View Album")
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .background(Color.blue.opacity(0.1))
-                            .cornerRadius(10)
                     }
-                    .padding(.top, 5)
-                }
-                
-                Spacer()
-                
-                // Subscription Message at the Bottom
-                if let message = subscriptionMessage {
-                    Text(message)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color(.systemBackground))
+                    Spacer()
                 }
             }
             .padding(.horizontal)
@@ -829,6 +848,7 @@ struct TrackDetailView: View {
         }
     }
 }
+
 
 struct ScrollableText: View {
     let text: String
@@ -984,18 +1004,25 @@ struct FullAlbumGridView: View {
     @State private var searchQuery: String = "" // State for search query
     @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
     
+    // State to store the albums that have been loaded
+    @State private var loadedAlbums: [Album] = []
+    
     // Filtered albums based on search query (title or artist name)
     var filteredAlbums: [Album] {
         if searchQuery.isEmpty {
-            return albums
+            return loadedAlbums
         } else {
-            return albums.filter { album in
+            return loadedAlbums.filter { album in
                 album.title.localizedCaseInsensitiveContains(searchQuery) ||
                 album.artistName.localizedCaseInsensitiveContains(searchQuery)
             }
         }
     }
     
+    // The number of albums to load at a time
+    let loadBatchSize = 20
+    
+    // Columns for LazyVGrid
     let columns = [
         GridItem(.flexible()),
         GridItem(.flexible())
@@ -1013,7 +1040,10 @@ struct FullAlbumGridView: View {
                     .onSubmit { isSearchBarFocused = false }
                 
                 if !searchQuery.isEmpty {
-                    Button(action: { searchQuery = "" }) {
+                    Button(action: {
+                        searchQuery = ""
+                        loadedAlbums = Array(albums.prefix(loadBatchSize)) // Reset loaded albums
+                    }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.gray)
                     }
@@ -1024,7 +1054,6 @@ struct FullAlbumGridView: View {
             
             // Content Section (Grid or Empty State)
             if filteredAlbums.isEmpty {
-                // Keeps the message below the search bar
                 Spacer()
                 Text("No albums found")
                     .font(.subheadline)
@@ -1036,30 +1065,11 @@ struct FullAlbumGridView: View {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(filteredAlbums, id: \.id) { album in
                             VStack {
-                                if let artworkURL = album.artwork?.url(width: 150, height: 150) {
-                                    AsyncImage(url: artworkURL) { phase in
-                                        switch phase {
-                                        case .empty:
-                                            Color.gray.opacity(0.3)
-                                                .frame(width: 150, height: 150)
-                                        case .success(let image):
-                                            image
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(width: 150, height: 150)
-                                                .clipped()
-                                                .cornerRadius(8)
-                                        case .failure:
-                                            Image(systemName: "photo")
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(width: 150, height: 150)
-                                                .clipped()
-                                                .foregroundColor(.gray)
-                                        @unknown default:
-                                            EmptyView()
-                                        }
-                                    }
+                                if let artworkURL = album.artwork?.url(width: 180, height: 180) {
+                                    CustomAsyncImage(url: artworkURL, placeholder: Image(systemName: "photo"))
+                                        .frame(width: 150, height: 150)
+                                        .clipped()
+                                        .cornerRadius(8)
                                 }
                                 Text(album.title)
                                     .font(.caption)
@@ -1072,6 +1082,12 @@ struct FullAlbumGridView: View {
                             .onTapGesture {
                                 onAlbumSelected(album)
                             }
+                            // Load more albums when the last item appears
+                            .onAppear {
+                                if album == filteredAlbums.last {
+                                    loadMoreAlbums()
+                                }
+                            }
                         }
                     }
                     .padding()
@@ -1082,8 +1098,22 @@ struct FullAlbumGridView: View {
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
         .onTapGesture { isSearchBarFocused = false } // Dismiss keyboard on tap
+        .onAppear {
+            // Load the first batch of albums when the view appears
+            if loadedAlbums.isEmpty {
+                loadedAlbums = Array(albums.prefix(loadBatchSize))
+            }
+        }
+    }
+    
+    // Function to load more albums
+    private func loadMoreAlbums() {
+        let nextIndex = loadedAlbums.count
+        let moreAlbums = albums.suffix(from: nextIndex).prefix(loadBatchSize)
+        loadedAlbums.append(contentsOf: moreAlbums)
     }
 }
+
 
 // MARK: - Album Carousel Item View
 
