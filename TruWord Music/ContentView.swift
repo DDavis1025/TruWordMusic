@@ -16,6 +16,7 @@ struct AlbumWithTracks {
     var tracks: [Song]
 }
 
+
 // Define a custom environment key
 struct NavigationPathKey: EnvironmentKey {
     static let defaultValue: Binding<NavigationPath>? = nil
@@ -669,7 +670,7 @@ struct TrackDetailView: View {
         GeometryReader { geometry in
             ZStack {
                 VStack {
-                    Spacer().frame(height: 40) // Adjust the space for the image and button
+                    Spacer().frame(height: 60) // Adjust the space for the image and button
                     
                     // Album Artwork (Increased size)
                     if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 0.95), height: Int(geometry.size.width * 0.95)) {
@@ -996,7 +997,6 @@ struct BottomPlayerView: View {
     }
 }
 
-
 struct FullAlbumGridView: View {
     let albums: [Album]
     let onAlbumSelected: (Album) -> Void
@@ -1004,25 +1004,18 @@ struct FullAlbumGridView: View {
     @State private var searchQuery: String = "" // State for search query
     @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
     
-    // State to store the albums that have been loaded
-    @State private var loadedAlbums: [Album] = []
-    
     // Filtered albums based on search query (title or artist name)
     var filteredAlbums: [Album] {
         if searchQuery.isEmpty {
-            return loadedAlbums
+            return albums
         } else {
-            return loadedAlbums.filter { album in
+            return albums.filter { album in
                 album.title.localizedCaseInsensitiveContains(searchQuery) ||
                 album.artistName.localizedCaseInsensitiveContains(searchQuery)
             }
         }
     }
     
-    // The number of albums to load at a time
-    let loadBatchSize = 20
-    
-    // Columns for LazyVGrid
     let columns = [
         GridItem(.flexible()),
         GridItem(.flexible())
@@ -1038,12 +1031,9 @@ struct FullAlbumGridView: View {
                     .cornerRadius(8)
                     .focused($isSearchBarFocused)
                     .onSubmit { isSearchBarFocused = false }
-                
+
                 if !searchQuery.isEmpty {
-                    Button(action: {
-                        searchQuery = ""
-                        loadedAlbums = Array(albums.prefix(loadBatchSize)) // Reset loaded albums
-                    }) {
+                    Button(action: { searchQuery = "" }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.gray)
                     }
@@ -1051,9 +1041,10 @@ struct FullAlbumGridView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-            
+
             // Content Section (Grid or Empty State)
             if filteredAlbums.isEmpty {
+                // Keeps the message below the search bar
                 Spacer()
                 Text("No albums found")
                     .font(.subheadline)
@@ -1065,11 +1056,30 @@ struct FullAlbumGridView: View {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(filteredAlbums, id: \.id) { album in
                             VStack {
-                                if let artworkURL = album.artwork?.url(width: 180, height: 180) {
-                                    CustomAsyncImage(url: artworkURL, placeholder: Image(systemName: "photo"))
-                                        .frame(width: 150, height: 150)
-                                        .clipped()
-                                        .cornerRadius(8)
+                                if let artworkURL = album.artwork?.url(width: 150, height: 150) {
+                                    AsyncImage(url: artworkURL) { phase in
+                                        switch phase {
+                                        case .empty:
+                                            Color.gray.opacity(0.3)
+                                                .frame(width: 150, height: 150)
+                                        case .success(let image):
+                                            image
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(width: 150, height: 150)
+                                                .clipped()
+                                                .cornerRadius(8)
+                                        case .failure:
+                                            Image(systemName: "photo")
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(width: 150, height: 150)
+                                                .clipped()
+                                                .foregroundColor(.gray)
+                                        @unknown default:
+                                            EmptyView()
+                                        }
+                                    }
                                 }
                                 Text(album.title)
                                     .font(.caption)
@@ -1082,12 +1092,6 @@ struct FullAlbumGridView: View {
                             .onTapGesture {
                                 onAlbumSelected(album)
                             }
-                            // Load more albums when the last item appears
-                            .onAppear {
-                                if album == filteredAlbums.last {
-                                    loadMoreAlbums()
-                                }
-                            }
                         }
                     }
                     .padding()
@@ -1098,19 +1102,6 @@ struct FullAlbumGridView: View {
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
         .onTapGesture { isSearchBarFocused = false } // Dismiss keyboard on tap
-        .onAppear {
-            // Load the first batch of albums when the view appears
-            if loadedAlbums.isEmpty {
-                loadedAlbums = Array(albums.prefix(loadBatchSize))
-            }
-        }
-    }
-    
-    // Function to load more albums
-    private func loadMoreAlbums() {
-        let nextIndex = loadedAlbums.count
-        let moreAlbums = albums.suffix(from: nextIndex).prefix(loadBatchSize)
-        loadedAlbums.append(contentsOf: moreAlbums)
     }
 }
 
