@@ -26,7 +26,6 @@ class ImageCache {
 
 struct CustomAsyncImage: View {
     let url: URL?
-    let placeholder: Image
     
     @State private var image: UIImage? = nil
     @State private var isLoading: Bool = false
@@ -36,14 +35,25 @@ struct CustomAsyncImage: View {
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFit()
+                    .scaledToFill() // Fill the frame while maintaining aspect ratio
             } else if isLoading {
-                ProgressView() // Show a loading indicator
-                    .frame(width: 50, height: 50)
+                ZStack {
+                    // Light grey background that matches the parent frame size
+                    Color(white: 0.95)
+                        .cornerRadius(8) // Match the corner radius of the parent
+                    
+                    // ProgressView centered in the frame
+                    ProgressView()
+                }
             } else {
-                placeholder // Show a placeholder if the image fails to load
+                // Directly use the "placeholder" image from assets
+                Image("placeholder")
+                    .resizable()
+                    .scaledToFill() // Fill the frame while maintaining aspect ratio
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity) // Expand to fill the parent frame
+        .clipped() // Clip content to the frame
         .onAppear {
             loadImage()
         }

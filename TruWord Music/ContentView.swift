@@ -619,7 +619,7 @@ struct SongRowView: View {
         HStack {
             // Album Artwork with configurable left padding
             if let artworkURL = song.artwork?.url(width: 150, height: 150) {
-                CustomAsyncImage(url: artworkURL, placeholder: Image(systemName: "photo"))
+                CustomAsyncImage(url: artworkURL)
                     .frame(width: 50, height: 50)
                     .clipped()
                     .cornerRadius(8)
@@ -674,27 +674,11 @@ struct TrackDetailView: View {
                     
                     // Album Artwork (Increased size)
                     if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 0.95), height: Int(geometry.size.width * 0.95)) {
-                        AsyncImage(url: artworkURL) { phase in
-                            switch phase {
-                            case .empty:
-                                ProgressView()
-                                    .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
-                                    .cornerRadius(12)
-                            case .failure:
-                                Image(systemName: "photo")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
-                                    .foregroundColor(.gray)
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
+                        CustomAsyncImage(url: artworkURL)
+                            .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
+                            .clipped()
+                            .cornerRadius(8)
+                            .id(song.id) // Unique ID to force recreation when song changes
                     }
                     
                     Spacer().frame(height: 14) // More space between image and title
@@ -958,8 +942,7 @@ struct BottomPlayerView: View {
         HStack {
             if let artworkURL = song.artwork?.url(width: 150, height: 150) {
                 CustomAsyncImage(
-                    url: artworkURL,
-                    placeholder: Image(systemName: "music.note") // Fallback placeholder
+                    url: artworkURL
                 )
                 .frame(width: 50, height: 50)
                 .cornerRadius(8)
@@ -1056,31 +1039,12 @@ struct FullAlbumGridView: View {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(filteredAlbums, id: \.id) { album in
                             VStack {
-                                if let artworkURL = album.artwork?.url(width: 150, height: 150) {
-                                    AsyncImage(url: artworkURL) { phase in
-                                        switch phase {
-                                        case .empty:
-                                            Color.gray.opacity(0.3)
-                                                .frame(width: 150, height: 150)
-                                        case .success(let image):
-                                            image
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(width: 150, height: 150)
-                                                .clipped()
-                                                .cornerRadius(8)
-                                        case .failure:
-                                            Image(systemName: "photo")
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(width: 150, height: 150)
-                                                .clipped()
-                                                .foregroundColor(.gray)
-                                        @unknown default:
-                                            EmptyView()
-                                        }
+                                if let artworkURL = album.artwork?.url(width: 200, height: 200) {
+                                    CustomAsyncImage(url: artworkURL)
+                                        .frame(width: 150, height: 150)
+                                        .clipped()
+                                        .cornerRadius(8)
                                     }
-                                }
                                 Text(album.title)
                                     .font(.caption)
                                     .lineLimit(1)
@@ -1113,28 +1077,10 @@ struct AlbumCarouselItemView: View {
     var body: some View {
         VStack {
             if let artworkURL = album.artwork?.url(width: 250, height: 250) {
-                AsyncImage(url: artworkURL) { phase in
-                    switch phase {
-                    case .empty:
-                        Color.gray.opacity(0.3)
-                            .frame(width: 150, height: 150)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 150, height: 150)
-                            .clipped()
-                            .cornerRadius(8)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 150, height: 150)
-                            .foregroundColor(.gray)
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
+                CustomAsyncImage(url: artworkURL)
+                    .frame(width: 150, height: 150)
+                    .clipped()
+                    .cornerRadius(8)
             }
             Text(album.title)
                 .font(.caption)
@@ -1161,27 +1107,10 @@ struct AlbumDetailView: View {
     var body: some View {
         VStack {
             if let artworkURL = album.artwork?.url(width: 350, height: 350) {
-                AsyncImage(url: artworkURL) { phase in
-                    switch phase {
-                    case .empty:
-                        Color.clear
-                            .frame(width: 250, height: 250)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 250, height: 250)
-                            .cornerRadius(12)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 250, height: 250)
-                            .foregroundColor(.gray)
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
+                CustomAsyncImage(url: artworkURL)
+                    .frame(width: 250, height: 250)
+                    .clipped()
+                    .cornerRadius(8)
             }
             Text(album.title)
                 .font(.headline) // Smaller font size
