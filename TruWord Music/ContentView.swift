@@ -392,8 +392,6 @@ struct ContentView: View {
         }
     }
     
-    
-    
     func previewDidEnd(player: AVPlayer) {
         guard let currentSong = currentlyPlayingSong else { return }
         
@@ -986,18 +984,7 @@ struct FullAlbumGridView: View {
     
     @State private var searchQuery: String = "" // State for search query
     @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
-    
-    // Filtered albums based on search query (title or artist name)
-    var filteredAlbums: [Album] {
-        if searchQuery.isEmpty {
-            return albums
-        } else {
-            return albums.filter { album in
-                album.title.localizedCaseInsensitiveContains(searchQuery) ||
-                album.artistName.localizedCaseInsensitiveContains(searchQuery)
-            }
-        }
-    }
+    @State private var filteredAlbums: [Album] = [] // State for filtered albums
     
     let columns = [
         GridItem(.flexible()),
@@ -1014,6 +1001,9 @@ struct FullAlbumGridView: View {
                     .cornerRadius(8)
                     .focused($isSearchBarFocused)
                     .onSubmit { isSearchBarFocused = false }
+                    .onChange(of: searchQuery) { _, newValue in
+                        filterAlbums(query: newValue)
+                    }
 
                 if !searchQuery.isEmpty {
                     Button(action: { searchQuery = "" }) {
@@ -1066,6 +1056,24 @@ struct FullAlbumGridView: View {
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
         .onTapGesture { isSearchBarFocused = false } // Dismiss keyboard on tap
+        .onAppear {
+            filterAlbums(query: searchQuery) // Initial load
+        }
+    }
+
+    // Perform filtering on a background thread
+    private func filterAlbums(query: String) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let filtered = query.isEmpty ? albums : albums.filter { album in
+                album.title.localizedCaseInsensitiveContains(query) ||
+                album.artistName.localizedCaseInsensitiveContains(query)
+            }
+            
+            // Update the UI on the main thread
+            DispatchQueue.main.async {
+                self.filteredAlbums = filtered
+            }
+        }
     }
 }
 
