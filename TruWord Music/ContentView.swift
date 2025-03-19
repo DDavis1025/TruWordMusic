@@ -52,6 +52,8 @@ struct ContentView: View {
     
     @State private var isLoading = false // Track loading state
     
+    @State private var playbackObservationTask: Task<Void, Never>?
+    
     @State private var navigationPath = NavigationPath()
     
     // Add scenePhase to detect app lifestyle changes
@@ -205,7 +207,7 @@ struct ContentView: View {
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 if newPhase == .active {
                     // App has entered the foreground
-                    onAppForeground()
+                       onAppForeground()
                 }
             }
         }
@@ -328,12 +330,16 @@ struct ContentView: View {
     
     // MARK: - Playback
     
+   
+   
     func playSong(_ song: Song) {
         Task {
             await checkAppleMusicStatus()
             
             if appleMusicSubscription {
+                // Use ApplicationMusicPlayer for full playback
                 do {
+                    print("appleMusicSubscription playSong")
                     let player = ApplicationMusicPlayer.shared
                     let queueSongs: [Song]
                     
@@ -362,13 +368,12 @@ struct ContentView: View {
                     print("Error playing full song: \(error.localizedDescription)")
                 }
             } else if let previewURL = song.previewAssets?.first?.url {
-                // Ensure no overlapping previews
+                // Use AVPlayer for preview playback
                 audioPlayer?.pause()
                 if let currentItem = audioPlayer?.currentItem {
                     NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: currentItem)
                 }
                 
-                // Initialize AVPlayer safely
                 audioPlayer = AVPlayer(url: previewURL)
                 
                 guard let audioPlayer = audioPlayer else {
@@ -386,8 +391,46 @@ struct ContentView: View {
                 audioPlayer.play()
                 currentlyPlayingSong = song
                 isPlaying = true
+                
+                // Stop ApplicationMusicPlayer and clear its queue
+                clearApplicationMusicPlayer()
+              
             } else {
                 print("No preview available and user is not subscribed.")
+                // Clear ApplicationMusicPlayer queue and Command Center metadata
+                clearApplicationMusicPlayer()
+            }
+        }
+    }
+    
+    func clearApplicationMusicPlayer() {
+        if !appleMusicSubscription {
+            let player = ApplicationMusicPlayer.shared
+            do {
+                // Stop playback
+                player.stop()
+                
+                // Reset the queue to an empty state
+                player.queue = .init()
+                
+                // Debug: Print the number of entries in the queue
+                print("Queue entries after reset: \(player.queue.entries.count)")
+                
+                // Forcefully clear the queue if it's not empty
+                if !player.queue.entries.isEmpty {
+                    print("Forcing queue to clear...")
+                    player.queue.entries.removeAll()
+                }
+                
+                // Verify the queue is empty
+                if player.queue.entries.isEmpty {
+                    print("ApplicationMusicPlayer queue cleared successfully.")
+                } else {
+                    print("Warning: Queue still contains entries after reset.")
+                }
+                
+                playbackObservationTask?.cancel()
+                playbackObservationTask = nil
             }
         }
     }
@@ -475,11 +518,21 @@ struct ContentView: View {
     }
     
     private func observePlaybackState() {
-        Task {
+        // Cancel the previous task if it exists
+        playbackObservationTask?.cancel()
+        
+        // Start a new task
+        playbackObservationTask = Task {
             let player = ApplicationMusicPlayer.shared
             var previousSong: Song? = currentlyPlayingSong
             
             while true {
+                // Check for cancellation
+                if Task.isCancelled {
+                    print("Playback observation task cancelled.")
+                    break
+                }
+                
                 // Check the current song every second
                 try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
                 
@@ -514,6 +567,7 @@ struct ContentView: View {
                     }
                 } else {
                     // No song is playing
+                    print("No song playing")
                     isPlaying = false
                 }
             }
@@ -982,9 +1036,9 @@ struct FullAlbumGridView: View {
     let albums: [Album]
     let onAlbumSelected: (Album) -> Void
     
-    @State private var searchQuery: String = "" // State for search query
-    @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
-    @State private var filteredAlbums: [Album] = [] // State for filtered albums
+    @State private var searchQuery: String = ""
+    @FocusState private var isSearchBarFocused: Bool
+    @State private var filteredAlbums: [Album] = []
     
     let columns = [
         GridItem(.flexible()),
@@ -1017,7 +1071,6 @@ struct FullAlbumGridView: View {
 
             // Content Section (Grid or Empty State)
             if filteredAlbums.isEmpty {
-                // Keeps the message below the search bar
                 Spacer()
                 Text("No albums found")
                     .font(.subheadline)
@@ -1052,10 +1105,10 @@ struct FullAlbumGridView: View {
                 }
             }
         }
-        .frame(maxHeight: .infinity, alignment: .top) // Ensures the search bar stays at the top
+        .frame(maxHeight: .infinity, alignment: .top)
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
-        .onTapGesture { isSearchBarFocused = false } // Dismiss keyboard on tap
+        .onTapGesture { isSearchBarFocused = false }
         .onAppear {
             filterAlbums(query: searchQuery) // Initial load
         }
@@ -1077,8 +1130,6 @@ struct FullAlbumGridView: View {
     }
 }
 
-
-// MARK: - Album Carousel Item View
 
 struct AlbumCarouselItemView: View {
     let album: Album
