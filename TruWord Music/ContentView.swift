@@ -40,7 +40,7 @@ struct ContentView: View {
     @State private var audioPlayer: AVPlayer?
     @State private var userAuthorized = false
     @State private var isPlaying = false
-    @State private var subscriptionMessage: String? = nil  // Inline message for non-subscribed users
+    @State private var bottomMessage: String? = nil  // Inline message for non-subscribed users
     @State private var showTrackDetail: Bool = false
     
     // New album-related state
@@ -53,6 +53,7 @@ struct ContentView: View {
     @State private var isLoading = false // Track loading state
     
     @State private var playbackObservationTask: Task<Void, Never>?
+    @State private var playerStateTask: Task<Void, Never>?
     
     @State private var navigationPath = NavigationPath()
     
@@ -111,7 +112,7 @@ struct ContentView: View {
                                         Spacer()
                                         if songs.count > 5 {
                                             NavigationLink("View More") {
-                                                FullTrackListView(songs: songs, playSong: playSong, currentlyPlayingSong: $currentlyPlayingSong, isPlayingFromAlbum: $isPlayingFromAlbum, subscriptionMessage: $subscriptionMessage)
+                                                FullTrackListView(songs: songs, playSong: playSong, currentlyPlayingSong: $currentlyPlayingSong, isPlayingFromAlbum: $isPlayingFromAlbum, bottomMessage: $bottomMessage)
                                             }
                                             .foregroundColor(.blue)
                                             .font(.system(size: 15)) // Smaller than .title2 (22pt)
@@ -125,7 +126,7 @@ struct ContentView: View {
                                             .onTapGesture {
                                                 playSong(song)
                                                 isPlayingFromAlbum = false
-                                                subscriptionMessage = nil
+                                                bottomMessage = nil
                                             }
                                     }
                                 }
@@ -139,7 +140,7 @@ struct ContentView: View {
                     if let song = currentlyPlayingSong {
                         VStack(spacing: 0) {
                             // Subscription Message (above BottomPlayerView)
-                            if let message = subscriptionMessage {
+                            if let message = bottomMessage {
                                 Text(message)
                                     .font(.caption)
                                     .foregroundColor(.red)
@@ -167,7 +168,7 @@ struct ContentView: View {
                 }
             }
             .navigationDestination(for: Album.self) { album in
-                AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum, subscriptionMessage: $subscriptionMessage, albumWithTracks: $albumWithTracks)
+                AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum, bottomMessage: $bottomMessage, albumWithTracks: $albumWithTracks)
                     .onAppear {
                         print("Showing details for album: \(album.title)")
                     }
@@ -178,7 +179,7 @@ struct ContentView: View {
                         song: song,
                         isPlaying: $isPlaying,
                         togglePlayPause: togglePlayPause,
-                        subscriptionMessage: $subscriptionMessage,
+                        bottomMessage: $bottomMessage,
                         isPlayingFromAlbum: $isPlayingFromAlbum,
                         albumWithTracks: $albumWithTracks,
                         albums: albums,
@@ -186,15 +187,16 @@ struct ContentView: View {
                         songs: $songs
                     )
                     .environment(\.navigationPath, $navigationPath)
-
-              }
+                    
+                }
             }
             .task {
                 isLoading = true
                 await requestMusicAuthorization()
-
+                
                 if musicAuthorized {
                     await withTaskGroup(of: Void.self) { group in
+                        group.addTask { await checkAppleMusicStatus() }
                         group.addTask { await fetchChristianSongs() }
                         group.addTask { await fetchChristianAlbums() }
                     }
@@ -202,12 +204,12 @@ struct ContentView: View {
                 
                 isLoading = false
             }
-
-
+            
+            
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 if newPhase == .active {
                     // App has entered the foreground
-                       onAppForeground()
+                    onAppForeground()
                 }
             }
         }
@@ -215,7 +217,13 @@ struct ContentView: View {
     
     // Function to call when the app enters the foreground
     private func onAppForeground() {
+        Task {
+            await checkAppleMusicStatus() // Refresh subscription status
+        }
         refreshCurrentSong()
+        if appleMusicSubscription {
+            monitorMusicPlayerState()
+        }
     }
     
     private func refreshCurrentSong() {
@@ -233,6 +241,29 @@ struct ContentView: View {
         }
     }
     
+    // Observe playback state when the app starts
+    func monitorMusicPlayerState() {
+        // Cancel the previous task if it exists
+        playerStateTask?.cancel()
+        
+        // Start a new task
+        playerStateTask = Task {
+            let player = ApplicationMusicPlayer.shared
+            while true {
+                // Check for cancellation
+                if Task.isCancelled {
+                    print("Player state observation task cancelled.")
+                    break
+                }
+                
+                let state = player.state
+                DispatchQueue.main.async {
+                    self.isPlaying = (state.playbackStatus == .playing)
+                }
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
+            }
+        }
+    }
     
     
     // MARK: - Authorization & Fetching
@@ -242,7 +273,6 @@ struct ContentView: View {
         if status == .authorized {
             musicAuthorized = true
             userAuthorized = true
-            await checkAppleMusicStatus()
         } else {
             musicAuthorized = false
             userAuthorized = false
@@ -322,7 +352,7 @@ struct ContentView: View {
             
             // Extract albums from the charts
             albums = albumCharts.flatMap { $0.items }
-    
+            
         } catch {
             print("Error fetching top Christian albums: \(error)")
         }
@@ -330,8 +360,8 @@ struct ContentView: View {
     
     // MARK: - Playback
     
-   
-   
+    
+    
     func playSong(_ song: Song) {
         Task {
             await checkAppleMusicStatus()
@@ -339,8 +369,8 @@ struct ContentView: View {
             if appleMusicSubscription {
                 // Use ApplicationMusicPlayer for full playback
                 do {
-                    print("appleMusicSubscription playSong")
                     let player = ApplicationMusicPlayer.shared
+                    
                     let queueSongs: [Song]
                     
                     if let albumWithTracks, albumWithTracks.tracks.contains(song), isPlayingFromAlbum {
@@ -361,7 +391,7 @@ struct ContentView: View {
                     
                     currentlyPlayingSong = song
                     isPlaying = true
-                    subscriptionMessage = nil
+                    bottomMessage = nil
                     
                     observePlaybackState()
                 } catch {
@@ -394,7 +424,7 @@ struct ContentView: View {
                 
                 // Stop ApplicationMusicPlayer and clear its queue
                 clearApplicationMusicPlayer()
-              
+                
             } else {
                 print("No preview available and user is not subscribed.")
                 // Clear ApplicationMusicPlayer queue and Command Center metadata
@@ -431,12 +461,22 @@ struct ContentView: View {
                 
                 playbackObservationTask?.cancel()
                 playbackObservationTask = nil
+                
+                playerStateTask?.cancel()
+                playerStateTask = nil
             }
         }
     }
     
     func previewDidEnd(player: AVPlayer) {
         guard let currentSong = currentlyPlayingSong else { return }
+        
+        if appleMusicSubscription {
+            // User subscribed after preview ended, switch to full playback
+            print("User has now subscribed. Switching to full playback.")
+            playSong(currentSong)
+            return
+        }
         
         let nextSong: Song?
         
@@ -470,54 +510,72 @@ struct ContentView: View {
         }
     }
     
+    
     func showSubscriptionMessage() {
-        withAnimation {
-            subscriptionMessage = "Preview ended. Log in or subscribe to Apple Music to play the full song."
-        }
-        if isPlayingFromAlbum {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                withAnimation {
-                    subscriptionMessage = nil
+        if !appleMusicSubscription {
+            withAnimation {
+                bottomMessage = "Preview ended. Log in or subscribe to Apple Music to play the full song."
+            }
+            if isPlayingFromAlbum {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 9) {
+                    withAnimation {
+                        bottomMessage = nil
+                    }
                 }
             }
+        } else {
+            bottomMessage = nil
         }
     }
     
     // MARK: - Settings & Toggle
     
+    // Updated togglePlayPause function
     func togglePlayPause() {
         if appleMusicSubscription {
             let player = ApplicationMusicPlayer.shared
-            if isPlaying {
-                player.pause()
-            } else {
-                Task {
-                    do {
+            
+            Task {
+                do {
+                    let state = player.state.playbackStatus
+                    
+                    if state == .playing {
+                        player.pause()
+                    } else {
                         try await player.play()
-                    } catch {
-                        print("Error resuming playback: \(error.localizedDescription)")
                     }
+                    
+                    // Force `isPlaying` update manually in case the observer is not fast enough
+                    DispatchQueue.main.async {
+                        self.isPlaying = (state == .paused)
+                    }
+                    
+                } catch {
+                    print("Error toggling playback: \(error.localizedDescription)")
                 }
             }
+            
         } else {
-            if isPlaying {
-                audioPlayer?.pause()
-            } else {
-                // If the preview has ended and the user presses play, restart the preview
-                audioPlayer?.play()
-                self.subscriptionMessage = nil
+            if let audioPlayer = audioPlayer {
+                if isPlaying {
+                    audioPlayer.pause()
+                } else {
+                    audioPlayer.play()
+                    self.bottomMessage = nil
+                }
             }
+            
+            isPlaying.toggle() // Only toggle manually for AVPlayer since we don't observe it
         }
-        isPlaying.toggle()
     }
     
     private func selectAlbum(_ album: Album) {
         selectedAlbum = album
-        print("album \(album)")
         navigationPath.append(album) // Simply append the album to the navigation path
     }
     
     private func observePlaybackState() {
+        print("observePlaybackState")
         // Cancel the previous task if it exists
         playbackObservationTask?.cancel()
         
@@ -582,7 +640,7 @@ struct FullTrackListView: View {
     let playSong: (Song) -> Void
     @Binding var currentlyPlayingSong: Song?
     @Binding var isPlayingFromAlbum: Bool
-    @Binding var subscriptionMessage: String?
+    @Binding var bottomMessage: String?
     
     @State private var searchQuery: String = "" // State for search query
     @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
@@ -641,7 +699,7 @@ struct FullTrackListView: View {
                             .onTapGesture {
                                 playSong(song)
                                 isPlayingFromAlbum = false
-                                subscriptionMessage = nil
+                                bottomMessage = nil
                             }
                             .padding(.vertical, 5)
                             .background(Color(.systemBackground))
@@ -704,7 +762,7 @@ struct TrackDetailView: View {
     let song: Song
     @Binding var isPlaying: Bool
     let togglePlayPause: () -> Void
-    @Binding var subscriptionMessage: String?
+    @Binding var bottomMessage: String?
     @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
     let albums: [Album]
@@ -725,7 +783,7 @@ struct TrackDetailView: View {
                     Spacer().frame(height: 60) // Adjust the space for the image and button
                     
                     // Album Artwork (Increased size)
-                    if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 0.95), height: Int(geometry.size.width * 0.95)) {
+                    if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 1.0), height: Int(geometry.size.width * 1.0)) {
                         CustomAsyncImage(url: artworkURL)
                             .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
                             .clipped()
@@ -800,7 +858,7 @@ struct TrackDetailView: View {
                     Spacer()
                     
                     // Subscription Message at the Bottom
-                    if let message = subscriptionMessage {
+                    if let message = bottomMessage {
                         Text(message)
                             .font(.caption)
                             .foregroundColor(.red)
@@ -851,7 +909,7 @@ struct TrackDetailView: View {
                 if previousIndex >= 0 {
                     let previousSong = songs[previousIndex]
                     playSong(previousSong)
-                    subscriptionMessage = nil
+                    bottomMessage = nil
                 }
             }
         }
@@ -879,7 +937,7 @@ struct TrackDetailView: View {
                 if nextIndex < songs.count {
                     let nextSong = songs[nextIndex]
                     playSong(nextSong)
-                    subscriptionMessage = nil
+                    bottomMessage = nil
                 }
             }
         }
@@ -1058,7 +1116,7 @@ struct FullAlbumGridView: View {
                     .onChange(of: searchQuery) { _, newValue in
                         filterAlbums(query: newValue)
                     }
-
+                
                 if !searchQuery.isEmpty {
                     Button(action: { searchQuery = "" }) {
                         Image(systemName: "xmark.circle.fill")
@@ -1068,7 +1126,7 @@ struct FullAlbumGridView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-
+            
             // Content Section (Grid or Empty State)
             if filteredAlbums.isEmpty {
                 Spacer()
@@ -1087,7 +1145,7 @@ struct FullAlbumGridView: View {
                                         .frame(width: 150, height: 150)
                                         .clipped()
                                         .cornerRadius(8)
-                                    }
+                                }
                                 Text(album.title)
                                     .font(.caption)
                                     .lineLimit(1)
@@ -1113,7 +1171,7 @@ struct FullAlbumGridView: View {
             filterAlbums(query: searchQuery) // Initial load
         }
     }
-
+    
     // Perform filtering on a background thread
     private func filterAlbums(query: String) {
         DispatchQueue.global(qos: .userInitiated).async {
@@ -1158,7 +1216,7 @@ struct AlbumDetailView: View {
     @State private var tracks: [Song] = []
     @State private var isLoadingTracks: Bool = true
     @Binding var isPlayingFromAlbum: Bool // Added binding
-    @Binding var subscriptionMessage: String?
+    @Binding var bottomMessage: String?
     @Binding var albumWithTracks: AlbumWithTracks?
     
     
@@ -1187,7 +1245,7 @@ struct AlbumDetailView: View {
                         Button {
                             playSong(song)
                             isPlayingFromAlbum = true
-                            subscriptionMessage = nil
+                            bottomMessage = nil
                         } label: {
                             VStack(alignment: .leading) {
                                 Text(song.title)
