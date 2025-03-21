@@ -239,10 +239,8 @@ struct ContentView: View {
                 case .song(let song):
                     currentlyPlayingSong = song
                 default:
-                    currentlyPlayingSong = nil // Handle other cases if needed
+                    return
                 }
-            } else {
-                currentlyPlayingSong = nil
             }
         }
     }
@@ -299,22 +297,6 @@ struct ContentView: View {
                     self.isPlaying = (state.playbackStatus == .playing)
                 }
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
-            }
-        }
-    }
-
-    private func resetSong() async {
-        // If a song was playing and user is not subscribed, restart it
-        let player = ApplicationMusicPlayer.shared
-        if let currentSong = currentlyPlayingSong {
-            Task {
-                do {
-                    print("User is not subscribed. Seeking to 0 and restarting the song.")
-                    player.queue = ApplicationMusicPlayer.Queue(for: [currentSong]) // Reset queue to same song
-                    try await player.play()
-                } catch {
-                    print("Error restarting song: \(error.localizedDescription)")
-                }
             }
         }
     }
@@ -524,13 +506,6 @@ struct ContentView: View {
     
     func previewDidEnd(player: AVPlayer) {
         guard let currentSong = currentlyPlayingSong else { return }
-        
-        if appleMusicSubscription {
-            // User subscribed after preview ended, switch to full playback
-            print("User has now subscribed. Switching to full playback.")
-            playSong(currentSong)
-            return
-        }
         
         let nextSong: Song?
         
