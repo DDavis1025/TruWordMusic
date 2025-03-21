@@ -52,6 +52,8 @@ struct ContentView: View {
     
     @State private var isLoading = false // Track loading state
     
+    @State private var isBottomPlayerVisible: Bool = true
+    
     @State private var playbackObservationTask: Task<Void, Never>?
     @State private var playerStateTask: Task<Void, Never>?
     
@@ -219,10 +221,14 @@ struct ContentView: View {
     private func onAppForeground() {
         Task {
             await checkAppleMusicStatus() // Refresh subscription status
-        }
-        refreshCurrentSong()
-        if appleMusicSubscription {
-            monitorMusicPlayerState()
+//            refreshCurrentSong()
+            
+            if appleMusicSubscription {
+                monitorMusicPlayerState()
+                await stopAndReplaceAVPlayer()
+            } else {
+                await stopApplicationMusicPlayer()
+            }
         }
     }
     
@@ -241,7 +247,39 @@ struct ContentView: View {
         }
     }
     
-    // Observe playback state when the app starts
+    func stopApplicationMusicPlayer() async {
+        let player = ApplicationMusicPlayer.shared
+            
+            // Check if the playback status is playing or paused, and the queue is not empty
+        if player.state.playbackStatus == .playing || player.state.playbackStatus == .paused {
+            if !player.queue.entries.isEmpty {
+                    currentlyPlayingSong = nil
+                    clearApplicationMusicPlayer()
+                }
+            }
+    }
+    
+    func stopAndReplaceAVPlayer() async {
+        let player = ApplicationMusicPlayer.shared
+            Task {
+                await checkAppleMusicStatus() // Check if user is now logged in
+                
+                if appleMusicSubscription {
+                    // Stop the preview playback if it was playing
+                    audioPlayer?.pause()
+                    
+                    // Switch to ApplicationMusicPlayer for full playback
+                    if let currentSong = currentlyPlayingSong {
+                        if player.state.playbackStatus != .playing || player.state.playbackStatus != .paused {
+                            if player.queue.entries.isEmpty {
+                                playSong(currentSong) // Start full playback using ApplicationMusicPlayer
+                                }
+                            }
+                    }
+                }
+            }
+        }
+    
     func monitorMusicPlayerState() {
         // Cancel the previous task if it exists
         playerStateTask?.cancel()
@@ -261,6 +299,22 @@ struct ContentView: View {
                     self.isPlaying = (state.playbackStatus == .playing)
                 }
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
+            }
+        }
+    }
+
+    private func resetSong() async {
+        // If a song was playing and user is not subscribed, restart it
+        let player = ApplicationMusicPlayer.shared
+        if let currentSong = currentlyPlayingSong {
+            Task {
+                do {
+                    print("User is not subscribed. Seeking to 0 and restarting the song.")
+                    player.queue = ApplicationMusicPlayer.Queue(for: [currentSong]) // Reset queue to same song
+                    try await player.play()
+                } catch {
+                    print("Error restarting song: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -532,9 +586,8 @@ struct ContentView: View {
     
     // Updated togglePlayPause function
     func togglePlayPause() {
-        if appleMusicSubscription {
-            let player = ApplicationMusicPlayer.shared
-            
+        let player = ApplicationMusicPlayer.shared
+        if appleMusicSubscription || player.queue.entries != [] {
             Task {
                 do {
                     let state = player.state.playbackStatus
@@ -575,7 +628,6 @@ struct ContentView: View {
     }
     
     private func observePlaybackState() {
-        print("observePlaybackState")
         // Cancel the previous task if it exists
         playbackObservationTask?.cancel()
         
