@@ -221,7 +221,7 @@ struct ContentView: View {
     private func onAppForeground() {
         Task {
             await checkAppleMusicStatus() // Refresh subscription status
-//            refreshCurrentSong()
+            refreshCurrentSong()
             
             if appleMusicSubscription {
                 monitorMusicPlayerState()
