@@ -251,6 +251,7 @@ struct ContentView: View {
             // Check if the playback status is playing or paused, and the queue is not empty
         if player.state.playbackStatus == .playing || player.state.playbackStatus == .paused {
             if !player.queue.entries.isEmpty {
+                    showTrackDetail = false // Dismiss TrackDetailView
                     currentlyPlayingSong = nil
                     clearApplicationMusicPlayer()
                 }
@@ -561,10 +562,11 @@ struct ContentView: View {
     
     // Updated togglePlayPause function
     func togglePlayPause() {
-        let player = ApplicationMusicPlayer.shared
-        if appleMusicSubscription || player.queue.entries != [] {
+
+        if appleMusicSubscription {
             Task {
                 do {
+                    let player = ApplicationMusicPlayer.shared
                     let state = player.state.playbackStatus
                     
                     if state == .playing {
@@ -1121,9 +1123,20 @@ struct FullAlbumGridView: View {
     let albums: [Album]
     let onAlbumSelected: (Album) -> Void
     
-    @State private var searchQuery: String = ""
-    @FocusState private var isSearchBarFocused: Bool
-    @State private var filteredAlbums: [Album] = []
+    @State private var searchQuery: String = "" // State for search query
+    @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
+    
+    // Filtered albums based on search query (title or artist name)
+    var filteredAlbums: [Album] {
+        if searchQuery.isEmpty {
+            return albums
+        } else {
+            return albums.filter { album in
+                album.title.localizedCaseInsensitiveContains(searchQuery) ||
+                album.artistName.localizedCaseInsensitiveContains(searchQuery)
+            }
+        }
+    }
     
     let columns = [
         GridItem(.flexible()),
@@ -1140,10 +1153,7 @@ struct FullAlbumGridView: View {
                     .cornerRadius(8)
                     .focused($isSearchBarFocused)
                     .onSubmit { isSearchBarFocused = false }
-                    .onChange(of: searchQuery) { _, newValue in
-                        filterAlbums(query: newValue)
-                    }
-                
+
                 if !searchQuery.isEmpty {
                     Button(action: { searchQuery = "" }) {
                         Image(systemName: "xmark.circle.fill")
@@ -1153,9 +1163,10 @@ struct FullAlbumGridView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-            
+
             // Content Section (Grid or Empty State)
             if filteredAlbums.isEmpty {
+                // Keeps the message below the search bar
                 Spacer()
                 Text("No albums found")
                     .font(.subheadline)
@@ -1172,7 +1183,7 @@ struct FullAlbumGridView: View {
                                         .frame(width: 150, height: 150)
                                         .clipped()
                                         .cornerRadius(8)
-                                }
+                                    }
                                 Text(album.title)
                                     .font(.caption)
                                     .lineLimit(1)
@@ -1190,31 +1201,12 @@ struct FullAlbumGridView: View {
                 }
             }
         }
-        .frame(maxHeight: .infinity, alignment: .top)
+        .frame(maxHeight: .infinity, alignment: .top) // Ensures the search bar stays at the top
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
-        .onTapGesture { isSearchBarFocused = false }
-        .onAppear {
-            filterAlbums(query: searchQuery) // Initial load
-        }
-    }
-    
-    // Perform filtering on a background thread
-    private func filterAlbums(query: String) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let filtered = query.isEmpty ? albums : albums.filter { album in
-                album.title.localizedCaseInsensitiveContains(query) ||
-                album.artistName.localizedCaseInsensitiveContains(query)
-            }
-            
-            // Update the UI on the main thread
-            DispatchQueue.main.async {
-                self.filteredAlbums = filtered
-            }
-        }
+        .onTapGesture { isSearchBarFocused = false } // Dismiss keyboard on tap
     }
 }
-
 
 struct AlbumCarouselItemView: View {
     let album: Album
