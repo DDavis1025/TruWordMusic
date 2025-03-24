@@ -30,7 +30,6 @@ extension EnvironmentValues {
     }
 }
 
-
 struct ContentView: View {
     // Existing song/player state
     @State private var musicAuthorized = false
@@ -132,6 +131,19 @@ struct ContentView: View {
                                             }
                                     }
                                 }
+                            } else {
+                                // Show message when music access is not authorized
+                                Text("Please allow Apple Music access to continue using this app.")
+                                    .foregroundColor(.red)
+                                    .padding()
+                                
+                                Button(action: {
+                                    openAppSettings()
+                                }) {
+                                    Text("Enable in Settings")
+                                        .foregroundColor(.blue)
+                                }
+                                .padding()
                             }
                         }
                         .padding(.horizontal, 16) // Add horizontal padding to the ScrollView
@@ -207,7 +219,6 @@ struct ContentView: View {
                 isLoading = false
             }
             
-            
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 if newPhase == .active {
                     // App has entered the foreground
@@ -215,6 +226,13 @@ struct ContentView: View {
                 }
             }
         }
+    }
+    
+    func openAppSettings() {
+        guard let appSettingsUrl = URL(string: UIApplication.openSettingsURLString),
+              UIApplication.shared.canOpenURL(appSettingsUrl) else { return }
+        
+        UIApplication.shared.open(appSettingsUrl)
     }
     
     // Function to call when the app enters the foreground
@@ -672,7 +690,6 @@ struct FullTrackListView: View {
     @Binding var bottomMessage: String?
     
     @State private var searchQuery: String = "" // State for search query
-    @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
     
     // Filtered songs based on search query (title or artist name)
     var filteredSongs: [Song] {
@@ -688,25 +705,6 @@ struct FullTrackListView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Search Bar at the Top
-            HStack {
-                TextField("Search tracks...", text: $searchQuery)
-                    .padding(10)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-                    .focused($isSearchBarFocused)
-                    .onSubmit { isSearchBarFocused = false }
-                
-                if !searchQuery.isEmpty {
-                    Button(action: { searchQuery = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
-                    }
-                }
-            }
-            .padding(.horizontal)
-            .padding(.top, 8)
-            
             // Content Section (List or Empty State)
             if filteredSongs.isEmpty {
                 Spacer()
@@ -737,10 +735,10 @@ struct FullTrackListView: View {
                 }
             }
         }
-        .frame(maxHeight: .infinity, alignment: .top) // Ensures the search bar stays at the top
+        .frame(maxHeight: .infinity, alignment: .top) // Ensures the content stays at the top
         .navigationTitle("Top Songs")
         .navigationBarTitleDisplayMode(.inline)
-        .onTapGesture { isSearchBarFocused = false } // Dismiss keyboard on tap
+        .searchable(text: $searchQuery) // Add the searchable modifier
     }
 }
 
@@ -1124,8 +1122,7 @@ struct FullAlbumGridView: View {
     let onAlbumSelected: (Album) -> Void
     
     @State private var searchQuery: String = "" // State for search query
-    @FocusState private var isSearchBarFocused: Bool // Track search bar focus state
-    
+
     // Filtered albums based on search query (title or artist name)
     var filteredAlbums: [Album] {
         if searchQuery.isEmpty {
@@ -1137,7 +1134,7 @@ struct FullAlbumGridView: View {
             }
         }
     }
-    
+
     let columns = [
         GridItem(.flexible()),
         GridItem(.flexible())
@@ -1145,25 +1142,6 @@ struct FullAlbumGridView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Search Bar at the Top
-            HStack {
-                TextField("Search albums...", text: $searchQuery)
-                    .padding(10)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-                    .focused($isSearchBarFocused)
-                    .onSubmit { isSearchBarFocused = false }
-
-                if !searchQuery.isEmpty {
-                    Button(action: { searchQuery = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
-                    }
-                }
-            }
-            .padding(.horizontal)
-            .padding(.top, 8)
-
             // Content Section (Grid or Empty State)
             if filteredAlbums.isEmpty {
                 // Keeps the message below the search bar
@@ -1201,10 +1179,9 @@ struct FullAlbumGridView: View {
                 }
             }
         }
-        .frame(maxHeight: .infinity, alignment: .top) // Ensures the search bar stays at the top
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
-        .onTapGesture { isSearchBarFocused = false } // Dismiss keyboard on tap
+        .searchable(text: $searchQuery) // Searchable modifier for iOS 15+
     }
 }
 
@@ -1336,9 +1313,4 @@ struct AlbumDetailView: View {
         
         isLoadingTracks = false
     }
-}
-
-
-#Preview {
-    ContentView()
 }
