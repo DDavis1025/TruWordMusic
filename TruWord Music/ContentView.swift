@@ -50,6 +50,7 @@ struct ContentView: View {
     @State private var isPlayingFromAlbum: Bool = false // Track if playing from album
     
     @State private var isLoading = false // Track loading state
+    @State private var hasRequestedMusicAuthorization = false
     
     @State private var isBottomPlayerVisible: Bool = true
     
@@ -64,7 +65,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack(alignment: .bottom) {
-                if isLoading {
+                if isLoading || !hasRequestedMusicAuthorization {
                     ProgressView("Loading...")
                         .progressViewStyle(CircularProgressViewStyle())
                         .scaleEffect(1.5)
@@ -328,9 +329,11 @@ struct ContentView: View {
         if status == .authorized {
             musicAuthorized = true
             userAuthorized = true
+            hasRequestedMusicAuthorization = true
         } else {
             musicAuthorized = false
             userAuthorized = false
+            hasRequestedMusicAuthorization = true
         }
     }
     
@@ -755,14 +758,16 @@ struct SongRowView: View {
     var body: some View {
         HStack {
             // Album Artwork with configurable left padding
+            let screenWidth = UIScreen.main.bounds.width
+            let songArtworkSize = min(max(screenWidth * 0.15, 50), 100) // Scales dynamically between 50-100pt
+
             if let artworkURL = song.artwork?.url(width: 150, height: 150) {
                 CustomAsyncImage(url: artworkURL)
-                    .frame(width: 50, height: 50)
+                    .frame(width: songArtworkSize, height: songArtworkSize)
                     .clipped()
                     .cornerRadius(8)
                     .padding(.leading, leftPadding) // Use configurable left padding
             }
-            
             // Song Title and Artist Name with configurable right padding
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.title)
@@ -1077,18 +1082,14 @@ struct BottomPlayerView: View {
     
     var body: some View {
         HStack {
-            if let artworkURL = song.artwork?.url(width: 150, height: 150) {
-                CustomAsyncImage(
-                    url: artworkURL
-                )
-                .frame(width: 50, height: 50)
-                .cornerRadius(8)
-            } else {
-                Image(systemName: "music.note") // Fallback icon if artwork is nil
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 50, height: 50)
-                    .foregroundColor(.gray)
+            let screenWidth = UIScreen.main.bounds.width
+            let songArtworkSize = min(max(screenWidth * 0.14, 40), 90) // Scales dynamically between 50-100pt
+
+            if let artworkURL = song.artwork?.url(width: 120, height: 120) {
+                CustomAsyncImage(url: artworkURL)
+                    .frame(width: songArtworkSize, height: songArtworkSize)
+                    .clipped()
+                    .cornerRadius(8)
             }
             
             VStack(alignment: .leading) {
@@ -1121,9 +1122,8 @@ struct FullAlbumGridView: View {
     let albums: [Album]
     let onAlbumSelected: (Album) -> Void
     
-    @State private var searchQuery: String = "" // State for search query
+    @State private var searchQuery: String = ""
 
-    // Filtered albums based on search query (title or artist name)
     var filteredAlbums: [Album] {
         if searchQuery.isEmpty {
             return albums
@@ -1135,16 +1135,16 @@ struct FullAlbumGridView: View {
         }
     }
 
-    let columns = [
-        GridItem(.flexible()),
-        GridItem(.flexible())
-    ]
-    
     var body: some View {
+        let screenWidth = UIScreen.main.bounds.width
+        let albumSize = max(min(screenWidth * 0.3, 220), 150) // Dynamic size: min 150px, max 220px
+
+        let columns = [
+            GridItem(.adaptive(minimum: albumSize), spacing: 20)
+        ]
+
         VStack(alignment: .leading, spacing: 10) {
-            // Content Section (Grid or Empty State)
             if filteredAlbums.isEmpty {
-                // Keeps the message below the search bar
                 Spacer()
                 Text("No albums found")
                     .font(.subheadline)
@@ -1153,22 +1153,24 @@ struct FullAlbumGridView: View {
                 Spacer()
             } else {
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 16) {
+                    LazyVGrid(columns: columns, spacing: 30) { // Increased spacing
                         ForEach(filteredAlbums, id: \.id) { album in
                             VStack {
-                                if let artworkURL = album.artwork?.url(width: 200, height: 200) {
+                                if let artworkURL = album.artwork?.url(width: 300, height: 300) {
                                     CustomAsyncImage(url: artworkURL)
-                                        .frame(width: 150, height: 150)
+                                        .frame(width: albumSize, height: albumSize)
                                         .clipped()
-                                        .cornerRadius(8)
-                                    }
+                                        .cornerRadius(12)
+                                }
                                 Text(album.title)
                                     .font(.caption)
                                     .lineLimit(1)
+                                    .frame(width: albumSize - 20)
                                 Text(album.artistName)
                                     .font(.caption2)
                                     .foregroundColor(.gray)
                                     .lineLimit(1)
+                                    .frame(width: albumSize - 20)
                             }
                             .onTapGesture {
                                 onAlbumSelected(album)
@@ -1181,25 +1183,36 @@ struct FullAlbumGridView: View {
         }
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchQuery) // Searchable modifier for iOS 15+
+        .searchable(text: $searchQuery)
     }
 }
 
-struct AlbumCarouselItemView: View {
-    let album: Album
-    var body: some View {
-        VStack {
-            if let artworkURL = album.artwork?.url(width: 250, height: 250) {
-                CustomAsyncImage(url: artworkURL)
-                    .frame(width: 150, height: 150)
-                    .clipped()
-                    .cornerRadius(8)
+
+
+
+
+    struct AlbumCarouselItemView: View {
+        let album: Album
+        
+        var body: some View {
+            let screenWidth = UIScreen.main.bounds.width
+            let albumSize = max(min(screenWidth * 0.3, 220), 150) // Dynamic size: min 150px, max 220px
+
+            VStack {
+                if let artworkURL = album.artwork?.url(width: 280, height: 280) {
+
+                    CustomAsyncImage(url: artworkURL)
+                        .frame(width: albumSize, height: albumSize)
+                        .clipped()
+                        .cornerRadius(12)
+                }
+                
+                Text(album.title)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .frame(maxWidth: 150) // Prevent text from stretching too wide
             }
-            Text(album.title)
-                .font(.caption)
-                .lineLimit(1)
-        }
-        .frame(width: 150)
+            .frame(maxWidth: albumSize) // Ensure VStack wraps around the image properly
     }
 }
 
@@ -1220,10 +1233,13 @@ struct AlbumDetailView: View {
     var body: some View {
         VStack {
             if let artworkURL = album.artwork?.url(width: 350, height: 350) {
+                let screenWidth = UIScreen.main.bounds.width
+                let albumSize = min(max(screenWidth * 0.5, 150), 300) // Keeps size between 150-300pt
+
                 CustomAsyncImage(url: artworkURL)
-                    .frame(width: 250, height: 250)
+                    .frame(width: albumSize, height: albumSize)
                     .clipped()
-                    .cornerRadius(8)
+                    .cornerRadius(12)
             }
             Text(album.title)
                 .font(.headline) // Smaller font size
