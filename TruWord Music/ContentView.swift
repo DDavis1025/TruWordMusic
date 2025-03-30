@@ -1094,10 +1094,10 @@ struct BottomPlayerView: View {
             
             VStack(alignment: .leading) {
                 Text(song.title)
-                    .font(.headline)
+                    .font(.subheadline)
                     .lineLimit(1)
                 Text(song.artistName)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundColor(.gray)
                     .lineLimit(1)
             }
@@ -1137,7 +1137,7 @@ struct FullAlbumGridView: View {
 
     var body: some View {
         let screenWidth = UIScreen.main.bounds.width
-        let albumSize = max(min(screenWidth * 0.3, 220), 150) // Dynamic size: min 150px, max 220px
+        let albumSize = max(min(screenWidth * 0.4, 255), 150) // Dynamic size: min 150px, max 220px
 
         let columns = [
             GridItem(.adaptive(minimum: albumSize), spacing: 20)
@@ -1156,7 +1156,7 @@ struct FullAlbumGridView: View {
                     LazyVGrid(columns: columns, spacing: 30) { // Increased spacing
                         ForEach(filteredAlbums, id: \.id) { album in
                             VStack {
-                                if let artworkURL = album.artwork?.url(width: 300, height: 300) {
+                                if let artworkURL = album.artwork?.url(width: 280, height: 280) {
                                     CustomAsyncImage(url: artworkURL)
                                         .frame(width: albumSize, height: albumSize)
                                         .clipped()
@@ -1196,7 +1196,7 @@ struct FullAlbumGridView: View {
         
         var body: some View {
             let screenWidth = UIScreen.main.bounds.width
-            let albumSize = max(min(screenWidth * 0.3, 220), 150) // Dynamic size: min 150px, max 220px
+            let albumSize = max(min(screenWidth * 0.4, 255), 150) // Dynamic size: min 150px, max 220px
 
             VStack {
                 if let artworkURL = album.artwork?.url(width: 280, height: 280) {
@@ -1242,8 +1242,11 @@ struct AlbumDetailView: View {
                     .cornerRadius(12)
             }
             Text(album.title)
-                .font(.headline) // Smaller font size
+                .font(.headline)
                 .padding(.top)
+            Text(album.artistName)
+                .font(.subheadline)
+                .foregroundColor(.gray)
             
             if isLoadingTracks {
                 ProgressView("Loading tracks...")
