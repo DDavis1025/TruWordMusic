@@ -207,18 +207,22 @@ struct ContentView: View {
             }
             .task {
                 isLoading = true
-                await requestMusicAuthorization()
+                hasRequestedMusicAuthorization = true
                 
+                async let authorization: () = requestMusicAuthorization()
+                async let appleMusicStatus: () = checkAppleMusicStatus()
+                async let christianSongs: () = fetchChristianSongs()
+                async let christianAlbums: () = fetchChristianAlbums()
+                
+                // Wait for authorization first, but start fetching in parallel
+                await authorization
                 if musicAuthorized {
-                    await withTaskGroup(of: Void.self) { group in
-                        group.addTask { await checkAppleMusicStatus() }
-                        group.addTask { await fetchChristianSongs() }
-                        group.addTask { await fetchChristianAlbums() }
-                    }
+                    _ = await (appleMusicStatus, christianSongs, christianAlbums)
                 }
                 
                 isLoading = false
             }
+
             
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 if newPhase == .active {
