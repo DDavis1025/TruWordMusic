@@ -207,17 +207,14 @@ struct ContentView: View {
             }
             .task {
                 isLoading = true
-                hasRequestedMusicAuthorization = true
+                await requestMusicAuthorization()
                 
-                async let authorization: () = requestMusicAuthorization()
-                async let appleMusicStatus: () = checkAppleMusicStatus()
-                async let christianSongs: () = fetchChristianSongs()
-                async let christianAlbums: () = fetchChristianAlbums()
-                
-                // Wait for authorization first, but start fetching in parallel
-                await authorization
                 if musicAuthorized {
-                    _ = await (appleMusicStatus, christianSongs, christianAlbums)
+                    await withTaskGroup(of: Void.self) { group in
+                        group.addTask { await checkAppleMusicStatus() }
+                        group.addTask { await fetchChristianSongs() }
+                        group.addTask { await fetchChristianAlbums() }
+                    }
                 }
                 
                 isLoading = false
@@ -404,7 +401,7 @@ struct ContentView: View {
             
             // Create a charts request for albums in the Christian & Gospel genre
             var request = MusicCatalogChartsRequest(genre: christianGenre, types: [Album.self])
-            request.limit = 50  // Get up to 50 albums
+            request.limit = 7  // Get up to 50 albums
             
             // Execute the request
             let response = try await request.response()
