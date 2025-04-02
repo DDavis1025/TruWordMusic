@@ -1188,10 +1188,6 @@ struct FullAlbumGridView: View {
     }
 }
 
-
-
-
-
 struct AlbumCarouselItemView: View {
     let album: Album
     
