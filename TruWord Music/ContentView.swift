@@ -401,7 +401,7 @@ struct ContentView: View {
             
             // Create a charts request for albums in the Christian & Gospel genre
             var request = MusicCatalogChartsRequest(genre: christianGenre, types: [Album.self])
-            request.limit = 7  // Get up to 50 albums
+            request.limit = 50  // Get up to 50 albums
             
             // Execute the request
             let response = try await request.response()
