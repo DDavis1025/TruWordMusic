@@ -70,7 +70,6 @@ struct ContentView: View {
                         .progressViewStyle(CircularProgressViewStyle())
                         .scaleEffect(1.5)
                 } else {
-                    // Main Content
                     ScrollView {
                         VStack {
                             if musicAuthorized {
@@ -89,7 +88,7 @@ struct ContentView: View {
                                             }
                                         }
                                         .padding(.vertical, 5)
-                                        
+
                                         ScrollView(.horizontal, showsIndicators: false) {
                                             HStack(spacing: 16) {
                                                 ForEach(albums.prefix(5), id: \.id) { album in
@@ -102,27 +101,32 @@ struct ContentView: View {
                                             .padding(.horizontal)
                                         }
                                     }
-                                    .padding(.bottom, 16) // Add padding to the bottom of the first VStack
+                                    .padding(.bottom, 16)
                                 }
-                                
+
                                 // MARK: Tracks Section
                                 VStack(alignment: .leading) {
                                     HStack {
                                         Text("Top Christian Songs")
-                                            .font(.system(size: 18)) // Smaller than .title2 (22pt)
+                                            .font(.system(size: 18))
                                             .bold()
                                         Spacer()
                                         if songs.count > 5 {
                                             NavigationLink("View More") {
-                                                FullTrackListView(songs: songs, playSong: playSong, currentlyPlayingSong: $currentlyPlayingSong, isPlayingFromAlbum: $isPlayingFromAlbum, bottomMessage: $bottomMessage)
+                                                FullTrackListView(
+                                                    songs: songs,
+                                                    playSong: playSong,
+                                                    currentlyPlayingSong: $currentlyPlayingSong,
+                                                    isPlayingFromAlbum: $isPlayingFromAlbum,
+                                                    bottomMessage: $bottomMessage
+                                                )
                                             }
                                             .foregroundColor(.blue)
-                                            .font(.system(size: 15)) // Smaller than .title2 (22pt)
+                                            .font(.system(size: 15))
                                         }
                                     }
                                     .padding(.vertical, 5)
-                                    
-                                    // Show only 5 songs initially
+
                                     ForEach(songs.prefix(5), id: \.id) { song in
                                         SongRowView(song: song, currentlyPlayingSong: $currentlyPlayingSong)
                                             .onTapGesture {
@@ -133,11 +137,11 @@ struct ContentView: View {
                                     }
                                 }
                             } else {
-                                // Show message when music access is not authorized
+                                // Message for no music authorization
                                 Text("Please allow Apple Music access to continue using this app.")
                                     .foregroundColor(.red)
                                     .padding()
-                                
+
                                 Button(action: {
                                     openAppSettings()
                                 }) {
@@ -147,32 +151,38 @@ struct ContentView: View {
                                 .padding()
                             }
                         }
-                        .padding(.horizontal, 16) // Add horizontal padding to the ScrollView
-                        .padding(.bottom, 80) // Add padding to avoid overlap with BottomPlayerView
+                        .padding(.horizontal, 16)
                     }
-                    
-                    // MARK: Bottom Player View and Subscription Message
-                    if let song = currentlyPlayingSong {
-                        VStack(spacing: 0) {
-                            // Subscription Message (above BottomPlayerView)
-                            if let message = bottomMessage {
-                                Text(message)
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                                    .padding(.horizontal)
-                                    .padding(.bottom, 4) // Add some padding below the message
-                                    .background(Color(.systemBackground)) // Ensure the background covers the message
-                            }
-                            
-                            // Bottom Player View
-                            BottomPlayerView(song: song, isPlaying: $isPlaying, togglePlayPause: togglePlayPause)
-                                .id(song.id) // Force re-render when song changes
-                                .onTapGesture {
-                                    showTrackDetail = true
-                                }
-                        }
-                        .background(Color(.systemBackground)) // Ensure the background covers the BottomPlayerView and message
-                    }
+                    // Ensure ScrollView avoids the BottomPlayerView and bottomMessage
+                     .safeAreaInset(edge: .bottom) {
+                         VStack(spacing: 0) {
+                             if let message = bottomMessage {
+                                 Text(message)
+                                     .font(.caption)
+                                     .foregroundColor(.red)
+                                     .padding()
+                                     .frame(maxWidth: .infinity)
+                                     .background(Color(.systemBackground))
+                                     .transition(.move(edge: .bottom).combined(with: .opacity)) // Smooth disappearing animation
+                             }
+
+                             if let song = currentlyPlayingSong {
+                                 BottomPlayerView(
+                                     song: song,
+                                     isPlaying: $isPlaying,
+                                     togglePlayPause: togglePlayPause
+                                 ).id(song.id) // Force re-render when song changes
+                                 .background(Color(.systemBackground))
+                                 .contentShape(Rectangle())
+                                 .onTapGesture {
+                                     showTrackDetail = true
+                                 }
+                             }
+                         }
+                     }
+                     .animation(.easeInOut(duration: 0.3), value: bottomMessage) // Animate the layout change
+
+
                 }
             }
             .navigationDestination(for: String.self) { value in
@@ -183,10 +193,13 @@ struct ContentView: View {
                 }
             }
             .navigationDestination(for: Album.self) { album in
-                AlbumDetailView(album: album, playSong: playSong, isPlayingFromAlbum: $isPlayingFromAlbum, bottomMessage: $bottomMessage, albumWithTracks: $albumWithTracks)
-                    .onAppear {
-                        print("Showing details for album: \(album.title)")
-                    }
+                AlbumDetailView(
+                    album: album,
+                    playSong: playSong,
+                    isPlayingFromAlbum: $isPlayingFromAlbum,
+                    bottomMessage: $bottomMessage,
+                    albumWithTracks: $albumWithTracks
+                )
             }
             .fullScreenCover(isPresented: $showTrackDetail) {
                 if let song = currentlyPlayingSong {
@@ -202,13 +215,12 @@ struct ContentView: View {
                         songs: $songs
                     )
                     .environment(\.navigationPath, $navigationPath)
-                    
                 }
             }
             .task {
                 isLoading = true
                 await requestMusicAuthorization()
-                
+
                 if musicAuthorized {
                     await withTaskGroup(of: Void.self) { group in
                         group.addTask { await checkAppleMusicStatus() }
@@ -216,19 +228,16 @@ struct ContentView: View {
                         group.addTask { await fetchChristianAlbums() }
                     }
                 }
-                
                 isLoading = false
             }
-            
-            
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 if newPhase == .active {
-                    // App has entered the foreground
                     onAppForeground()
                 }
             }
         }
     }
+
     
     func openAppSettings() {
         guard let appSettingsUrl = URL(string: UIApplication.openSettingsURLString),
