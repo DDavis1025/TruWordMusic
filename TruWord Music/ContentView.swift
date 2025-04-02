@@ -1138,7 +1138,7 @@ struct FullAlbumGridView: View {
     
     var body: some View {
         let screenWidth = UIScreen.main.bounds.width
-        let albumSize = max(min(screenWidth * 0.4, 255), 150) // Dynamic size: min 150px, max 220px
+        let albumSize = max(min(screenWidth * 0.4, 255), 150) // Dynamic size: min 150px, max 255px
         
         let columns = [
             GridItem(.adaptive(minimum: albumSize), spacing: 20)
@@ -1197,7 +1197,7 @@ struct AlbumCarouselItemView: View {
     
     var body: some View {
         let screenWidth = UIScreen.main.bounds.width
-        let albumSize = max(min(screenWidth * 0.4, 255), 150) // Dynamic size: min 150px, max 220px
+        let albumSize = max(min(screenWidth * 0.4, 255), 150) // Dynamic size: min 150px, max 255px
         
         VStack {
             if let artworkURL = album.artwork?.url(width: 280, height: 280) {
