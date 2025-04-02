@@ -219,7 +219,7 @@ struct ContentView: View {
                 
                 isLoading = false
             }
-
+            
             
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 if newPhase == .active {
@@ -267,37 +267,37 @@ struct ContentView: View {
     
     func stopApplicationMusicPlayer() async {
         let player = ApplicationMusicPlayer.shared
-            
-            // Check if the playback status is playing or paused, and the queue is not empty
+        
+        // Check if the playback status is playing or paused, and the queue is not empty
         if player.state.playbackStatus == .playing || player.state.playbackStatus == .paused {
             if !player.queue.entries.isEmpty {
-                    showTrackDetail = false // Dismiss TrackDetailView
-                    currentlyPlayingSong = nil
-                    clearApplicationMusicPlayer()
-                }
+                showTrackDetail = false // Dismiss TrackDetailView
+                currentlyPlayingSong = nil
+                clearApplicationMusicPlayer()
             }
+        }
     }
     
     func stopAndReplaceAVPlayer() async {
         let player = ApplicationMusicPlayer.shared
-            Task {
-                await checkAppleMusicStatus() // Check if user is now logged in
+        Task {
+            await checkAppleMusicStatus() // Check if user is now logged in
+            
+            if appleMusicSubscription {
+                // Stop the preview playback if it was playing
+                audioPlayer?.pause()
                 
-                if appleMusicSubscription {
-                    // Stop the preview playback if it was playing
-                    audioPlayer?.pause()
-                    
-                    // Switch to ApplicationMusicPlayer for full playback
-                    if let currentSong = currentlyPlayingSong {
-                        if player.state.playbackStatus != .playing || player.state.playbackStatus != .paused {
-                            if player.queue.entries.isEmpty {
-                                playSong(currentSong) // Start full playback using ApplicationMusicPlayer
-                                }
-                            }
+                // Switch to ApplicationMusicPlayer for full playback
+                if let currentSong = currentlyPlayingSong {
+                    if player.state.playbackStatus != .playing || player.state.playbackStatus != .paused {
+                        if player.queue.entries.isEmpty {
+                            playSong(currentSong) // Start full playback using ApplicationMusicPlayer
+                        }
                     }
                 }
             }
         }
+    }
     
     func monitorMusicPlayerState() {
         // Cancel the previous task if it exists
@@ -584,7 +584,7 @@ struct ContentView: View {
     
     // Updated togglePlayPause function
     func togglePlayPause() {
-
+        
         if appleMusicSubscription {
             Task {
                 do {
@@ -761,7 +761,7 @@ struct SongRowView: View {
             // Album Artwork with configurable left padding
             let screenWidth = UIScreen.main.bounds.width
             let songArtworkSize = min(max(screenWidth * 0.15, 50), 100) // Scales dynamically between 50-100pt
-
+            
             if let artworkURL = song.artwork?.url(width: 150, height: 150) {
                 CustomAsyncImage(url: artworkURL)
                     .frame(width: songArtworkSize, height: songArtworkSize)
@@ -1085,7 +1085,7 @@ struct BottomPlayerView: View {
         HStack {
             let screenWidth = UIScreen.main.bounds.width
             let songArtworkSize = min(max(screenWidth * 0.14, 40), 90) // Scales dynamically between 50-100pt
-
+            
             if let artworkURL = song.artwork?.url(width: 120, height: 120) {
                 CustomAsyncImage(url: artworkURL)
                     .frame(width: songArtworkSize, height: songArtworkSize)
@@ -1124,7 +1124,7 @@ struct FullAlbumGridView: View {
     let onAlbumSelected: (Album) -> Void
     
     @State private var searchQuery: String = ""
-
+    
     var filteredAlbums: [Album] {
         if searchQuery.isEmpty {
             return albums
@@ -1135,15 +1135,15 @@ struct FullAlbumGridView: View {
             }
         }
     }
-
+    
     var body: some View {
         let screenWidth = UIScreen.main.bounds.width
         let albumSize = max(min(screenWidth * 0.4, 255), 150) // Dynamic size: min 150px, max 220px
-
+        
         let columns = [
             GridItem(.adaptive(minimum: albumSize), spacing: 20)
         ]
-
+        
         VStack(alignment: .leading, spacing: 10) {
             if filteredAlbums.isEmpty {
                 Spacer()
@@ -1192,28 +1192,28 @@ struct FullAlbumGridView: View {
 
 
 
-    struct AlbumCarouselItemView: View {
-        let album: Album
+struct AlbumCarouselItemView: View {
+    let album: Album
+    
+    var body: some View {
+        let screenWidth = UIScreen.main.bounds.width
+        let albumSize = max(min(screenWidth * 0.4, 255), 150) // Dynamic size: min 150px, max 220px
         
-        var body: some View {
-            let screenWidth = UIScreen.main.bounds.width
-            let albumSize = max(min(screenWidth * 0.4, 255), 150) // Dynamic size: min 150px, max 220px
-
-            VStack {
-                if let artworkURL = album.artwork?.url(width: 280, height: 280) {
-
-                    CustomAsyncImage(url: artworkURL)
-                        .frame(width: albumSize, height: albumSize)
-                        .clipped()
-                        .cornerRadius(12)
-                }
+        VStack {
+            if let artworkURL = album.artwork?.url(width: 280, height: 280) {
                 
-                Text(album.title)
-                    .font(.caption)
-                    .lineLimit(1)
-                    .frame(maxWidth: 150) // Prevent text from stretching too wide
+                CustomAsyncImage(url: artworkURL)
+                    .frame(width: albumSize, height: albumSize)
+                    .clipped()
+                    .cornerRadius(12)
             }
-            .frame(maxWidth: albumSize) // Ensure VStack wraps around the image properly
+            
+            Text(album.title)
+                .font(.caption)
+                .lineLimit(1)
+                .frame(maxWidth: 150) // Prevent text from stretching too wide
+        }
+        .frame(maxWidth: albumSize) // Ensure VStack wraps around the image properly
     }
 }
 
@@ -1236,7 +1236,7 @@ struct AlbumDetailView: View {
             if let artworkURL = album.artwork?.url(width: 350, height: 350) {
                 let screenWidth = UIScreen.main.bounds.width
                 let albumSize = min(max(screenWidth * 0.5, 150), 300) // Keeps size between 150-300pt
-
+                
                 CustomAsyncImage(url: artworkURL)
                     .frame(width: albumSize, height: albumSize)
                     .clipped()
