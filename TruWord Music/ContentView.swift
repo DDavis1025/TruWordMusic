@@ -37,10 +37,12 @@ struct ContentView: View {
     @State private var currentlyPlayingSong: Song?
     @State private var appleMusicSubscription = false
     @State private var audioPlayer: AVPlayer?
+    @State private var playerIsReady = true
     @State private var userAuthorized = false
     @State private var isPlaying = false
     @State private var bottomMessage: String? = nil  // Inline message for non-subscribed users
     @State private var showTrackDetail: Bool = false
+    @State private var previewDidEnd: Bool = false
     
     // New album-related state
     @State private var albums: [Album] = []
@@ -88,7 +90,7 @@ struct ContentView: View {
                                             }
                                         }
                                         .padding(.vertical, 5)
-
+                                        
                                         ScrollView(.horizontal, showsIndicators: false) {
                                             HStack(spacing: 16) {
                                                 ForEach(albums.prefix(5), id: \.id) { album in
@@ -103,7 +105,7 @@ struct ContentView: View {
                                     }
                                     .padding(.bottom, 16)
                                 }
-
+                                
                                 // MARK: Tracks Section
                                 VStack(alignment: .leading) {
                                     HStack {
@@ -126,7 +128,7 @@ struct ContentView: View {
                                         }
                                     }
                                     .padding(.vertical, 5)
-
+                                    
                                     ForEach(songs.prefix(5), id: \.id) { song in
                                         SongRowView(song: song, currentlyPlayingSong: $currentlyPlayingSong)
                                             .onTapGesture {
@@ -141,7 +143,7 @@ struct ContentView: View {
                                 Text("Please allow Apple Music access to continue using this app.")
                                     .foregroundColor(.red)
                                     .padding()
-
+                                
                                 Button(action: {
                                     openAppSettings()
                                 }) {
@@ -154,35 +156,36 @@ struct ContentView: View {
                         .padding(.horizontal, 16)
                     }
                     // Ensure ScrollView avoids the BottomPlayerView and bottomMessage
-                     .safeAreaInset(edge: .bottom) {
-                         VStack(spacing: 0) {
-                             if let message = bottomMessage {
-                                 Text(message)
-                                     .font(.caption)
-                                     .foregroundColor(.red)
-                                     .padding()
-                                     .frame(maxWidth: .infinity)
-                                     .background(Color(.systemBackground))
-                                     .transition(.move(edge: .bottom).combined(with: .opacity)) // Smooth disappearing animation
-                             }
-
-                             if let song = currentlyPlayingSong {
-                                 BottomPlayerView(
-                                     song: song,
-                                     isPlaying: $isPlaying,
-                                     togglePlayPause: togglePlayPause
-                                 ).id(song.id) // Force re-render when song changes
-                                 .background(Color(.systemBackground))
-                                 .contentShape(Rectangle())
-                                 .onTapGesture {
-                                     showTrackDetail = true
-                                 }
-                             }
-                         }
-                     }
-                     .animation(.easeInOut(duration: 0.3), value: bottomMessage) // Animate the layout change
-
-
+                    .safeAreaInset(edge: .bottom) {
+                        VStack(spacing: 0) {
+                            if let message = bottomMessage {
+                                Text(message)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color(.systemBackground))
+                                    .transition(.move(edge: .bottom).combined(with: .opacity)) // Smooth disappearing animation
+                            }
+                            
+                            if let song = currentlyPlayingSong {
+                                BottomPlayerView(
+                                    song: song,
+                                    isPlaying: $isPlaying,
+                                    togglePlayPause: togglePlayPause,
+                                    playerIsReady: playerIsReady
+                                ).id(song.id) // Force re-render when song changes
+                                    .background(Color(.systemBackground))
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        showTrackDetail = true
+                                    }
+                            }
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.3), value: bottomMessage) // Animate the layout change
+                    
+                    
                 }
             }
             .navigationDestination(for: String.self) { value in
@@ -220,7 +223,7 @@ struct ContentView: View {
             .task {
                 isLoading = true
                 await requestMusicAuthorization()
-
+                
                 if musicAuthorized {
                     await withTaskGroup(of: Void.self) { group in
                         group.addTask { await checkAppleMusicStatus() }
@@ -237,7 +240,7 @@ struct ContentView: View {
             }
         }
     }
-
+    
     
     func openAppSettings() {
         guard let appSettingsUrl = URL(string: UIApplication.openSettingsURLString),
@@ -253,8 +256,8 @@ struct ContentView: View {
             refreshCurrentSong()
             
             if appleMusicSubscription {
-                monitorMusicPlayerState()
                 await stopAndReplaceAVPlayer()
+                monitorMusicPlayerState()
             } else {
                 await stopApplicationMusicPlayer()
             }
@@ -287,6 +290,7 @@ struct ContentView: View {
         }
     }
     
+    
     func stopAndReplaceAVPlayer() async {
         let player = ApplicationMusicPlayer.shared
         Task {
@@ -300,7 +304,9 @@ struct ContentView: View {
                 if let currentSong = currentlyPlayingSong {
                     if player.state.playbackStatus != .playing || player.state.playbackStatus != .paused {
                         if player.queue.entries.isEmpty {
-                            playSong(currentSong) // Start full playback using ApplicationMusicPlayer
+                            Task {
+                                playSong(currentSong)
+                            }
                         }
                     }
                 }
@@ -455,12 +461,16 @@ struct ContentView: View {
                     let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
                     player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
                     
-                    try await player.play()
-                    
-                    currentlyPlayingSong = song
-                    isPlaying = true
                     bottomMessage = nil
                     
+                    if !previewDidEnd {
+                        try await player.play()
+                        isPlaying = true
+                    } else {
+                        await ensurePlayerIsReady()
+                    }
+                    
+                    currentlyPlayingSong = song
                     observePlaybackState()
                 } catch {
                     print("Error playing full song: \(error.localizedDescription)")
@@ -499,6 +509,31 @@ struct ContentView: View {
                 clearApplicationMusicPlayer()
             }
         }
+    }
+    
+    func ensurePlayerIsReady() async {
+        let player = ApplicationMusicPlayer.shared
+        DispatchQueue.main.async {
+            self.playerIsReady = false
+        }
+
+        while player.state.playbackStatus != .paused {
+            print("Player not ready. Retrying prepareToPlay...")
+
+            do {
+                try await player.prepareToPlay()
+            } catch {
+                print("prepareToPlay failed with error: \(error.localizedDescription)")
+            }
+
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+
+        DispatchQueue.main.async {
+            self.playerIsReady = true
+        }
+
+        print("✅ Player is ready: \(player.state.playbackStatus)")
     }
     
     func clearApplicationMusicPlayer() {
@@ -540,6 +575,8 @@ struct ContentView: View {
         guard let currentSong = currentlyPlayingSong else { return }
         
         let nextSong: Song?
+        
+        previewDidEnd = true
         
         if isPlayingFromAlbum, let albumWithTracks, albumWithTracks.tracks.contains(currentSong) {
             // Find the current song's index in the album's track list
@@ -598,6 +635,7 @@ struct ContentView: View {
             Task {
                 do {
                     let player = ApplicationMusicPlayer.shared
+                    
                     let state = player.state.playbackStatus
                     
                     if state == .playing {
@@ -1084,41 +1122,55 @@ struct ScrollableText: View {
 }
 
 // MARK: - Bottom Player View
-
 struct BottomPlayerView: View {
     let song: Song
     @Binding var isPlaying: Bool
     let togglePlayPause: () -> Void
+    let playerIsReady: Bool
     
     var body: some View {
         HStack {
             let screenWidth = UIScreen.main.bounds.width
-            let songArtworkSize = min(max(screenWidth * 0.14, 40), 90) // Scales dynamically between 50-100pt
+            let songArtworkSize = min(max(screenWidth * 0.14, 40), 90) // Between 40-90pt
             
+            // Song Artwork
             if let artworkURL = song.artwork?.url(width: 120, height: 120) {
                 CustomAsyncImage(url: artworkURL)
                     .frame(width: songArtworkSize, height: songArtworkSize)
                     .clipped()
                     .cornerRadius(8)
             }
-            
+
+            // Song Title & Artist
             VStack(alignment: .leading) {
                 Text(song.title)
                     .font(.subheadline)
+                    .fontWeight(.medium)
                     .lineLimit(1)
+                
                 Text(song.artistName)
                     .font(.caption)
                     .foregroundColor(.gray)
                     .lineLimit(1)
             }
+            
             Spacer()
-            Button(action: togglePlayPause) {
-                Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 32))
-                    .foregroundColor(.blue)
+
+            // Play/Pause Button or Loading Indicator
+            if playerIsReady {
+                Button(action: togglePlayPause) {
+                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        .font(.system(size: 32))
+                        .foregroundColor(.blue)
+                }
+                .disabled(!playerIsReady)
+            } else {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .frame(width: 32, height: 32)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 9)
         .padding(.vertical, 8)
         .background(Color(.systemGray6))
         .cornerRadius(12)
@@ -1127,6 +1179,8 @@ struct BottomPlayerView: View {
         .padding(.bottom, 8)
     }
 }
+
+
 
 struct FullAlbumGridView: View {
     let albums: [Album]
