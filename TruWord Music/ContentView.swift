@@ -55,6 +55,7 @@ struct ContentView: View {
     @State private var hasRequestedMusicAuthorization = false
     
     @State private var isBottomPlayerVisible: Bool = true
+    @State private var showBottomMessageOnce: Bool = true // Add this state variable
     
     @State private var playbackObservationTask: Task<Void, Never>?
     @State private var playerStateTask: Task<Void, Never>?
@@ -158,23 +159,38 @@ struct ContentView: View {
                     // Ensure ScrollView avoids the BottomPlayerView and bottomMessage
                     .safeAreaInset(edge: .bottom) {
                         VStack(spacing: 0) {
-                            if let message = bottomMessage {
-                                Text(message)
+                            if let message = bottomMessage, showBottomMessageOnce {
+                                HStack {
+                                    Text(message)
+                                        .font(.caption)
+                                        .foregroundColor(.red)
+
+                                    Spacer()
+
+                                    Button("OK") {
+                                        withAnimation {
+                                            showBottomMessageOnce = false
+                                        }
+                                    }
                                     .font(.caption)
-                                    .foregroundColor(.red)
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color(.systemBackground))
-                                    .transition(.move(edge: .bottom).combined(with: .opacity)) // Smooth disappearing animation
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.gray.opacity(0.1))
+                                    .cornerRadius(6)
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color(.systemBackground))
+                                .transition(.move(edge: .bottom).combined(with: .opacity)) // Smooth disappearing animation
                             }
-                            
+
                             if let song = currentlyPlayingSong {
                                 BottomPlayerView(
                                     song: song,
                                     isPlaying: $isPlaying,
                                     togglePlayPause: togglePlayPause,
                                     playerIsReady: playerIsReady
-                                ).id(song.id) // Force re-render when song changes
+                                ).id(song.id)
                                     .background(Color(.systemBackground))
                                     .contentShape(Rectangle())
                                     .onTapGesture {
@@ -183,6 +199,7 @@ struct ContentView: View {
                             }
                         }
                     }
+
                     .animation(.easeInOut(duration: 0.3), value: bottomMessage) // Animate the layout change
                     
                     
@@ -215,7 +232,9 @@ struct ContentView: View {
                         albumWithTracks: $albumWithTracks,
                         albums: albums,
                         playSong: playSong,
-                        songs: $songs
+                        songs: $songs,
+                        playerIsReady: $playerIsReady,
+                        showBottomMessageOnce: $showBottomMessageOnce
                     )
                     .environment(\.navigationPath, $navigationPath)
                 }
@@ -254,6 +273,8 @@ struct ContentView: View {
         Task {
             await checkAppleMusicStatus() // Refresh subscription status
             refreshCurrentSong()
+            
+            showBottomMessageOnce = true
             
             if appleMusicSubscription {
                 await stopAndReplaceAVPlayer()
@@ -466,8 +487,11 @@ struct ContentView: View {
                     if !previewDidEnd {
                         try await player.play()
                         isPlaying = true
+                        print("!previewDidEnd")
                     } else {
+                        print("previewDidEnd")
                         await ensurePlayerIsReady()
+                        previewDidEnd = false
                     }
                     
                     currentlyPlayingSong = song
@@ -477,6 +501,7 @@ struct ContentView: View {
                 }
             } else if let previewURL = song.previewAssets?.first?.url {
                 // Use AVPlayer for preview playback
+                previewDidEnd = false
                 audioPlayer?.pause()
                 if let currentItem = audioPlayer?.currentItem {
                     NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: currentItem)
@@ -515,6 +540,12 @@ struct ContentView: View {
         let player = ApplicationMusicPlayer.shared
         DispatchQueue.main.async {
             self.playerIsReady = false
+        }
+        
+        do {
+            try await player.prepareToPlay()
+        } catch {
+            print("prepareToPlay failed with error: \(error.localizedDescription)")
         }
 
         while player.state.playbackStatus != .paused {
@@ -848,6 +879,8 @@ struct TrackDetailView: View {
     let albums: [Album]
     let playSong: (Song) -> Void
     @Binding var songs: [Song]
+    @Binding var playerIsReady: Bool
+    @Binding var showBottomMessageOnce: Bool
     
     @State private var selectedAlbum: Album? = nil
     @Environment(\.dismiss) private var dismiss
@@ -897,10 +930,17 @@ struct TrackDetailView: View {
                                 .foregroundColor(.primary)
                         }
                         
-                        Button(action: togglePlayPause) {
-                            Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                                .font(.system(size: 60))
-                                .foregroundColor(.primary)
+                        if playerIsReady {
+                            Button(action: togglePlayPause) {
+                                Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                    .font(.system(size: 60))
+                                    .foregroundColor(.primary)
+                            }
+                            .disabled(!playerIsReady)
+                        } else {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .frame(width: 60, height: 60)
                         }
                         
                         Button(action: playNextSong) {
@@ -938,13 +978,29 @@ struct TrackDetailView: View {
                     Spacer()
                     
                     // Subscription Message at the Bottom
-                    if let message = bottomMessage {
-                        Text(message)
+                    if let message = bottomMessage, showBottomMessageOnce {
+                        HStack {
+                            Text(message)
+                                .font(.caption)
+                                .foregroundColor(.red)
+
+                            Spacer()
+
+                            Button("OK") {
+                                withAnimation {
+                                    showBottomMessageOnce = false
+                                }
+                            }
                             .font(.caption)
-                            .foregroundColor(.red)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color(.systemBackground))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(6)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color(.systemBackground))
+                        .transition(.opacity)
                     }
                 }
                 
