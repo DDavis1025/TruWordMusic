@@ -56,6 +56,7 @@ struct ContentView: View {
     
     @State private var isBottomPlayerVisible: Bool = true
     @State private var showBottomMessageOnce: Bool = true // Add this state variable
+    @State private var bottomMessageShown: Int = 0
     
     @State private var playbackObservationTask: Task<Void, Never>?
     @State private var playerStateTask: Task<Void, Never>?
@@ -166,17 +167,18 @@ struct ContentView: View {
                                         .foregroundColor(.red)
 
                                     Spacer()
-
-                                    Button("OK") {
-                                        withAnimation {
-                                            showBottomMessageOnce = false
+                                    if bottomMessageShown >= 3 {
+                                        Button("OK") {
+                                            withAnimation {
+                                                showBottomMessageOnce = false
+                                            }
                                         }
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.gray.opacity(0.1))
+                                        .cornerRadius(6)
                                     }
-                                    .font(.caption)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.gray.opacity(0.1))
-                                    .cornerRadius(6)
                                 }
                                 .padding()
                                 .frame(maxWidth: .infinity)
@@ -234,7 +236,8 @@ struct ContentView: View {
                         playSong: playSong,
                         songs: $songs,
                         playerIsReady: $playerIsReady,
-                        showBottomMessageOnce: $showBottomMessageOnce
+                        showBottomMessageOnce: $showBottomMessageOnce,
+                        bottomMessageShown: $bottomMessageShown
                     )
                     .environment(\.navigationPath, $navigationPath)
                 }
@@ -273,9 +276,6 @@ struct ContentView: View {
         Task {
             await checkAppleMusicStatus() // Refresh subscription status
             refreshCurrentSong()
-            
-            showBottomMessageOnce = true
-            
             if appleMusicSubscription {
                 await stopAndReplaceAVPlayer()
                 monitorMusicPlayerState()
@@ -487,11 +487,9 @@ struct ContentView: View {
                     if !previewDidEnd {
                         try await player.play()
                         isPlaying = true
-                        print("!previewDidEnd")
                     } else {
-                        print("previewDidEnd")
-                        await ensurePlayerIsReady()
                         previewDidEnd = false
+                        await ensurePlayerIsReady()
                     }
                     
                     currentlyPlayingSong = song
@@ -517,6 +515,7 @@ struct ContentView: View {
                 if let playerItem = audioPlayer.currentItem {
                     NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: playerItem, queue: .main) { _ in
                         previewDidEnd(player: audioPlayer)
+                        bottomMessageShown += 1
                         showSubscriptionMessage()
                     }
                 }
@@ -881,6 +880,7 @@ struct TrackDetailView: View {
     @Binding var songs: [Song]
     @Binding var playerIsReady: Bool
     @Binding var showBottomMessageOnce: Bool
+    @Binding var bottomMessageShown: Int
     
     @State private var selectedAlbum: Album? = nil
     @Environment(\.dismiss) private var dismiss
@@ -930,18 +930,20 @@ struct TrackDetailView: View {
                                 .foregroundColor(.primary)
                         }
                         
-                        if playerIsReady {
-                            Button(action: togglePlayPause) {
-                                Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(.primary)
+                        ZStack {
+                            if playerIsReady {
+                                Button(action: togglePlayPause) {
+                                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .foregroundColor(.primary)
+                                }
+                            } else {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
                             }
-                            .disabled(!playerIsReady)
-                        } else {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                                .frame(width: 60, height: 60)
                         }
+                        .frame(width: 60, height: 60) // Ensures fixed size
                         
                         Button(action: playNextSong) {
                             Image(systemName: "forward.fill")
@@ -986,16 +988,18 @@ struct TrackDetailView: View {
 
                             Spacer()
 
-                            Button("OK") {
-                                withAnimation {
-                                    showBottomMessageOnce = false
+                            if bottomMessageShown >= 3 {
+                                Button("OK") {
+                                    withAnimation {
+                                        showBottomMessageOnce = false
+                                    }
                                 }
+                                .font(.caption)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(6)
                             }
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(6)
                         }
                         .padding()
                         .frame(maxWidth: .infinity)
