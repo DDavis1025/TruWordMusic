@@ -645,7 +645,7 @@ struct ContentView: View {
                 bottomMessage = "Preview ended. Log in or subscribe to Apple Music to play the full song."
             }
             if isPlayingFromAlbum {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 9) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 11) {
                     withAnimation {
                         bottomMessage = nil
                     }
@@ -896,7 +896,7 @@ struct TrackDetailView: View {
                     Spacer().frame(height: 60) // Adjust the space for the image and button
                     
                     // Album Artwork (Increased size)
-                    if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 1.0), height: Int(geometry.size.width * 1.0)) {
+                    if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 1.3), height: Int(geometry.size.width * 1.3)) {
                         CustomAsyncImage(url: artworkURL)
                             .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
                             .clipped()
