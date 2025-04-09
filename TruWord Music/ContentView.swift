@@ -60,6 +60,7 @@ struct ContentView: View {
     
     @State private var playbackObservationTask: Task<Void, Never>?
     @State private var playerStateTask: Task<Void, Never>?
+    @State private var playerPreparationTask: Task<Void, Never>? = nil
     
     @State private var navigationPath = NavigationPath()
     
@@ -165,7 +166,7 @@ struct ContentView: View {
                                     Text(message)
                                         .font(.caption)
                                         .foregroundColor(.red)
-
+                                    
                                     Spacer()
                                     if bottomMessageShown >= 3 {
                                         Button("OK") {
@@ -185,7 +186,7 @@ struct ContentView: View {
                                 .background(Color(.systemBackground))
                                 .transition(.move(edge: .bottom).combined(with: .opacity)) // Smooth disappearing animation
                             }
-
+                            
                             if let song = currentlyPlayingSong {
                                 BottomPlayerView(
                                     song: song,
@@ -201,7 +202,7 @@ struct ContentView: View {
                             }
                         }
                     }
-
+                    
                     .animation(.easeInOut(duration: 0.3), value: bottomMessage) // Animate the layout change
                     
                     
@@ -463,40 +464,47 @@ struct ContentView: View {
             
             if appleMusicSubscription {
                 // Use ApplicationMusicPlayer for full playback
-                do {
-                    let player = ApplicationMusicPlayer.shared
-                    
-                    let queueSongs: [Song]
-                    
-                    if let albumWithTracks, albumWithTracks.tracks.contains(song), isPlayingFromAlbum {
-                        queueSongs = albumWithTracks.tracks
-                    } else {
-                        queueSongs = songs
+                
+                let player = ApplicationMusicPlayer.shared
+                
+                let queueSongs: [Song]
+                
+                if let albumWithTracks, albumWithTracks.tracks.contains(song), isPlayingFromAlbum {
+                    queueSongs = albumWithTracks.tracks
+                } else {
+                    queueSongs = songs
+                }
+                
+                guard let startIndex = queueSongs.firstIndex(of: song) else {
+                    print("Error: Song not found in queue list.")
+                    return
+                }
+                
+                let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
+                player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
+                
+                bottomMessage = nil
+                currentlyPlayingSong = song
+                
+                if !previewDidEnd {
+                    playerPreparationTask?.cancel()
+                    playerPreparationTask = nil
+                    playerPreparationTask = Task {
+                        await ensurePlayerPlays()
                     }
-                    
-                    guard let startIndex = queueSongs.firstIndex(of: song) else {
-                        print("Error: Song not found in queue list.")
-                        return
-                    }
-                    
-                    let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
-                    player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
-                    
-                    bottomMessage = nil
-                    
-                    if !previewDidEnd {
-                        try await player.play()
-                        isPlaying = true
-                    } else {
-                        previewDidEnd = false
+                    isPlaying = true
+                } else {
+                    playerPreparationTask?.cancel()
+                    playerPreparationTask = nil
+                    previewDidEnd = false
+                    playerPreparationTask = Task {
                         await ensurePlayerIsReady()
                     }
-                    
-                    currentlyPlayingSong = song
-                    observePlaybackState()
-                } catch {
-                    print("Error playing full song: \(error.localizedDescription)")
+                    isPlaying = true
                 }
+                
+                observePlaybackState()
+                
             } else if let previewURL = song.previewAssets?.first?.url {
                 // Use AVPlayer for preview playback
                 previewDidEnd = false
@@ -537,34 +545,72 @@ struct ContentView: View {
     
     func ensurePlayerIsReady() async {
         let player = ApplicationMusicPlayer.shared
-        DispatchQueue.main.async {
+        
+        await MainActor.run {
             self.playerIsReady = false
         }
         
-        do {
-            try await player.prepareToPlay()
-        } catch {
-            print("prepareToPlay failed with error: \(error.localizedDescription)")
-        }
-
-        while player.state.playbackStatus != .paused {
-            print("Player not ready. Retrying prepareToPlay...")
-
+        while true {
+            // Exit loop if cancelled
+            if Task.isCancelled {
+                print("ensurePlayerIsReady was cancelled.")
+                return
+            }
+            
             do {
                 try await player.prepareToPlay()
             } catch {
-                print("prepareToPlay failed with error: \(error.localizedDescription)")
+                print("prepareToPlay failed: \(error.localizedDescription)")
             }
-
+            
+            if player.state.playbackStatus == .paused {
+                await MainActor.run {
+                    self.playerIsReady = true
+                }
+                print("✅ Player is ready: \(player.state.playbackStatus)")
+                return
+            }
+            
+            // Retry every 0.5s
             try? await Task.sleep(nanoseconds: 500_000_000)
         }
-
-        DispatchQueue.main.async {
-            self.playerIsReady = true
-        }
-
-        print("✅ Player is ready: \(player.state.playbackStatus)")
     }
+    
+    func ensurePlayerPlays() async {
+        let player = ApplicationMusicPlayer.shared
+        
+        await MainActor.run {
+            self.playerIsReady = false
+        }
+        
+        while true {
+            // Exit loop if cancelled
+            if Task.isCancelled {
+                print("ensurePlayerIsReady was cancelled.")
+                return
+            }
+            
+            do {
+                try await player.play()
+            } catch {
+                print("prepareToPlay failed: \(error.localizedDescription)")
+            }
+            
+            if player.state.playbackStatus == .playing {
+                await MainActor.run {
+                    self.playerIsReady = true
+                }
+                print("✅ Player is ready: \(player.state.playbackStatus)")
+                return
+            }
+            
+            // Retry every 0.5s
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+    }
+    
+    
+    
     
     func clearApplicationMusicPlayer() {
         if !appleMusicSubscription {
@@ -985,9 +1031,9 @@ struct TrackDetailView: View {
                             Text(message)
                                 .font(.caption)
                                 .foregroundColor(.red)
-
+                            
                             Spacer()
-
+                            
                             if bottomMessageShown >= 3 {
                                 Button("OK") {
                                     withAnimation {
@@ -1200,7 +1246,7 @@ struct BottomPlayerView: View {
                     .clipped()
                     .cornerRadius(8)
             }
-
+            
             // Song Title & Artist
             VStack(alignment: .leading) {
                 Text(song.title)
@@ -1215,7 +1261,7 @@ struct BottomPlayerView: View {
             }
             
             Spacer()
-
+            
             // Play/Pause Button or Loading Indicator
             if playerIsReady {
                 Button(action: togglePlayPause) {
