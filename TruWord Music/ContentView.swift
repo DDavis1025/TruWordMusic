@@ -236,9 +236,7 @@ struct ContentView: View {
                         albums: albums,
                         playSong: playSong,
                         songs: $songs,
-                        playerIsReady: $playerIsReady,
-                        showBottomMessageOnce: $showBottomMessageOnce,
-                        bottomMessageShown: $bottomMessageShown
+                        playerIsReady: $playerIsReady
                     )
                     .environment(\.navigationPath, $navigationPath)
                 }
@@ -542,6 +540,7 @@ struct ContentView: View {
             }
         }
     }
+    
     
     func ensurePlayerIsReady() async {
         let player = ApplicationMusicPlayer.shared
@@ -925,8 +924,6 @@ struct TrackDetailView: View {
     let playSong: (Song) -> Void
     @Binding var songs: [Song]
     @Binding var playerIsReady: Bool
-    @Binding var showBottomMessageOnce: Bool
-    @Binding var bottomMessageShown: Int
     
     @State private var selectedAlbum: Album? = nil
     @Environment(\.dismiss) private var dismiss
@@ -934,6 +931,10 @@ struct TrackDetailView: View {
     
     @State private var animateTitle: Bool = false
     @State private var animateArtist: Bool = false
+    
+    private var appleMusicURL: URL? {
+        URL(string: "https://music.apple.com/us/song/\(song.id)")
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -1026,33 +1027,19 @@ struct TrackDetailView: View {
                     Spacer()
                     
                     // Subscription Message at the Bottom
-                    if let message = bottomMessage, showBottomMessageOnce {
+                    if let appleMusicURL {
                         HStack {
-                            Text(message)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                            
-                            Spacer()
-                            
-                            if bottomMessageShown >= 3 {
-                                Button("OK") {
-                                    withAnimation {
-                                        showBottomMessageOnce = false
-                                    }
-                                }
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(6)
+                            Link(destination: appleMusicURL) {
+                                Image("AppleMusicBadge")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(height: min(geometry.size.width * 0.09, 59))
+                                    .padding(.top, 10)
                             }
+                            .padding()
                         }
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color(.systemBackground))
-                        .transition(.opacity)
+                      }
                     }
-                }
                 
                 // Close Button
                 VStack {
