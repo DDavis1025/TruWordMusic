@@ -1063,55 +1063,70 @@ struct TrackDetailView: View {
     }
     
     private func playPreviousSong() {
-        // Reset the animation state
+        animateTitle = false
+        animateArtist = false
+
+        if isPlayingFromAlbum,
+           let albumWithTracks,
+           let currentIndex = albumWithTracks.tracks.firstIndex(where: { $0.id == song.id }) {
+            
+            var previousIndex = currentIndex - 1
+            while previousIndex >= 0 {
+                let previousSong = albumWithTracks.tracks[previousIndex]
+                let isReleased = previousSong.releaseDate.map { $0 <= Date() } ?? false
+                if isReleased {
+                    playSong(previousSong)
+                    return
+                }
+                previousIndex -= 1
+            }
+
+        } else if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
+            var previousIndex = currentIndex - 1
+            while previousIndex >= 0 {
+                let previousSong = songs[previousIndex]
+                let isReleased = previousSong.releaseDate.map { $0 <= Date() } ?? false
+                if isReleased {
+                    playSong(previousSong)
+                    bottomMessage = nil
+                    return
+                }
+                previousIndex -= 1
+            }
+        }
+    }
+
+    
+    private func playNextSong() {
         animateTitle = false
         animateArtist = false
         
         if isPlayingFromAlbum,
-           let albumWithTracks, // Unwrap single album
+           let albumWithTracks,
            let currentIndex = albumWithTracks.tracks.firstIndex(where: { $0.id == song.id }) {
             
-            let previousIndex = currentIndex - 1
-            if previousIndex >= 0 {
-                let previousSong = albumWithTracks.tracks[previousIndex]
-                playSong(previousSong)
-            }
-        } else {
-            if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
-                let previousIndex = currentIndex - 1
-                if previousIndex >= 0 {
-                    let previousSong = songs[previousIndex]
-                    playSong(previousSong)
-                    bottomMessage = nil
-                }
-            }
-        }
-    }
-    
-    private func playNextSong() {
-        // Reset the animation state
-        animateTitle = false
-        animateArtist = false
-        
-        if isPlayingFromAlbum {
-            if isPlayingFromAlbum,
-               let albumWithTracks,
-               let currentIndex = albumWithTracks.tracks.firstIndex(where: { $0.id == song.id }) {
-                
-                let nextIndex = currentIndex + 1
-                if nextIndex < albumWithTracks.tracks.count {
-                    let nextSong = albumWithTracks.tracks[nextIndex]
+            var nextIndex = currentIndex + 1
+            while nextIndex < albumWithTracks.tracks.count {
+                let nextSong = albumWithTracks.tracks[nextIndex]
+                let isReleased = nextSong.releaseDate.map { $0 <= Date() } ?? false
+                if isReleased {
                     playSong(nextSong)
+                    return
                 }
+                nextIndex += 1
             }
-        } else {
-            if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
-                let nextIndex = currentIndex + 1
-                if nextIndex < songs.count {
-                    let nextSong = songs[nextIndex]
+            
+        } else if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
+            var nextIndex = currentIndex + 1
+            while nextIndex < songs.count {
+                let nextSong = songs[nextIndex]
+                let isReleased = nextSong.releaseDate.map { $0 <= Date() } ?? false
+                if isReleased {
                     playSong(nextSong)
                     bottomMessage = nil
+                    return
                 }
+                nextIndex += 1
             }
         }
     }
@@ -1384,22 +1399,31 @@ struct AlbumDetailView: View {
     
     
     var body: some View {
-        VStack {
+        VStack(spacing: 4) { // Controls vertical spacing
             if let artworkURL = album.artwork?.url(width: 350, height: 350) {
                 let screenWidth = UIScreen.main.bounds.width
-                let albumSize = min(max(screenWidth * 0.5, 150), 300) // Keeps size between 150-300pt
-                
+                let albumSize = min(max(screenWidth * 0.5, 150), 300)
+
                 CustomAsyncImage(url: artworkURL)
                     .frame(width: albumSize, height: albumSize)
                     .clipped()
                     .cornerRadius(12)
             }
+
             Text(album.title)
                 .font(.headline)
-                .padding(.top)
+                .padding(.top, 2) // Slightly smaller than default padding
+
             Text(album.artistName)
                 .font(.subheadline)
                 .foregroundColor(.gray)
+
+            if let releaseDate = album.releaseDate {
+                Text(releaseDate.formatted(date: .abbreviated, time: .omitted))
+                    .font(.footnote)
+                    .foregroundColor(.gray)
+                    .padding(.bottom, 2)
+            }
             
             if isLoadingTracks {
                 ProgressView("Loading tracks...")
@@ -1410,22 +1434,32 @@ struct AlbumDetailView: View {
             } else {
                 List {
                     ForEach(tracks, id: \.id) { song in
+
+                        let isReleased = song.releaseDate.map { $0 <= Date() } ?? false
+                        
                         Button {
-                            playSong(song)
-                            isPlayingFromAlbum = true
-                            bottomMessage = nil
+                            if isReleased {
+                                playSong(song)
+                                isPlayingFromAlbum = true
+                                bottomMessage = nil
+                            }
                         } label: {
                             VStack(alignment: .leading) {
                                 Text(song.title)
                                     .font(.subheadline)
                                     .lineLimit(1)
+                                    .foregroundColor(isReleased ? .primary : .gray)
                                 Text(song.artistName)
                                     .font(.caption)
                                     .lineLimit(1)
                                     .foregroundColor(.gray)
+
+                                .font(.caption2)
+                                .foregroundColor(.gray)
                             }
-                            .padding(.vertical, 3) // Increase vertical padding
+                            .padding(.vertical, 3)
                         }
+                        .disabled(!isReleased)
                     }
                 }
             }
