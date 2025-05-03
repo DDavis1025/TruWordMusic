@@ -648,28 +648,22 @@ struct ContentView: View {
     
     func previewDidEnd(player: AVPlayer) {
         guard let currentSong = currentlyPlayingSong else { return }
-        
-        let nextSong: Song?
-        
+
         previewDidEnd = true
-        
+
+        var nextSong: Song?
+
         if isPlayingFromAlbum, let albumWithTracks, albumWithTracks.tracks.contains(currentSong) {
             // Find the current song's index in the album's track list
-            if let currentIndex = albumWithTracks.tracks.firstIndex(of: currentSong), currentIndex < albumWithTracks.tracks.count - 1 {
-                nextSong = albumWithTracks.tracks[currentIndex + 1]
-            } else {
-                nextSong = nil // No more tracks in the album
-            }
-        } else {
-            nextSong = nil // No more songs in the list
-            let timeZero = CMTime(seconds: 0, preferredTimescale: 1)
-            player.seek(to: timeZero) { finished in
-                if finished {
-                    print("Seek to 0 completed")
-                }
+            if let currentIndex = albumWithTracks.tracks.firstIndex(of: currentSong) {
+                // Look ahead to find the next released song
+                let remainingTracks = albumWithTracks.tracks[(currentIndex + 1)...]
+                nextSong = remainingTracks.first(where: { song in
+                    song.releaseDate.map { $0 <= Date() } ?? false
+                })
             }
         }
-        
+
         if let nextSongToPlay = nextSong {
             playSong(nextSongToPlay)
         } else {
@@ -682,6 +676,7 @@ struct ContentView: View {
             }
         }
     }
+
     
     
     func showSubscriptionMessage() {
@@ -1448,14 +1443,11 @@ struct AlbumDetailView: View {
                                 Text(song.title)
                                     .font(.subheadline)
                                     .lineLimit(1)
-                                    .foregroundColor(isReleased ? .primary : .gray)
+                                    .foregroundColor(isReleased ? .primary : Color(UIColor.lightGray))
                                 Text(song.artistName)
                                     .font(.caption)
                                     .lineLimit(1)
-                                    .foregroundColor(.gray)
-
-                                .font(.caption2)
-                                .foregroundColor(.gray)
+                                    .foregroundColor(isReleased ? .gray : Color(UIColor.lightGray))
                             }
                             .padding(.vertical, 3)
                         }
