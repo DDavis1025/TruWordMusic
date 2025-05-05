@@ -648,11 +648,11 @@ struct ContentView: View {
     
     func previewDidEnd(player: AVPlayer) {
         guard let currentSong = currentlyPlayingSong else { return }
-
+        
         previewDidEnd = true
-
+        
         var nextSong: Song?
-
+        
         if isPlayingFromAlbum, let albumWithTracks, albumWithTracks.tracks.contains(currentSong) {
             // Find the current song's index in the album's track list
             if let currentIndex = albumWithTracks.tracks.firstIndex(of: currentSong) {
@@ -663,7 +663,7 @@ struct ContentView: View {
                 })
             }
         }
-
+        
         if let nextSongToPlay = nextSong {
             playSong(nextSongToPlay)
         } else {
@@ -676,7 +676,7 @@ struct ContentView: View {
             }
         }
     }
-
+    
     
     
     func showSubscriptionMessage() {
@@ -895,7 +895,7 @@ struct SongRowView: View {
                 
                 Text(song.artistName)
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(Color(UIColor.darkGray))
                     .lineLimit(1)
                     .multilineTextAlignment(.leading)
             }
@@ -959,7 +959,7 @@ struct TrackDetailView: View {
                     // Artist Name
                     ScrollableText(text: song.artistName, isAnimating: $animateArtist, scrollSpeed: 47.0)
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(Color(UIColor.darkGray))
                         .id("artist-\(song.id)") // Unique ID for the artist
                     
                     Spacer().frame(height: 30) // Ensures artist name is ~20 pts above play button
@@ -1033,8 +1033,8 @@ struct TrackDetailView: View {
                             }
                             .padding()
                         }
-                      }
                     }
+                }
                 
                 // Close Button
                 VStack {
@@ -1060,7 +1060,7 @@ struct TrackDetailView: View {
     private func playPreviousSong() {
         animateTitle = false
         animateArtist = false
-
+        
         if isPlayingFromAlbum,
            let albumWithTracks,
            let currentIndex = albumWithTracks.tracks.firstIndex(where: { $0.id == song.id }) {
@@ -1075,7 +1075,7 @@ struct TrackDetailView: View {
                 }
                 previousIndex -= 1
             }
-
+            
         } else if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
             var previousIndex = currentIndex - 1
             while previousIndex >= 0 {
@@ -1090,7 +1090,7 @@ struct TrackDetailView: View {
             }
         }
     }
-
+    
     
     private func playNextSong() {
         animateTitle = false
@@ -1253,7 +1253,7 @@ struct BottomPlayerView: View {
                 
                 Text(song.artistName)
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(Color(UIColor.darkGray))
                     .lineLimit(1)
             }
             
@@ -1335,7 +1335,7 @@ struct FullAlbumGridView: View {
                                     .frame(width: albumSize - 20)
                                 Text(album.artistName)
                                     .font(.caption2)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(Color(UIColor.darkGray))
                                     .lineLimit(1)
                                     .frame(width: albumSize - 20)
                             }
@@ -1398,21 +1398,21 @@ struct AlbumDetailView: View {
             if let artworkURL = album.artwork?.url(width: 350, height: 350) {
                 let screenWidth = UIScreen.main.bounds.width
                 let albumSize = min(max(screenWidth * 0.5, 150), 300)
-
+                
                 CustomAsyncImage(url: artworkURL)
                     .frame(width: albumSize, height: albumSize)
                     .clipped()
                     .cornerRadius(12)
             }
-
+            
             Text(album.title)
                 .font(.headline)
                 .padding(.top, 2) // Slightly smaller than default padding
-
+            
             Text(album.artistName)
                 .font(.subheadline)
-                .foregroundColor(.gray)
-
+                .foregroundColor(Color(UIColor.darkGray))
+            
             if let releaseDate = album.releaseDate {
                 Text(releaseDate.formatted(date: .abbreviated, time: .omitted))
                     .font(.footnote)
@@ -1429,11 +1429,15 @@ struct AlbumDetailView: View {
             } else {
                 List {
                     ForEach(tracks, id: \.id) { song in
-
+                        
                         let isReleased = song.releaseDate.map { $0 <= Date() } ?? false
                         
                         Button {
                             if isReleased {
+                                // Only update if it's a different album
+                                if albumWithTracks?.album.id != album.id {
+                                    albumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
+                                }
                                 playSong(song)
                                 isPlayingFromAlbum = true
                                 bottomMessage = nil
@@ -1447,7 +1451,7 @@ struct AlbumDetailView: View {
                                 Text(song.artistName)
                                     .font(.caption)
                                     .lineLimit(1)
-                                    .foregroundColor(isReleased ? .gray : Color(UIColor.lightGray))
+                                    .foregroundColor(isReleased ? Color(UIColor.darkGray) : Color(UIColor.lightGray))
                             }
                             .padding(.vertical, 3)
                         }
@@ -1500,9 +1504,6 @@ struct AlbumDetailView: View {
             
             // Assign fetched songs to the tracks array
             tracks = Array(songResponse.items)
-            
-            albumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
-            
             
         } catch {
             print("Error fetching album tracks: \(error)")
