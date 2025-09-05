@@ -31,6 +31,8 @@ extension EnvironmentValues {
 }
 
 struct ContentView: View {
+    // Add network monitor
+    @StateObject private var networkMonitor = NetworkMonitor()
     // Existing song/player state
     @State private var musicAuthorized = false
     @State private var songs: [Song] = []
@@ -55,8 +57,7 @@ struct ContentView: View {
     @State private var hasRequestedMusicAuthorization = false
     
     @State private var isBottomPlayerVisible: Bool = true
-    @State private var showBottomMessageOnce: Bool = true // Add this state variable
-    @State private var bottomMessageShown: Int = 0
+    @State private var showBottomMessage: Bool = true
     
     @State private var playbackObservationTask: Task<Void, Never>?
     @State private var playerStateTask: Task<Void, Never>?
@@ -67,10 +68,31 @@ struct ContentView: View {
     // Add scenePhase to detect app lifestyle changes
     @Environment(\.scenePhase) private var scenePhase
     
+    private let bottomPlayerHeight: CGFloat = 80
+    
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack(alignment: .bottom) {
-                if isLoading || !hasRequestedMusicAuthorization {
+                // Main content area
+                if !networkMonitor.isConnected && !isLoading {
+                    // No internet connection view
+                    VStack(spacing: 8) {
+                        Spacer()
+                        Text("No Internet connection")
+                            .font(.headline)
+                            .foregroundColor(.black)
+                        Text("Please connect to the internet")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                        Spacer()
+                        
+                        // Add padding equal to the BottomPlayerView height
+                        Color.clear
+                            .frame(height: bottomPlayerHeight)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemBackground))
+                } else if isLoading || !hasRequestedMusicAuthorization {
                     ProgressView("Loading...")
                         .progressViewStyle(CircularProgressViewStyle())
                         .scaleEffect(1.5)
@@ -158,54 +180,95 @@ struct ContentView: View {
                         }
                         .padding(.horizontal, 16)
                     }
-                    // Ensure ScrollView avoids the BottomPlayerView and bottomMessage
+                    // Add safe area inset for bottom message and player (only for ScrollView)
                     .safeAreaInset(edge: .bottom) {
                         VStack(spacing: 0) {
-                            if let message = bottomMessage, showBottomMessageOnce {
+                            // Bottom message (when applicable)
+                            if let message = bottomMessage, showBottomMessage {
                                 HStack {
                                     Text(message)
                                         .font(.caption)
                                         .foregroundColor(.red)
                                     
                                     Spacer()
-                                    if bottomMessageShown >= 3 {
-                                        Button("OK") {
-                                            withAnimation {
-                                                showBottomMessageOnce = false
-                                            }
+                                    Button("OK") {
+                                        withAnimation {
+                                            showBottomMessage = false
                                         }
-                                        .font(.caption)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.gray.opacity(0.1))
-                                        .cornerRadius(6)
                                     }
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.gray.opacity(0.1))
+                                    .cornerRadius(6)
                                 }
                                 .padding()
                                 .frame(maxWidth: .infinity)
                                 .background(Color(.systemBackground))
-                                .transition(.move(edge: .bottom).combined(with: .opacity)) // Smooth disappearing animation
                             }
                             
+                            // BottomPlayerView always visible when there's a song playing
                             if let song = currentlyPlayingSong {
                                 BottomPlayerView(
                                     song: song,
                                     isPlaying: $isPlaying,
                                     togglePlayPause: togglePlayPause,
                                     playerIsReady: playerIsReady
-                                ).id(song.id)
-                                    .background(Color(.systemBackground))
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        showTrackDetail = true
-                                    }
+                                )
+                                .id(song.id)
+                                .background(Color(.systemBackground))
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    showTrackDetail = true
+                                }
                             }
                         }
                     }
-                    
-                    .animation(.easeInOut(duration: 0.3), value: bottomMessage) // Animate the layout change
-                    
-                    
+                }
+                
+                // Bottom elements for non-ScrollView states (no internet, loading)
+                if (!networkMonitor.isConnected && !isLoading) {
+                    VStack(spacing: 0) {
+                        // Bottom message (when applicable)
+                        if let message = bottomMessage, showBottomMessage {
+                            HStack {
+                                Text(message)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                
+                                Spacer()
+                                Button("OK") {
+                                    withAnimation {
+                                        showBottomMessage = false
+                                    }
+                                }
+                                .font(.caption)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(6)
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color(.systemBackground))
+                        }
+                        
+                        // BottomPlayerView always visible when there's a song playing
+                        if let song = currentlyPlayingSong {
+                            BottomPlayerView(
+                                song: song,
+                                isPlaying: $isPlaying,
+                                togglePlayPause: togglePlayPause,
+                                playerIsReady: playerIsReady
+                            )
+                            .id(song.id)
+                            .background(Color(.systemBackground))
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                showTrackDetail = true
+                            }
+                        }
+                    }
                 }
             }
             .navigationDestination(for: String.self) { value in
@@ -236,7 +299,9 @@ struct ContentView: View {
                         albums: albums,
                         playSong: playSong,
                         songs: $songs,
-                        playerIsReady: $playerIsReady
+                        playerIsReady: $playerIsReady,
+                        networkMonitor: networkMonitor,
+                        appleMusicSubscription: $appleMusicSubscription
                     )
                     .environment(\.navigationPath, $navigationPath)
                 }
@@ -261,7 +326,6 @@ struct ContentView: View {
             }
         }
     }
-    
     
     func openAppSettings() {
         guard let appSettingsUrl = URL(string: UIApplication.openSettingsURLString),
@@ -521,7 +585,6 @@ struct ContentView: View {
                 if let playerItem = audioPlayer.currentItem {
                     NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: playerItem, queue: .main) { _ in
                         previewDidEnd(player: audioPlayer)
-                        bottomMessageShown += 1
                         showSubscriptionMessage()
                     }
                 }
@@ -664,7 +727,7 @@ struct ContentView: View {
             }
         }
         
-        if let nextSongToPlay = nextSong {
+        if let nextSongToPlay = nextSong, networkMonitor.isConnected {
             playSong(nextSongToPlay)
         } else {
             isPlaying = false
@@ -684,7 +747,7 @@ struct ContentView: View {
             withAnimation {
                 bottomMessage = "Preview ended. Log in or subscribe to Apple Music to play the full song."
             }
-            if isPlayingFromAlbum {
+            if isPlayingFromAlbum && networkMonitor.isConnected {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 11) {
                     withAnimation {
                         bottomMessage = nil
@@ -895,7 +958,7 @@ struct SongRowView: View {
                 
                 Text(song.artistName)
                     .font(.caption)
-                    .foregroundColor(Color(UIColor.darkGray))
+                    .foregroundColor(Color(white: 0.48))
                     .lineLimit(1)
                     .multilineTextAlignment(.leading)
             }
@@ -919,6 +982,8 @@ struct TrackDetailView: View {
     let playSong: (Song) -> Void
     @Binding var songs: [Song]
     @Binding var playerIsReady: Bool
+    @ObservedObject var networkMonitor: NetworkMonitor
+    @Binding var appleMusicSubscription: Bool
     
     @State private var selectedAlbum: Album? = nil
     @Environment(\.dismiss) private var dismiss
@@ -959,7 +1024,7 @@ struct TrackDetailView: View {
                     // Artist Name
                     ScrollableText(text: song.artistName, isAnimating: $animateArtist, scrollSpeed: 47.0)
                         .font(.subheadline)
-                        .foregroundColor(Color(UIColor.darkGray))
+                        .foregroundColor(Color(white: 0.48))
                         .id("artist-\(song.id)") // Unique ID for the artist
                     
                     Spacer().frame(height: 30) // Ensures artist name is ~20 pts above play button
@@ -969,8 +1034,9 @@ struct TrackDetailView: View {
                         Button(action: playPreviousSong) {
                             Image(systemName: "backward.fill")
                                 .font(.system(size: 28))
-                                .foregroundColor(.primary)
+                                .foregroundColor(networkMonitor.isConnected ? .primary : .gray)
                         }
+                        .disabled(!networkMonitor.isConnected)
                         
                         ZStack {
                             if playerIsReady {
@@ -990,8 +1056,9 @@ struct TrackDetailView: View {
                         Button(action: playNextSong) {
                             Image(systemName: "forward.fill")
                                 .font(.system(size: 28))
-                                .foregroundColor(.primary)
+                                .foregroundColor(networkMonitor.isConnected ? .primary : .gray)
                         }
+                        .disabled(!networkMonitor.isConnected)
                     }
                     .padding(.bottom, 10)
                     
@@ -1010,19 +1077,20 @@ struct TrackDetailView: View {
                         }) {
                             Text("View Album")
                                 .font(.subheadline)
-                                .foregroundColor(.blue)
+                                .foregroundColor(networkMonitor.isConnected ? .blue : .gray)
                                 .padding(.vertical, 10)
                                 .padding(.horizontal, 16)
                                 .background(Color.blue.opacity(0.1))
                                 .cornerRadius(10)
                         }
+                        .disabled(!networkMonitor.isConnected)
                         .padding(.top, 5)
                     }
                     
                     Spacer()
                     
                     // Subscription Message at the Bottom
-                    if let appleMusicURL {
+                    if let appleMusicURL, !appleMusicSubscription {
                         HStack {
                             Link(destination: appleMusicURL) {
                                 Image("AppleMusicBadge")
@@ -1058,6 +1126,7 @@ struct TrackDetailView: View {
     }
     
     private func playPreviousSong() {
+        guard networkMonitor.isConnected else { return }
         animateTitle = false
         animateArtist = false
         
@@ -1068,8 +1137,8 @@ struct TrackDetailView: View {
             var previousIndex = currentIndex - 1
             while previousIndex >= 0 {
                 let previousSong = albumWithTracks.tracks[previousIndex]
-                let isReleased = previousSong.releaseDate.map { $0 <= Date() } ?? false
-                if isReleased {
+                let isPlayable = (previousSong.releaseDate.map { $0 <= Date() } ?? false) && previousSong.playParameters != nil
+                if isPlayable {
                     playSong(previousSong)
                     return
                 }
@@ -1080,8 +1149,8 @@ struct TrackDetailView: View {
             var previousIndex = currentIndex - 1
             while previousIndex >= 0 {
                 let previousSong = songs[previousIndex]
-                let isReleased = previousSong.releaseDate.map { $0 <= Date() } ?? false
-                if isReleased {
+                let isPlayable = (previousSong.releaseDate.map { $0 <= Date() } ?? false) && previousSong.playParameters != nil
+                if isPlayable {
                     playSong(previousSong)
                     bottomMessage = nil
                     return
@@ -1093,6 +1162,7 @@ struct TrackDetailView: View {
     
     
     private func playNextSong() {
+        guard networkMonitor.isConnected else { return }
         animateTitle = false
         animateArtist = false
         
@@ -1103,8 +1173,8 @@ struct TrackDetailView: View {
             var nextIndex = currentIndex + 1
             while nextIndex < albumWithTracks.tracks.count {
                 let nextSong = albumWithTracks.tracks[nextIndex]
-                let isReleased = nextSong.releaseDate.map { $0 <= Date() } ?? false
-                if isReleased {
+                let isPlayable = (song.releaseDate.map { $0 <= Date() } ?? false) && nextSong.playParameters != nil
+                if isPlayable {
                     playSong(nextSong)
                     return
                 }
@@ -1115,8 +1185,8 @@ struct TrackDetailView: View {
             var nextIndex = currentIndex + 1
             while nextIndex < songs.count {
                 let nextSong = songs[nextIndex]
-                let isReleased = nextSong.releaseDate.map { $0 <= Date() } ?? false
-                if isReleased {
+                let isPlayable = (song.releaseDate.map { $0 <= Date() } ?? false) && nextSong.playParameters != nil
+                if isPlayable {
                     playSong(nextSong)
                     bottomMessage = nil
                     return
@@ -1253,7 +1323,7 @@ struct BottomPlayerView: View {
                 
                 Text(song.artistName)
                     .font(.caption)
-                    .foregroundColor(Color(UIColor.darkGray))
+                    .foregroundColor(Color(white: 0.48))
                     .lineLimit(1)
             }
             
@@ -1335,7 +1405,7 @@ struct FullAlbumGridView: View {
                                     .frame(width: albumSize - 20)
                                 Text(album.artistName)
                                     .font(.caption2)
-                                    .foregroundColor(Color(UIColor.darkGray))
+                                    .foregroundColor(Color(white: 0.48))
                                     .lineLimit(1)
                                     .frame(width: albumSize - 20)
                             }
@@ -1411,12 +1481,12 @@ struct AlbumDetailView: View {
             
             Text(album.artistName)
                 .font(.subheadline)
-                .foregroundColor(Color(UIColor.darkGray))
+                .foregroundColor(Color(white: 0.48)) // white: 0.0 = black, 1.0 = white
             
             if let releaseDate = album.releaseDate {
                 Text(releaseDate.formatted(date: .abbreviated, time: .omitted))
                     .font(.footnote)
-                    .foregroundColor(.gray)
+                    .foregroundColor(Color(white: 0.48))
                     .padding(.bottom, 2)
             }
             
@@ -1429,11 +1499,10 @@ struct AlbumDetailView: View {
             } else {
                 List {
                     ForEach(tracks, id: \.id) { song in
-                        
-                        let isReleased = song.releaseDate.map { $0 <= Date() } ?? false
+                        let isPlayable = (song.releaseDate.map { $0 <= Date() } ?? false) && song.playParameters != nil
                         
                         Button {
-                            if isReleased {
+                            if isPlayable {
                                 // Only update if it's a different album
                                 if albumWithTracks?.album.id != album.id {
                                     albumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
@@ -1447,15 +1516,15 @@ struct AlbumDetailView: View {
                                 Text(song.title)
                                     .font(.subheadline)
                                     .lineLimit(1)
-                                    .foregroundColor(isReleased ? .primary : Color(UIColor.lightGray))
+                                    .foregroundColor(isPlayable ? .primary : Color(UIColor.lightGray))
                                 Text(song.artistName)
                                     .font(.caption)
                                     .lineLimit(1)
-                                    .foregroundColor(isReleased ? Color(UIColor.darkGray) : Color(UIColor.lightGray))
+                                    .foregroundColor(isPlayable ? Color(white: 0.48) : Color(UIColor.lightGray))
                             }
                             .padding(.vertical, 3)
                         }
-                        .disabled(!isReleased)
+                        .disabled(!isPlayable)
                     }
                 }
             }
