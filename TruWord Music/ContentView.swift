@@ -81,9 +81,11 @@ struct ContentView: View {
                         Text("No Internet connection")
                             .font(.headline)
                             .foregroundColor(.black)
-                        Text("Please connect to the internet")
+                            .multilineTextAlignment(.center)
+                        Text("Your device is not connected to the internet")
                             .font(.subheadline)
                             .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
                         Spacer()
                         
                         // Add padding equal to the BottomPlayerView height
@@ -145,7 +147,8 @@ struct ContentView: View {
                                                     playSong: playSong,
                                                     currentlyPlayingSong: $currentlyPlayingSong,
                                                     isPlayingFromAlbum: $isPlayingFromAlbum,
-                                                    bottomMessage: $bottomMessage
+                                                    bottomMessage: $bottomMessage,
+                                                    networkMonitor: networkMonitor
                                                 )
                                             }
                                             .foregroundColor(.blue)
@@ -166,7 +169,8 @@ struct ContentView: View {
                             } else {
                                 // Message for no music authorization
                                 Text("Please allow Apple Music access to continue using this app.")
-                                    .foregroundColor(.red)
+                                    .foregroundColor(.black)
+                                    .multilineTextAlignment(.center)
                                     .padding()
                                 
                                 Button(action: {
@@ -273,9 +277,9 @@ struct ContentView: View {
             }
             .navigationDestination(for: String.self) { value in
                 if value == "fullAlbumGrid" {
-                    FullAlbumGridView(albums: albums) { album in
+                    FullAlbumGridView(albums: albums, onAlbumSelected: { album in
                         selectAlbum(album)
-                    }
+                    }, networkMonitor: networkMonitor)
                 }
             }
             .navigationDestination(for: Album.self) { album in
@@ -284,7 +288,8 @@ struct ContentView: View {
                     playSong: playSong,
                     isPlayingFromAlbum: $isPlayingFromAlbum,
                     bottomMessage: $bottomMessage,
-                    albumWithTracks: $albumWithTracks
+                    albumWithTracks: $albumWithTracks,
+                    networkMonitor: networkMonitor
                 )
             }
             .fullScreenCover(isPresented: $showTrackDetail) {
@@ -873,7 +878,11 @@ struct FullTrackListView: View {
     @Binding var isPlayingFromAlbum: Bool
     @Binding var bottomMessage: String?
     
+    @ObservedObject var networkMonitor: NetworkMonitor
+    
     @State private var searchQuery: String = "" // State for search query
+    
+    private let bottomPlayerHeight: CGFloat = 80
     
     // Filtered songs based on search query (title or artist name)
     var filteredSongs: [Song] {
@@ -889,8 +898,27 @@ struct FullTrackListView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Content Section (List or Empty State)
-            if filteredSongs.isEmpty {
+            if !networkMonitor.isConnected {
+                // No internet connection view
+                VStack(spacing: 8) {
+                    Spacer()
+                    Text("No Internet connection")
+                        .font(.headline)
+                        .foregroundColor(.black)
+                        .multilineTextAlignment(.center)
+                    Text("Your device is not connected to the internet")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                    Spacer()
+                    
+                    // Add padding equal to the BottomPlayerView height
+                    Color.clear
+                        .frame(height: bottomPlayerHeight)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+            } else if filteredSongs.isEmpty {
                 Spacer()
                 Text("No tracks found")
                     .font(.subheadline)
@@ -922,7 +950,9 @@ struct FullTrackListView: View {
         .frame(maxHeight: .infinity, alignment: .top) // Ensures the content stays at the top
         .navigationTitle("Top Songs")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchQuery) // Add the searchable modifier
+        .if(networkMonitor.isConnected) { view in
+            view.searchable(text: $searchQuery)
+        }
     }
 }
 
@@ -1358,8 +1388,11 @@ struct BottomPlayerView: View {
 struct FullAlbumGridView: View {
     let albums: [Album]
     let onAlbumSelected: (Album) -> Void
+    @ObservedObject var networkMonitor: NetworkMonitor
     
     @State private var searchQuery: String = ""
+    
+    private let bottomPlayerHeight: CGFloat = 80
     
     var filteredAlbums: [Album] {
         if searchQuery.isEmpty {
@@ -1381,7 +1414,27 @@ struct FullAlbumGridView: View {
         ]
         
         VStack(alignment: .leading, spacing: 10) {
-            if filteredAlbums.isEmpty {
+            if !networkMonitor.isConnected {
+                // No internet connection view
+                VStack(spacing: 8) {
+                    Spacer()
+                    Text("No Internet connection")
+                        .font(.headline)
+                        .foregroundColor(.black)
+                        .multilineTextAlignment(.center)
+                    Text("Your device is not connected to the internet")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                    Spacer()
+                    
+                    // Add padding equal to the BottomPlayerView height
+                    Color.clear
+                        .frame(height: bottomPlayerHeight)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+            } else if filteredAlbums.isEmpty {
                 Spacer()
                 Text("No albums found")
                     .font(.subheadline)
@@ -1420,7 +1473,9 @@ struct FullAlbumGridView: View {
         }
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchQuery)
+        .if(networkMonitor.isConnected) { view in
+            view.searchable(text: $searchQuery)
+        }
     }
 }
 
@@ -1460,8 +1515,7 @@ struct AlbumDetailView: View {
     @Binding var isPlayingFromAlbum: Bool // Added binding
     @Binding var bottomMessage: String?
     @Binding var albumWithTracks: AlbumWithTracks?
-    
-    
+    @ObservedObject var networkMonitor: NetworkMonitor
     
     var body: some View {
         VStack(spacing: 4) { // Controls vertical spacing
@@ -1516,15 +1570,15 @@ struct AlbumDetailView: View {
                                 Text(song.title)
                                     .font(.subheadline)
                                     .lineLimit(1)
-                                    .foregroundColor(isPlayable ? .primary : Color(UIColor.lightGray))
+                                    .foregroundColor(isPlayable && networkMonitor.isConnected ? .primary : Color(UIColor.lightGray))
                                 Text(song.artistName)
                                     .font(.caption)
                                     .lineLimit(1)
-                                    .foregroundColor(isPlayable ? Color(white: 0.48) : Color(UIColor.lightGray))
+                                    .foregroundColor(isPlayable && networkMonitor.isConnected ? Color(white: 0.48) : Color(UIColor.lightGray))
                             }
                             .padding(.vertical, 3)
                         }
-                        .disabled(!isPlayable)
+                        .disabled(!isPlayable || !networkMonitor.isConnected)
                     }
                 }
             }
@@ -1582,3 +1636,18 @@ struct AlbumDetailView: View {
         isLoadingTracks = false
     }
 }
+
+extension View {
+    @ViewBuilder
+    func `if`<Content: View>(
+        _ condition: Bool,
+        transform: (Self) -> Content
+    ) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
+}
+
