@@ -11,7 +11,7 @@ import SwiftUI
 struct TruWord_MusicApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainAppView()
         }
     }
 }

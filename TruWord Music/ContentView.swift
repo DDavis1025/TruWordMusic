@@ -31,290 +31,94 @@ extension EnvironmentValues {
 }
 
 struct ContentView: View {
-    // Add network monitor
-    @StateObject private var networkMonitor = NetworkMonitor()
-    // Existing song/player state
+    @ObservedObject var playerManager: PlayerManager
+    @ObservedObject var networkMonitor: NetworkMonitor
+
+    // Authorization & Data
     @State private var musicAuthorized = false
+    @State private var hasRequestedMusicAuthorization = false
+    @State private var isLoading = false
+
+    // Songs & Albums
     @State private var songs: [Song] = []
-    @State private var currentlyPlayingSong: Song?
-    @State private var appleMusicSubscription = false
-    @State private var audioPlayer: AVPlayer?
-    @State private var playerIsReady = true
-    @State private var userAuthorized = false
-    @State private var isPlaying = false
-    @State private var bottomMessage: String? = nil  // Inline message for non-subscribed users
-    @State private var showTrackDetail: Bool = false
-    @State private var previewDidEnd: Bool = false
-    
-    // New album-related state
     @State private var albums: [Album] = []
     @State private var albumWithTracks: AlbumWithTracks? = nil
-    @State private var selectedAlbum: Album? = nil
-    @State private var showAlbumDetail = false
-    @State private var isPlayingFromAlbum: Bool = false // Track if playing from album
-    
-    @State private var isLoading = false // Track loading state
-    @State private var hasRequestedMusicAuthorization = false
-    
-    @State private var isBottomPlayerVisible: Bool = true
-    @State private var showBottomMessage: Bool = true
-    
-    @State private var playbackObservationTask: Task<Void, Never>?
-    @State private var playerStateTask: Task<Void, Never>?
-    @State private var playerPreparationTask: Task<Void, Never>? = nil
-    
+
+    // UI State
     @State private var navigationPath = NavigationPath()
-    
-    // Add scenePhase to detect app lifestyle changes
+
     @Environment(\.scenePhase) private var scenePhase
     
     private let bottomPlayerHeight: CGFloat = 80
-    
+
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            ZStack(alignment: .bottom) {
-                // Main content area
+            Group {
                 if !networkMonitor.isConnected && !isLoading {
-                    // No internet connection view
-                    VStack(spacing: 8) {
-                        Spacer()
-                        Text("No Internet connection")
-                            .font(.headline)
-                            .foregroundColor(.black)
-                            .multilineTextAlignment(.center)
-                        Text("Your device is not connected to the internet")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                        Spacer()
-                        
-                        // Add padding equal to the BottomPlayerView height
-                        Color.clear
-                            .frame(height: bottomPlayerHeight)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemBackground))
+                    noInternetView
                 } else if isLoading || !hasRequestedMusicAuthorization {
                     ProgressView("Loading...")
                         .progressViewStyle(CircularProgressViewStyle())
                         .scaleEffect(1.5)
                 } else {
-                    ScrollView {
-                        VStack {
-                            if musicAuthorized {
-                                // MARK: Albums Section
-                                if !albums.isEmpty {
-                                    VStack(alignment: .leading) {
-                                        HStack {
-                                            Text("Top Christian Albums")
-                                                .font(.system(size: 18))
-                                                .bold()
-                                            Spacer()
-                                            if albums.count > 5 {
-                                                NavigationLink("View More", value: "fullAlbumGrid")
-                                                    .foregroundColor(.blue)
-                                                    .font(.system(size: 15))
-                                            }
-                                        }
-                                        .padding(.vertical, 5)
-                                        
-                                        ScrollView(.horizontal, showsIndicators: false) {
-                                            HStack(spacing: 16) {
-                                                ForEach(albums.prefix(5), id: \.id) { album in
-                                                    AlbumCarouselItemView(album: album)
-                                                        .onTapGesture {
-                                                            selectAlbum(album)
-                                                        }
-                                                }
-                                            }
-                                            .padding(.horizontal)
-                                        }
-                                    }
-                                    .padding(.bottom, 16)
-                                }
-                                
-                                // MARK: Tracks Section
-                                VStack(alignment: .leading) {
-                                    HStack {
-                                        Text("Top Christian Songs")
-                                            .font(.system(size: 18))
-                                            .bold()
-                                        Spacer()
-                                        if songs.count > 5 {
-                                            NavigationLink("View More") {
-                                                FullTrackListView(
-                                                    songs: songs,
-                                                    playSong: playSong,
-                                                    currentlyPlayingSong: $currentlyPlayingSong,
-                                                    isPlayingFromAlbum: $isPlayingFromAlbum,
-                                                    bottomMessage: $bottomMessage,
-                                                    networkMonitor: networkMonitor
-                                                )
-                                            }
-                                            .foregroundColor(.blue)
-                                            .font(.system(size: 15))
-                                        }
-                                    }
-                                    .padding(.vertical, 5)
-                                    
-                                    ForEach(songs.prefix(5), id: \.id) { song in
-                                        SongRowView(song: song, currentlyPlayingSong: $currentlyPlayingSong)
-                                            .onTapGesture {
-                                                playSong(song)
-                                                isPlayingFromAlbum = false
-                                                bottomMessage = nil
-                                            }
-                                    }
-                                }
-                            } else {
-                                // Message for no music authorization
-                                Text("Please allow Apple Music access to continue using this app.")
-                                    .foregroundColor(.black)
-                                    .multilineTextAlignment(.center)
-                                    .padding()
-                                
-                                Button(action: {
-                                    openAppSettings()
-                                }) {
-                                    Text("Enable in Settings")
-                                        .foregroundColor(.blue)
-                                }
-                                .padding()
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                    }
-                    // Add safe area inset for bottom message and player (only for ScrollView)
-                    .safeAreaInset(edge: .bottom) {
-                        VStack(spacing: 0) {
-                            // Bottom message (when applicable)
-                            if let message = bottomMessage, showBottomMessage {
-                                HStack {
-                                    Text(message)
-                                        .font(.caption)
-                                        .foregroundColor(.red)
-                                    
-                                    Spacer()
-                                    Button("OK") {
-                                        withAnimation {
-                                            showBottomMessage = false
-                                        }
-                                    }
-                                    .font(.caption)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.gray.opacity(0.1))
-                                    .cornerRadius(6)
-                                }
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color(.systemBackground))
-                            }
-                            
-                            // BottomPlayerView always visible when there's a song playing
-                            if let song = currentlyPlayingSong {
-                                BottomPlayerView(
-                                    song: song,
-                                    isPlaying: $isPlaying,
-                                    togglePlayPause: togglePlayPause,
-                                    playerIsReady: playerIsReady
-                                )
-                                .id(song.id)
-                                .background(Color(.systemBackground))
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    showTrackDetail = true
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Bottom elements for non-ScrollView states (no internet, loading)
-                if (!networkMonitor.isConnected && !isLoading) {
-                    VStack(spacing: 0) {
-                        // Bottom message (when applicable)
-                        if let message = bottomMessage, showBottomMessage {
-                            HStack {
-                                Text(message)
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                                
-                                Spacer()
-                                Button("OK") {
-                                    withAnimation {
-                                        showBottomMessage = false
-                                    }
-                                }
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(6)
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color(.systemBackground))
-                        }
-                        
-                        // BottomPlayerView always visible when there's a song playing
-                        if let song = currentlyPlayingSong {
-                            BottomPlayerView(
-                                song: song,
-                                isPlaying: $isPlaying,
-                                togglePlayPause: togglePlayPause,
-                                playerIsReady: playerIsReady
-                            )
-                            .id(song.id)
-                            .background(Color(.systemBackground))
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                showTrackDetail = true
-                            }
-                        }
-                    }
+                    mainScrollView
                 }
             }
             .navigationDestination(for: String.self) { value in
                 if value == "fullAlbumGrid" {
-                    FullAlbumGridView(albums: albums, onAlbumSelected: { album in
-                        selectAlbum(album)
-                    }, networkMonitor: networkMonitor)
+                    FullAlbumGridView(
+                        albums: albums,
+                        onAlbumSelected: { album in navigationPath.append(album) },
+                        networkMonitor: networkMonitor
+                    )
                 }
             }
             .navigationDestination(for: Album.self) { album in
                 AlbumDetailView(
                     album: album,
-                    playSong: playSong,
-                    isPlayingFromAlbum: $isPlayingFromAlbum,
-                    bottomMessage: $bottomMessage,
+                    playSong: { song in
+                        playerManager.playSong(
+                            song,
+                            from: songs,
+                            albumWithTracks: albumWithTracks,
+                            playFromAlbum: true,
+                            networkMonitor: networkMonitor
+                        )
+                    },
+                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                    bottomMessage: $playerManager.bottomMessage,
                     albumWithTracks: $albumWithTracks,
                     networkMonitor: networkMonitor
                 )
             }
-            .fullScreenCover(isPresented: $showTrackDetail) {
-                if let song = currentlyPlayingSong {
+            .fullScreenCover(isPresented: $playerManager.showTrackDetail) {
+                if let song = playerManager.currentlyPlayingSong {
                     TrackDetailView(
                         song: song,
-                        isPlaying: $isPlaying,
-                        togglePlayPause: togglePlayPause,
-                        bottomMessage: $bottomMessage,
-                        isPlayingFromAlbum: $isPlayingFromAlbum,
-                        albumWithTracks: $albumWithTracks,
+                        isPlaying: $playerManager.isPlaying,
+                        togglePlayPause: playerManager.togglePlayPause,
+                        bottomMessage: $playerManager.bottomMessage,
+                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                        albumWithTracks: $playerManager.albumWithTracks,
                         albums: albums,
-                        playSong: playSong,
+                        playSong: { s in
+                            playerManager.playSong(
+                                s,
+                                from: songs,
+                                albumWithTracks: albumWithTracks,
+                                playFromAlbum: false
+                            )
+                        },
                         songs: $songs,
-                        playerIsReady: $playerIsReady,
+                        playerIsReady: $playerManager.playerIsReady,
                         networkMonitor: networkMonitor,
-                        appleMusicSubscription: $appleMusicSubscription
+                        appleMusicSubscription: $playerManager.appleMusicSubscription
                     )
-                    .environment(\.navigationPath, $navigationPath)
                 }
             }
             .task {
                 isLoading = true
                 await requestMusicAuthorization()
-                
                 if musicAuthorized {
                     await withTaskGroup(of: Void.self) { group in
                         group.addTask { await checkAppleMusicStatus() }
@@ -324,557 +128,176 @@ struct ContentView: View {
                 }
                 isLoading = false
             }
-            .onChange(of: scenePhase) { oldPhase, newPhase in
+            .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
-                    onAppForeground()
+                    Task { await checkAppleMusicStatus() }
                 }
             }
         }
     }
+
+
     
-    func openAppSettings() {
-        guard let appSettingsUrl = URL(string: UIApplication.openSettingsURLString),
-              UIApplication.shared.canOpenURL(appSettingsUrl) else { return }
-        
-        UIApplication.shared.open(appSettingsUrl)
-    }
+    // MARK: - UI
     
-    // Function to call when the app enters the foreground
-    private func onAppForeground() {
-        Task {
-            await checkAppleMusicStatus() // Refresh subscription status
-            refreshCurrentSong()
-            if appleMusicSubscription {
-                await stopAndReplaceAVPlayer()
-                monitorMusicPlayerState()
-            } else {
-                await stopApplicationMusicPlayer()
-            }
+    private var noInternetView: some View {
+        VStack(spacing: 8) {
+            Spacer()
+            Text("No Internet connection")
+                .font(.headline)
+                .foregroundColor(.black)
+            Text("Your device is not connected to the internet")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+            Spacer()
+            Color.clear.frame(height: bottomPlayerHeight)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
     }
     
-    private func refreshCurrentSong() {
-        if appleMusicSubscription {
-            if let item = ApplicationMusicPlayer.shared.queue.currentEntry?.item {
-                switch item {
-                case .song(let song):
-                    currentlyPlayingSong = song
-                default:
-                    return
-                }
-            }
-        }
-    }
-    
-    func stopApplicationMusicPlayer() async {
-        let player = ApplicationMusicPlayer.shared
-        
-        // Check if the playback status is playing or paused, and the queue is not empty
-        if player.state.playbackStatus == .playing || player.state.playbackStatus == .paused {
-            if !player.queue.entries.isEmpty {
-                showTrackDetail = false // Dismiss TrackDetailView
-                currentlyPlayingSong = nil
-                clearApplicationMusicPlayer()
-            }
-        }
-    }
-    
-    
-    func stopAndReplaceAVPlayer() async {
-        let player = ApplicationMusicPlayer.shared
-        Task {
-            await checkAppleMusicStatus() // Check if user is now logged in
-            
-            if appleMusicSubscription {
-                // Stop the preview playback if it was playing
-                audioPlayer?.pause()
-                
-                // Switch to ApplicationMusicPlayer for full playback
-                if let currentSong = currentlyPlayingSong {
-                    if player.state.playbackStatus != .playing || player.state.playbackStatus != .paused {
-                        if player.queue.entries.isEmpty {
-                            Task {
-                                playSong(currentSong)
-                            }
+    private var mainScrollView: some View {
+        ScrollView {
+            VStack {
+                if musicAuthorized {
+                    albumsSection
+                    songsSection
+                } else {
+                    Text("Please allow Apple Music access to continue using this app.")
+                        .foregroundColor(.black)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                    
+                    Button("Enable in Settings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
                         }
                     }
+                    .foregroundColor(.blue)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, bottomPlayerHeight + 16) // important!
         }
     }
     
-    func monitorMusicPlayerState() {
-        // Cancel the previous task if it exists
-        playerStateTask?.cancel()
-        
-        // Start a new task
-        playerStateTask = Task {
-            let player = ApplicationMusicPlayer.shared
-            while true {
-                // Check for cancellation
-                if Task.isCancelled {
-                    print("Player state observation task cancelled.")
-                    break
+    private var albumsSection: some View {
+        if albums.isEmpty { return AnyView(EmptyView()) }
+        return AnyView(
+            VStack(alignment: .leading) {
+                HStack {
+                    Text("Top Christian Albums")
+                        .font(.system(size: 18)).bold()
+                    Spacer()
+                    if albums.count > 5 {
+                        NavigationLink("View More", value: "fullAlbumGrid")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 15))
+                    }
                 }
+                .padding(.vertical, 5)
                 
-                let state = player.state
-                DispatchQueue.main.async {
-                    self.isPlaying = (state.playbackStatus == .playing)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(albums.prefix(5), id: \.id) { album in
+                            AlbumCarouselItemView(album: album)
+                                .onTapGesture { navigationPath.append(album) }
+                        }
+                    }
+                    .padding(.horizontal)
                 }
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
             }
-        }
+            .padding(.bottom, 16)
+        )
     }
     
+    private var songsSection: some View {
+        VStack(alignment: .leading) {
+            HStack {
+                Text("Top Christian Songs")
+                    .font(.system(size: 18)).bold()
+                Spacer()
+                if songs.count > 5 {
+                    NavigationLink("View More") {
+                        FullTrackListView(
+                            songs: songs,
+                            playSong: { song in
+                                playerManager.playSong(song, from: songs, networkMonitor: networkMonitor)
+                            },
+                            currentPlayingSong: $playerManager.currentlyPlayingSong,
+                            isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                            bottomMessage: $playerManager.bottomMessage,
+                            networkMonitor: networkMonitor
+                        )
+                    }
+                    .foregroundColor(.blue)
+                    .font(.system(size: 15))
+                }
+            }
+            .padding(.vertical, 5)
+            
+            ForEach(songs.prefix(5), id: \.id) { song in
+                SongRowView(song: song, currentPlayingSong: $playerManager.currentlyPlayingSong)
+                    .onTapGesture {
+                        playerManager.playSong(song, from: songs)
+                        playerManager.isPlayingFromAlbum = false
+                        playerManager.bottomMessage = nil
+                    }
+             }
+        }
+    }
+
     
-    // MARK: - Authorization & Fetching
+    // MARK: - MusicKit
     
-    func requestMusicAuthorization() async {
+    private func requestMusicAuthorization() async {
         let status = await MusicAuthorization.request()
-        if status == .authorized {
-            musicAuthorized = true
-            userAuthorized = true
-            hasRequestedMusicAuthorization = true
-        } else {
-            musicAuthorized = false
-            userAuthorized = false
-            hasRequestedMusicAuthorization = true
-        }
+        musicAuthorized = (status == .authorized)
+        hasRequestedMusicAuthorization = true
     }
     
-    func checkAppleMusicStatus() async {
+    private func checkAppleMusicStatus() async {
         do {
             let subscription = try await MusicSubscription.current
-            appleMusicSubscription = subscription.canPlayCatalogContent
+            playerManager.appleMusicSubscription = subscription.canPlayCatalogContent
         } catch {
-            print("Error checking Apple Music subscription: \(error)")
-            appleMusicSubscription = false
+            playerManager.appleMusicSubscription = false
         }
     }
     
-    func fetchChristianGenre() async throws -> Genre? {
-        // Hardcoded genre ID for "Christian & Gospel"
-        let christianGenreID = MusicItemID("22") // Replace with the correct genre ID
-        
-        // Create a request to fetch the genre by its ID
+    private func fetchChristianGenre() async throws -> Genre? {
+        let christianGenreID = MusicItemID("22") // Christian & Gospel
         var request = MusicCatalogResourceRequest<Genre>(matching: \.id, equalTo: christianGenreID)
-        request.limit = 1 // Fetch only one result
-        
-        // Execute the request
-        let response = try await request.response()
-        
-        // Return the first matching genre
-        return response.items.first
+        request.limit = 1
+        return try await request.response().items.first
     }
     
-    func fetchChristianSongs() async {
+    private func fetchChristianSongs() async {
         do {
-            // Fetch the "Christian & Gospel" genre
-            guard let christianGenre = try await fetchChristianGenre() else {
-                print("Christian & Gospel genre not found")
-                return
-            }
-            
-            // Create a request for top Christian songs
-            var request = MusicCatalogChartsRequest(genre: christianGenre, types: [Song.self])
+            guard let genre = try await fetchChristianGenre() else { return }
+            var request = MusicCatalogChartsRequest(genre: genre, types: [Song.self])
             request.limit = 50
-            
-            // Execute the request
-            let response = try await request.response()
-            
-            // Extract songs from each chart
-            let songCharts: [MusicCatalogChart<Song>] = response.songCharts
-            
-            // Flatten the array to get a list of songs
-            songs = songCharts.flatMap { $0.items }
-            
-            
-        } catch {
-            print("Error fetching Christian songs: \(error)")
-        }
+            songs = (try await request.response()).songCharts.flatMap { $0.items }
+        } catch { print("Error fetching songs: \(error)") }
     }
     
-    
-    func fetchChristianAlbums() async {
+    private func fetchChristianAlbums() async {
         do {
-            // Fetch the "Christian & Gospel" genre
-            guard let christianGenre = try await fetchChristianGenre() else {
-                print("Christian & Gospel genre not found")
-                return
-            }
-            
-            // Create a charts request for albums in the Christian & Gospel genre
-            var request = MusicCatalogChartsRequest(genre: christianGenre, types: [Album.self])
-            request.limit = 50  // Get up to 50 albums
-            
-            // Execute the request
-            let response = try await request.response()
-            
-            // Extract the album charts
-            let albumCharts: [MusicCatalogChart<Album>] = response.albumCharts
-            
-            // Extract albums from the charts
-            albums = albumCharts.flatMap { $0.items }
-            
-        } catch {
-            print("Error fetching top Christian albums: \(error)")
-        }
-    }
-    
-    // MARK: - Playback
-    
-    
-    
-    func playSong(_ song: Song) {
-        Task {
-            await checkAppleMusicStatus()
-            
-            if appleMusicSubscription {
-                // Use ApplicationMusicPlayer for full playback
-                
-                let player = ApplicationMusicPlayer.shared
-                
-                let queueSongs: [Song]
-                
-                if let albumWithTracks, albumWithTracks.tracks.contains(song), isPlayingFromAlbum {
-                    queueSongs = albumWithTracks.tracks
-                } else {
-                    queueSongs = songs
-                }
-                
-                guard let startIndex = queueSongs.firstIndex(of: song) else {
-                    print("Error: Song not found in queue list.")
-                    return
-                }
-                
-                let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
-                player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
-                
-                bottomMessage = nil
-                currentlyPlayingSong = song
-                
-                if !previewDidEnd {
-                    playerPreparationTask?.cancel()
-                    playerPreparationTask = nil
-                    playerPreparationTask = Task {
-                        await ensurePlayerPlays()
-                    }
-                    isPlaying = true
-                } else {
-                    playerPreparationTask?.cancel()
-                    playerPreparationTask = nil
-                    previewDidEnd = false
-                    playerPreparationTask = Task {
-                        await ensurePlayerIsReady()
-                    }
-                    isPlaying = true
-                }
-                
-                observePlaybackState()
-                
-            } else if let previewURL = song.previewAssets?.first?.url {
-                // Use AVPlayer for preview playback
-                previewDidEnd = false
-                audioPlayer?.pause()
-                if let currentItem = audioPlayer?.currentItem {
-                    NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: currentItem)
-                }
-                
-                audioPlayer = AVPlayer(url: previewURL)
-                
-                guard let audioPlayer = audioPlayer else {
-                    print("Error: AVPlayer failed to initialize.")
-                    return
-                }
-                
-                if let playerItem = audioPlayer.currentItem {
-                    NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: playerItem, queue: .main) { _ in
-                        previewDidEnd(player: audioPlayer)
-                        showSubscriptionMessage()
-                    }
-                }
-                
-                audioPlayer.play()
-                currentlyPlayingSong = song
-                isPlaying = true
-                
-                // Stop ApplicationMusicPlayer and clear its queue
-                clearApplicationMusicPlayer()
-                
-            } else {
-                print("No preview available and user is not subscribed.")
-                // Clear ApplicationMusicPlayer queue and Command Center metadata
-                clearApplicationMusicPlayer()
-            }
-        }
-    }
-    
-    
-    func ensurePlayerIsReady() async {
-        let player = ApplicationMusicPlayer.shared
-        
-        await MainActor.run {
-            self.playerIsReady = false
-        }
-        
-        while true {
-            // Exit loop if cancelled
-            if Task.isCancelled {
-                print("ensurePlayerIsReady was cancelled.")
-                return
-            }
-            
-            do {
-                try await player.prepareToPlay()
-            } catch {
-                print("prepareToPlay failed: \(error.localizedDescription)")
-            }
-            
-            if player.state.playbackStatus == .paused {
-                await MainActor.run {
-                    self.playerIsReady = true
-                }
-                print("✅ Player is ready: \(player.state.playbackStatus)")
-                return
-            }
-            
-            // Retry every 0.5s
-            try? await Task.sleep(nanoseconds: 500_000_000)
-        }
-    }
-    
-    func ensurePlayerPlays() async {
-        let player = ApplicationMusicPlayer.shared
-        
-        await MainActor.run {
-            self.playerIsReady = false
-        }
-        
-        while true {
-            // Exit loop if cancelled
-            if Task.isCancelled {
-                print("ensurePlayerIsReady was cancelled.")
-                return
-            }
-            
-            do {
-                try await player.play()
-            } catch {
-                print("prepareToPlay failed: \(error.localizedDescription)")
-            }
-            
-            if player.state.playbackStatus == .playing {
-                await MainActor.run {
-                    self.playerIsReady = true
-                }
-                print("✅ Player is ready: \(player.state.playbackStatus)")
-                return
-            }
-            
-            // Retry every 0.5s
-            try? await Task.sleep(nanoseconds: 500_000_000)
-        }
-    }
-    
-    
-    
-    
-    func clearApplicationMusicPlayer() {
-        if !appleMusicSubscription {
-            let player = ApplicationMusicPlayer.shared
-            do {
-                // Stop playback
-                player.stop()
-                
-                // Reset the queue to an empty state
-                player.queue = .init()
-                
-                // Debug: Print the number of entries in the queue
-                print("Queue entries after reset: \(player.queue.entries.count)")
-                
-                // Forcefully clear the queue if it's not empty
-                if !player.queue.entries.isEmpty {
-                    print("Forcing queue to clear...")
-                    player.queue.entries.removeAll()
-                }
-                
-                // Verify the queue is empty
-                if player.queue.entries.isEmpty {
-                    print("ApplicationMusicPlayer queue cleared successfully.")
-                } else {
-                    print("Warning: Queue still contains entries after reset.")
-                }
-                
-                playbackObservationTask?.cancel()
-                playbackObservationTask = nil
-                
-                playerStateTask?.cancel()
-                playerStateTask = nil
-            }
-        }
-    }
-    
-    func previewDidEnd(player: AVPlayer) {
-        guard let currentSong = currentlyPlayingSong else { return }
-        
-        previewDidEnd = true
-        
-        var nextSong: Song?
-        
-        if isPlayingFromAlbum, let albumWithTracks, albumWithTracks.tracks.contains(currentSong) {
-            // Find the current song's index in the album's track list
-            if let currentIndex = albumWithTracks.tracks.firstIndex(of: currentSong) {
-                // Look ahead to find the next released song
-                let remainingTracks = albumWithTracks.tracks[(currentIndex + 1)...]
-                nextSong = remainingTracks.first(where: { song in
-                    song.releaseDate.map { $0 <= Date() } ?? false
-                })
-            }
-        }
-        
-        if let nextSongToPlay = nextSong, networkMonitor.isConnected {
-            playSong(nextSongToPlay)
-        } else {
-            isPlaying = false
-            let timeZero = CMTime(seconds: 0, preferredTimescale: 1)
-            player.seek(to: timeZero) { finished in
-                if finished {
-                    print("Seek to 0 completed")
-                }
-            }
-        }
-    }
-    
-    
-    
-    func showSubscriptionMessage() {
-        if !appleMusicSubscription {
-            withAnimation {
-                bottomMessage = "Preview ended. Log in or subscribe to Apple Music to play the full song."
-            }
-            if isPlayingFromAlbum && networkMonitor.isConnected {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 11) {
-                    withAnimation {
-                        bottomMessage = nil
-                    }
-                }
-            }
-        } else {
-            bottomMessage = nil
-        }
-    }
-    
-    // MARK: - Settings & Toggle
-    
-    // Updated togglePlayPause function
-    func togglePlayPause() {
-        
-        if appleMusicSubscription {
-            Task {
-                do {
-                    let player = ApplicationMusicPlayer.shared
-                    
-                    let state = player.state.playbackStatus
-                    
-                    if state == .playing {
-                        player.pause()
-                    } else {
-                        try await player.play()
-                    }
-                    
-                    // Force `isPlaying` update manually in case the observer is not fast enough
-                    DispatchQueue.main.async {
-                        self.isPlaying = (state == .paused)
-                    }
-                    
-                } catch {
-                    print("Error toggling playback: \(error.localizedDescription)")
-                }
-            }
-            
-        } else {
-            if let audioPlayer = audioPlayer {
-                if isPlaying {
-                    audioPlayer.pause()
-                } else {
-                    audioPlayer.play()
-                    self.bottomMessage = nil
-                }
-            }
-            
-            isPlaying.toggle() // Only toggle manually for AVPlayer since we don't observe it
-        }
-    }
-    
-    private func selectAlbum(_ album: Album) {
-        selectedAlbum = album
-        navigationPath.append(album) // Simply append the album to the navigation path
-    }
-    
-    private func observePlaybackState() {
-        // Cancel the previous task if it exists
-        playbackObservationTask?.cancel()
-        
-        // Start a new task
-        playbackObservationTask = Task {
-            let player = ApplicationMusicPlayer.shared
-            var previousSong: Song? = currentlyPlayingSong
-            
-            while true {
-                // Check for cancellation
-                if Task.isCancelled {
-                    print("Playback observation task cancelled.")
-                    break
-                }
-                
-                // Check the current song every second
-                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-                
-                if let currentEntry = player.queue.currentEntry {
-                    switch currentEntry.item {
-                    case .song(let song):
-                        // Extract the song from the current entry
-                        if isPlayingFromAlbum,
-                           let albumWithTracks, // Unwrap optional AlbumWithTracks
-                           let currentSong = albumWithTracks.tracks.first(where: { $0.id == song.id }) {
-                            
-                            if currentSong != previousSong {
-                                // Song has changed
-                                previousSong = currentSong
-                                currentlyPlayingSong = currentSong
-                                isPlaying = true
-                            }
-                        } else {
-                            // Find the song in the general songs list
-                            if let currentSong = songs.first(where: { $0.id == song.id }) {
-                                if currentSong != previousSong {
-                                    // Song has changed
-                                    previousSong = currentSong
-                                    currentlyPlayingSong = currentSong
-                                    isPlaying = true
-                                }
-                            }
-                        }
-                    default:
-                        // Handle other cases (e.g., album, playlist)
-                        break
-                    }
-                } else {
-                    // No song is playing
-                    print("No song playing")
-                    isPlaying = false
-                }
-            }
-        }
+            guard let genre = try await fetchChristianGenre() else { return }
+            var request = MusicCatalogChartsRequest(genre: genre, types: [Album.self])
+            request.limit = 50
+            albums = (try await request.response()).albumCharts.flatMap { $0.items }
+        } catch { print("Error fetching albums: \(error)") }
     }
 }
+
 
 // MARK: - Full Track List View
 
 struct FullTrackListView: View {
     let songs: [Song]
     let playSong: (Song) -> Void
-    @Binding var currentlyPlayingSong: Song?
+    @Binding var currentPlayingSong: Song?
     @Binding var isPlayingFromAlbum: Bool
     @Binding var bottomMessage: String?
     
@@ -931,7 +354,7 @@ struct FullTrackListView: View {
                         ForEach(filteredSongs, id: \.id) { song in
                             SongRowView(
                                 song: song,
-                                currentlyPlayingSong: $currentlyPlayingSong,
+                                currentPlayingSong: $currentPlayingSong,
                                 leftPadding: 8,
                                 rightPadding: 8
                             )
@@ -962,7 +385,7 @@ struct FullTrackListView: View {
 
 struct SongRowView: View {
     let song: Song
-    @Binding var currentlyPlayingSong: Song?
+    @Binding var currentPlayingSong: Song?
     var leftPadding: CGFloat = 0 // Default left padding
     var rightPadding: CGFloat = 0 // Default right padding
     
