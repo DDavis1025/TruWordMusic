@@ -42,29 +42,71 @@ enum SearchResultItem: Identifiable {
     }
 }
 
-// MARK: - Search View
+// MARK: - Tab Selection Enum
+enum SearchTab: String, CaseIterable, Identifiable {
+    case all = "All"
+    case songs = "Songs"
+    case albums = "Albums"
+    
+    var id: String { rawValue }
+}
+
 struct SearchView: View {
     @ObservedObject var playerManager: PlayerManager
     @ObservedObject var networkMonitor: NetworkMonitor
-
+    @Binding var navigationPath: NavigationPath
+    
     @State private var searchQuery: String = ""
     @State private var searchResults: [SearchResultItem] = []
     @State private var isSearching: Bool = false
+    @State private var selectedTab: SearchTab = .all
+    @State private var scrollOffsets: [SearchTab: CGFloat] = [:] // track each tab
     
-    @Binding var navigationPath: NavigationPath // shared
-
+    @Namespace private var tabNamespace
     private let bottomPlayerHeight: CGFloat = 80
-
+    
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(spacing: 0) {
+                
+                // MARK: - Tab Bar
+                HStack(spacing: 0) {
+                    ForEach(SearchTab.allCases) { tab in
+                        Button {
+                            withAnimation(.spring()) { selectedTab = tab }
+                        } label: {
+                            Text(tab.rawValue)
+                                .font(.subheadline)
+                                .fontWeight(selectedTab == tab ? .semibold : .regular)
+                                .foregroundColor(selectedTab == tab ? .accentColor : .gray)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(
+                                    ZStack {
+                                        if selectedTab == tab {
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(Color.accentColor.opacity(0.2))
+                                                .matchedGeometryEffect(id: "tabHighlight", in: tabNamespace)
+                                        }
+                                    }
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                
+                Divider()
+                
+                // MARK: - Content
                 if !networkMonitor.isConnected {
                     noInternetView
                 } else if isSearching {
                     ProgressView("Searching...")
                         .progressViewStyle(CircularProgressViewStyle())
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if searchResults.isEmpty && !searchQuery.isEmpty {
+                } else if filteredResults.isEmpty && !searchQuery.isEmpty {
                     Spacer()
                     Text("No results found")
                         .font(.subheadline)
@@ -72,34 +114,78 @@ struct SearchView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                     Spacer()
                 } else {
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            ForEach(searchResults) { item in
-                                SongRowLikeView(
-                                    title: item.title,
-                                    artistName: item.artistName,
-                                    artworkURL: item.artworkURL,
-                                    currentlyPlayingSong: $playerManager.currentlyPlayingSong
-                                )
-                                .onTapGesture {
-                                    switch item {
-                                    case .song(let song):
-                                        // Play song from search results
-                                        let songsFromResults = searchResults.compactMap { result -> Song? in
-                                            if case .song(let s) = result { return s } else { return nil }
+                    ScrollViewReader { proxy in
+                        ScrollView(.vertical, showsIndicators: true) {
+                            VStack(spacing: 0) {
+                                ForEach(filteredResults) { item in
+                                    SongRowLikeView(
+                                        title: item.title,
+                                        artistName: item.artistName,
+                                        artworkURL: item.artworkURL,
+                                        currentlyPlayingSong: $playerManager.currentlyPlayingSong
+                                    )
+                                    .id(item.id)
+                                    .onTapGesture {
+                                        switch item {
+                                        case .song(let song):
+                                            let songsFromSearch = filteredResults.compactMap { r -> Song? in
+                                                if case .song(let s) = r { return s } else { return nil }
+                                            }
+                                            playerManager.playSong(song, from: songsFromSearch)
+                                            playerManager.isPlayingFromAlbum = false
+                                            playerManager.bottomMessage = nil
+                                        case .album(let album):
+                                            navigationPath.append(album)
                                         }
-                                        playerManager.playSong(song, from: songsFromResults, playFromAlbum: false, networkMonitor: networkMonitor)
-                                    case .album(let album):
-                                        navigationPath.append(album)
                                     }
+                                    .padding(.vertical, 5)
+                                    .background(Color(.systemBackground))
                                 }
-                                .padding(.vertical, 5)
-                                .background(Color(.systemBackground))
+                            }
+                            .padding(.bottom, bottomPlayerHeight)
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear
+                                        .preference(key: ScrollOffsetKey.self, value: geo.frame(in: .named("scroll")).minY)
+                                }
+                            )
+                        }
+                        .coordinateSpace(name: "scroll")
+                        .onPreferenceChange(ScrollOffsetKey.self) { value in
+                            scrollOffsets[selectedTab] = value
+                        }
+                        .onChange(of: selectedTab) {
+                            // restore scroll position per tab
+                            if let firstItem = filteredResults.first {
+                                withAnimation {
+                                    proxy.scrollTo(firstItem.id, anchor: .top)
+                                }
                             }
                         }
-                        .padding(.bottom, bottomPlayerHeight + 16)
                     }
                 }
+            }
+            .navigationDestination(for: Album.self) { album in
+                AlbumDetailView(
+                    album: album,
+                    playSong: { song in
+                        let songsFromResults = searchResults.compactMap { item -> Song? in
+                            if case .song(let s) = item { return s } else { return nil }
+                        }
+                        playerManager.playSong(
+                            song,
+                            from: songsFromResults,
+                            albumWithTracks: playerManager.albumWithTracks,
+                            playFromAlbum: true,
+                            networkMonitor: networkMonitor
+                        )
+                    },
+                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                    bottomMessage: $playerManager.bottomMessage,
+                    albumWithTracks: $playerManager.albumWithTracks,
+                    networkMonitor: networkMonitor,
+                    playerManager: playerManager
+                )
             }
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.inline)
@@ -107,36 +193,51 @@ struct SearchView: View {
             .onSubmit(of: .search) {
                 Task { await performSearch() }
             }
-            .navigationDestination(for: Album.self) { album in
-                AlbumDetailView(
-                    album: album,
-                    playSong: { song in
-                        // Build a flat array of songs from the search results
-                        let songsFromResults = searchResults.compactMap { result -> Song? in
-                            if case .song(let s) = result { return s } else { return nil }
-                        }
-
-                        // Play the selected song
-                        playerManager.playSong(
-                            song,
-                            from: songsFromResults,
-                            albumWithTracks: playerManager.albumWithTracks,
-                            playFromAlbum: true, // user is navigating inside album
-                            networkMonitor: networkMonitor
-                        )
-                    },
-                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                    bottomMessage: $playerManager.bottomMessage,
-                    albumWithTracks: $playerManager.albumWithTracks,
-                    networkMonitor: networkMonitor
-                )
-            }
         }
     }
-
     
-    // MARK: - Views
+    // MARK: - Filtered Results
+        private var filteredResults: [SearchResultItem] {
+            switch selectedTab {
+            case .all: return searchResults
+            case .songs: return searchResults.compactMap { if case .song(let s) = $0 { return .song(s) } else { return nil } }
+            case .albums: return searchResults.compactMap { if case .album(let a) = $0 { return .album(a) } else { return nil } }
+            }
+        }
     
+    // MARK: - Results List
+    private var resultsList: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                ForEach(filteredResults) { item in
+                    SongRowLikeView(
+                        title: item.title,
+                        artistName: item.artistName,
+                        artworkURL: item.artworkURL,
+                        currentlyPlayingSong: $playerManager.currentlyPlayingSong
+                    )
+                    .onTapGesture {
+                        switch item {
+                        case .song(let song):
+                            let songsFromSearch = filteredResults.compactMap { result -> Song? in
+                                if case .song(let s) = result { return s } else { return nil }
+                            }
+                            playerManager.playSong(song, from: songsFromSearch)
+                            playerManager.isPlayingFromAlbum = false
+                            playerManager.bottomMessage = nil
+                        case .album(let album):
+                            navigationPath.append(album)
+                        }
+                    }
+                    .padding(.vertical, 5)
+                    .background(Color(.systemBackground))
+                }
+            }
+            .padding(.bottom, bottomPlayerHeight)
+        }
+    }
+    
+    // MARK: - No Internet View
     private var noInternetView: some View {
         VStack(spacing: 8) {
             Spacer()
@@ -155,41 +256,7 @@ struct SearchView: View {
         .background(Color(.systemBackground))
     }
     
-    private var resultsList: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                ForEach(searchResults) { item in
-                    SongRowLikeView(
-                        title: item.title,
-                        artistName: item.artistName,
-                        artworkURL: item.artworkURL,
-                        currentlyPlayingSong: $playerManager.currentlyPlayingSong
-                    )
-                    .onTapGesture {
-                        switch item {
-                        case .song(let song):
-                            // Pass the list of all songs in the search results
-                            let songsFromSearch = searchResults.compactMap { result -> Song? in
-                                if case .song(let s) = result { return s } else { return nil }
-                            }
-                            playerManager.playSong(song, from: songsFromSearch)
-                            playerManager.isPlayingFromAlbum = false
-                            playerManager.bottomMessage = nil
-                        case .album(let album):
-                            navigationPath.append(album) // Navigate to AlbumDetailView
-                        }
-                    }
-                    .padding(.vertical, 5)
-                    .background(Color(.systemBackground))
-                }
-            }
-            .padding(.bottom, bottomPlayerHeight)
-        }
-    }
-    
-    
-    // MARK: - Search
-    
+    // MARK: - Perform Search
     private func performSearch() async {
         guard !searchQuery.isEmpty else { return }
         isSearching = true
@@ -221,40 +288,47 @@ struct SearchView: View {
     }
 }
 
-
 // MARK: - Row View (Shared by Songs & Albums)
 struct SongRowLikeView: View {
     let title: String
     let artistName: String
     let artworkURL: URL?
     @Binding var currentlyPlayingSong: Song?
-    
+
     var body: some View {
-        HStack {
-            let screenWidth = UIScreen.main.bounds.width
-            let artworkSize = min(max(screenWidth * 0.15, 50), 100)
-            
+        HStack(spacing: 8) {
             if let url = artworkURL {
                 CustomAsyncImage(url: url)
-                    .frame(width: artworkSize, height: artworkSize)
-                    .clipped()
+                    .frame(width: 60, height: 60)
                     .cornerRadius(8)
-                    .padding(.leading, 8)
             }
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.subheadline)
                     .lineLimit(1)
+                    .truncationMode(.tail)
                 Text(artistName)
                     .font(.caption)
-                    .foregroundColor(Color(white: 0.48))
+                    .foregroundColor(.gray)
                     .lineLimit(1)
+                    .truncationMode(.tail)
             }
-            .padding(.trailing, 8)
-            
+
             Spacer()
         }
-        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading) // Key: prevents row from expanding beyond screen
+        .background(Color(.systemBackground))
     }
 }
+
+
+// MARK: - PreferenceKey for Scroll Offset
+    struct ScrollOffsetKey: PreferenceKey {
+        static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+    }
+
+

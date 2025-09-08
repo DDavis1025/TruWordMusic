@@ -20,7 +20,7 @@ class PlayerManager: ObservableObject {
     @Published var albumWithTracks: AlbumWithTracks?
     @Published var appleMusicSubscription: Bool = false
     @Published var showTrackDetail: Bool = false
-    
+    @Published var selectedAlbum: Album? = nil
     // MARK: - Private
     private var audioPlayer: AVPlayer?
     private var previewDidEnd: Bool = false

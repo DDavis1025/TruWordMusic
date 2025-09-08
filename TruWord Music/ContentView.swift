@@ -16,20 +16,6 @@ struct AlbumWithTracks {
     var tracks: [Song]
 }
 
-
-// Define a custom environment key
-struct NavigationPathKey: EnvironmentKey {
-    static let defaultValue: Binding<NavigationPath>? = nil
-}
-
-// Extend EnvironmentValues to include the custom key
-extension EnvironmentValues {
-    var navigationPath: Binding<NavigationPath>? {
-        get { self[NavigationPathKey.self] }
-        set { self[NavigationPathKey.self] = newValue }
-    }
-}
-
 struct ContentView: View {
     @ObservedObject var playerManager: PlayerManager
     @ObservedObject var networkMonitor: NetworkMonitor
@@ -67,7 +53,9 @@ struct ContentView: View {
                 if value == "fullAlbumGrid" {
                     FullAlbumGridView(
                         albums: albums,
-                        onAlbumSelected: { album in navigationPath.append(album) },
+                        onAlbumSelected: {
+                            album in navigationPath.append(album)
+                        },
                         networkMonitor: networkMonitor
                     )
                 }
@@ -87,34 +75,9 @@ struct ContentView: View {
                     isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                     bottomMessage: $playerManager.bottomMessage,
                     albumWithTracks: $playerManager.albumWithTracks,
-                    networkMonitor: networkMonitor
+                    networkMonitor: networkMonitor,
+                    playerManager: playerManager
                 )
-            }
-            .fullScreenCover(isPresented: $playerManager.showTrackDetail) {
-                if let song = playerManager.currentlyPlayingSong {
-                    TrackDetailView(
-                        song: song,
-                        isPlaying: $playerManager.isPlaying,
-                        togglePlayPause: playerManager.togglePlayPause,
-                        bottomMessage: $playerManager.bottomMessage,
-                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                        albumWithTracks: $playerManager.albumWithTracks,
-                        albums: albums,
-                        playSong: { s in
-                            playerManager.playSong(
-                                s,
-                                from: songs,
-                                albumWithTracks: playerManager.albumWithTracks,
-                                playFromAlbum: false
-                            )
-                        },
-                        songs: $songs,
-                        playerIsReady: $playerManager.playerIsReady,
-                        networkMonitor: networkMonitor,
-                        appleMusicSubscription: $playerManager.appleMusicSubscription,
-                        navigationPath: $navigationPath
-                    )
-                }
             }
             .task {
                 isLoading = true
@@ -201,7 +164,10 @@ struct ContentView: View {
                     HStack(spacing: 16) {
                         ForEach(albums.prefix(5), id: \.id) { album in
                             AlbumCarouselItemView(album: album)
-                                .onTapGesture { navigationPath.append(album) }
+                                .onTapGesture {
+                                    navigationPath.append(album)
+                                    playerManager.selectedAlbum = album
+                                }
                         }
                     }
                     .padding(.horizontal)

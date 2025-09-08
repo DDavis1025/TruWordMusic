@@ -15,19 +15,20 @@ struct TrackDetailView: View {
     @Binding var bottomMessage: String?
     @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
-    let albums: [Album]
     let playSong: (Song) -> Void
     @Binding var songs: [Song]
     @Binding var playerIsReady: Bool
     @ObservedObject var networkMonitor: NetworkMonitor
     @Binding var appleMusicSubscription: Bool
     @Binding var navigationPath: NavigationPath
+    @Binding var selectedAlbum: Album?
     
-    @State private var selectedAlbum: Album? = nil
     @Environment(\.dismiss) private var dismiss
     
     @State private var animateTitle: Bool = false
     @State private var animateArtist: Bool = false
+    
+    @State private var albumStack: [Album] = []
     
     private var appleMusicURL: URL? {
         URL(string: "https://music.apple.com/us/song/\(song.id)")
@@ -104,7 +105,10 @@ struct TrackDetailView: View {
                         Button(action: {
                             if let albumWithTracks,
                                albumWithTracks.tracks.contains(where: { $0.id == song.id }) {
-                                navigationPath.append(albumWithTracks.album)
+
+                                if selectedAlbum?.id != albumWithTracks.album.id || navigationPath.isEmpty {
+                                    navigationPath.append(albumWithTracks.album)
+                                }
                             }
                             dismiss()
                         }) {
@@ -231,5 +235,4 @@ struct TrackDetailView: View {
     
 
 }
-
 

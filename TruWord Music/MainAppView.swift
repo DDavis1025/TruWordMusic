@@ -54,13 +54,13 @@ struct MainAppView: View {
                 bottomMessage: $playerManager.bottomMessage,
                 isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                 albumWithTracks: $playerManager.albumWithTracks,
-                albums: [], // your albums array
                 playSong: { s in playerManager.playSong(s, from: []) },
                 songs: .constant([]),
                 playerIsReady: $playerManager.playerIsReady,
                 networkMonitor: networkMonitor,
                 appleMusicSubscription: $playerManager.appleMusicSubscription,
-                navigationPath: $navigationPath
+                navigationPath: $navigationPath,
+                selectedAlbum: $playerManager.selectedAlbum
             )
         }
 

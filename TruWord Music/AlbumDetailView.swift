@@ -18,6 +18,8 @@ struct AlbumDetailView: View {
     @Binding var bottomMessage: String?
     @Binding var albumWithTracks: AlbumWithTracks?
     @ObservedObject var networkMonitor: NetworkMonitor
+    @ObservedObject var playerManager: PlayerManager
+
     
     var body: some View {
         VStack(spacing: 4) { // Controls vertical spacing
@@ -58,15 +60,21 @@ struct AlbumDetailView: View {
                         let isPlayable = (song.releaseDate.map { $0 <= Date() } ?? false) && song.playParameters != nil
                         
                         Button {
-                            if isPlayable {
-                                // Only update if it's a different album
-                                if albumWithTracks?.album.id != album.id {
-                                    albumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
-                                }
-                                playSong(song)
-                                isPlayingFromAlbum = true
-                                bottomMessage = nil
-                            }
+                            guard isPlayable && networkMonitor.isConnected else { return }
+
+                            // Build AlbumWithTracks for this album
+                            let currentAlbumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
+                            
+                            // Update binding so playerManager knows the current album
+                            albumWithTracks = currentAlbumWithTracks
+                            
+                            // Play the tapped song
+                            playSong(song)
+                            
+                            // Update UI state
+                            isPlayingFromAlbum = true
+                            bottomMessage = nil
+                            
                         } label: {
                             VStack(alignment: .leading) {
                                 Text(song.title)
@@ -83,13 +91,19 @@ struct AlbumDetailView: View {
                         .disabled(!isPlayable || !networkMonitor.isConnected)
                     }
                 }
+
             }
         }
         .navigationTitle("Album")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await fetchAlbumTracks(album: album)
+            await setSelectedAlbum(album: album)
         }
+    }
+    
+    func setSelectedAlbum(album: Album) async {
+        playerManager.selectedAlbum = album
     }
     
     func fetchAlbumTracks(album: Album) async {
