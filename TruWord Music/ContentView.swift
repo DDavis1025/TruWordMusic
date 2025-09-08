@@ -42,10 +42,9 @@ struct ContentView: View {
     // Songs & Albums
     @State private var songs: [Song] = []
     @State private var albums: [Album] = []
-    @State private var albumWithTracks: AlbumWithTracks? = nil
 
     // UI State
-    @State private var navigationPath = NavigationPath()
+    @Binding var navigationPath: NavigationPath // shared
 
     @Environment(\.scenePhase) private var scenePhase
     
@@ -80,14 +79,14 @@ struct ContentView: View {
                         playerManager.playSong(
                             song,
                             from: songs,
-                            albumWithTracks: albumWithTracks,
+                            albumWithTracks: playerManager.albumWithTracks,
                             playFromAlbum: true,
                             networkMonitor: networkMonitor
                         )
                     },
                     isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                     bottomMessage: $playerManager.bottomMessage,
-                    albumWithTracks: $albumWithTracks,
+                    albumWithTracks: $playerManager.albumWithTracks,
                     networkMonitor: networkMonitor
                 )
             }
@@ -105,14 +104,15 @@ struct ContentView: View {
                             playerManager.playSong(
                                 s,
                                 from: songs,
-                                albumWithTracks: albumWithTracks,
+                                albumWithTracks: playerManager.albumWithTracks,
                                 playFromAlbum: false
                             )
                         },
                         songs: $songs,
                         playerIsReady: $playerManager.playerIsReady,
                         networkMonitor: networkMonitor,
-                        appleMusicSubscription: $playerManager.appleMusicSubscription
+                        appleMusicSubscription: $playerManager.appleMusicSubscription,
+                        navigationPath: $navigationPath
                     )
                 }
             }

@@ -50,7 +50,8 @@ struct SearchView: View {
     @State private var searchQuery: String = ""
     @State private var searchResults: [SearchResultItem] = []
     @State private var isSearching: Bool = false
-    @State private var navigationPath = NavigationPath()
+    
+    @Binding var navigationPath: NavigationPath // shared
 
     private let bottomPlayerHeight: CGFloat = 80
 
@@ -110,15 +111,23 @@ struct SearchView: View {
                 AlbumDetailView(
                     album: album,
                     playSong: { song in
-                        // Play songs from search results
+                        // Build a flat array of songs from the search results
                         let songsFromResults = searchResults.compactMap { result -> Song? in
                             if case .song(let s) = result { return s } else { return nil }
                         }
-                        playerManager.playSong(song, from: songsFromResults, albumWithTracks: nil, playFromAlbum: false, networkMonitor: networkMonitor)
+
+                        // Play the selected song
+                        playerManager.playSong(
+                            song,
+                            from: songsFromResults,
+                            albumWithTracks: playerManager.albumWithTracks,
+                            playFromAlbum: true, // user is navigating inside album
+                            networkMonitor: networkMonitor
+                        )
                     },
                     isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                     bottomMessage: $playerManager.bottomMessage,
-                    albumWithTracks: .constant(nil),
+                    albumWithTracks: $playerManager.albumWithTracks,
                     networkMonitor: networkMonitor
                 )
             }

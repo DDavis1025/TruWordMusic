@@ -13,16 +13,18 @@ struct MainAppView: View {
     @StateObject private var playerManager = PlayerManager()
 
     @State private var selectedSongForDetail: Song? = nil
+    @State private var navigationPath = NavigationPath()
+    
     private let tabBarHeight: CGFloat = 49
 
     var body: some View {
         ZStack(alignment: .bottom) {
             // MARK: - Tabs
             TabView {
-                ContentView(playerManager: playerManager, networkMonitor: networkMonitor)
+                ContentView(playerManager: playerManager, networkMonitor: networkMonitor, navigationPath: $navigationPath)
                     .tabItem { Label("Home", systemImage: "house.fill") }
 
-                SearchView(playerManager: playerManager, networkMonitor: networkMonitor)
+                SearchView(playerManager: playerManager, networkMonitor: networkMonitor, navigationPath: $navigationPath)
                     .tabItem { Label("Search", systemImage: "magnifyingglass") }
             }
 
@@ -37,10 +39,10 @@ struct MainAppView: View {
                         togglePlayPause: playerManager.togglePlayPause,
                         playerIsReady: playerManager.playerIsReady
                     )
+                    .id(song.id) // <-- This forces SwiftUI to reload the view when song changes
                 }
                 .buttonStyle(.plain)
                 .padding(.bottom, tabBarHeight) // Push above TabBar
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         // MARK: - Full Screen Track Detail
@@ -57,9 +59,11 @@ struct MainAppView: View {
                 songs: .constant([]),
                 playerIsReady: $playerManager.playerIsReady,
                 networkMonitor: networkMonitor,
-                appleMusicSubscription: $playerManager.appleMusicSubscription
+                appleMusicSubscription: $playerManager.appleMusicSubscription,
+                navigationPath: $navigationPath
             )
         }
+
         .animation(.spring(), value: playerManager.currentlyPlayingSong) // Smooth show/hide
     }
 }
