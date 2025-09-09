@@ -60,138 +60,128 @@ struct SearchView: View {
     @State private var searchResults: [SearchResultItem] = []
     @State private var isSearching: Bool = false
     @State private var selectedTab: SearchTab = .all
-    @State private var scrollOffsets: [SearchTab: CGFloat] = [:] // track each tab
+    @State private var scrollOffsets: [SearchTab: CGFloat] = [:]
     
     @Namespace private var tabNamespace
     private let bottomPlayerHeight: CGFloat = 80
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            VStack(spacing: 0) {
-                
-                // MARK: - Tab Bar
-                HStack(spacing: 0) {
-                    ForEach(SearchTab.allCases) { tab in
-                        Button {
-                            withAnimation(.spring()) { selectedTab = tab }
-                        } label: {
-                            Text(tab.rawValue)
-                                .font(.subheadline)
-                                .fontWeight(selectedTab == tab ? .semibold : .regular)
-                                .foregroundColor(selectedTab == tab ? .accentColor : .gray)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(
-                                    ZStack {
-                                        if selectedTab == tab {
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(Color.accentColor.opacity(0.2))
-                                                .matchedGeometryEffect(id: "tabHighlight", in: tabNamespace)
-                                        }
-                                    }
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.top, 8)
-                
-                Divider()
-                
-                // MARK: - Content
-                if !networkMonitor.isConnected {
-                    noInternetView
-                } else if isSearching {
-                    ProgressView("Searching...")
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if filteredResults.isEmpty && !searchQuery.isEmpty {
-                    Spacer()
-                    Text("No results found")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                    Spacer()
-                } else {
-                    ScrollViewReader { proxy in
-                        ScrollView(.vertical, showsIndicators: true) {
-                            VStack(spacing: 0) {
-                                ForEach(filteredResults) { item in
-                                    SongRowLikeView(
-                                        title: item.title,
-                                        artistName: item.artistName,
-                                        artworkURL: item.artworkURL,
-                                        currentlyPlayingSong: $playerManager.currentlyPlayingSong
-                                    )
-                                    .id(item.id)
-                                    .onTapGesture {
-                                        switch item {
-                                        case .song(let song):
-                                            let songsFromSearch = filteredResults.compactMap { r -> Song? in
-                                                if case .song(let s) = r { return s } else { return nil }
+            if !networkMonitor.isConnected {
+                noInternetView
+            } else {
+                VStack(spacing: 0) {
+                    // MARK: - Tab Bar
+                    HStack(spacing: 0) {
+                        ForEach(SearchTab.allCases) { tab in
+                            Button {
+                                withAnimation(.spring()) { selectedTab = tab }
+                            } label: {
+                                Text(tab.rawValue)
+                                    .font(.subheadline)
+                                    .fontWeight(selectedTab == tab ? .semibold : .regular)
+                                    .foregroundColor(selectedTab == tab ? .accentColor : .gray)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        ZStack {
+                                            if selectedTab == tab {
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(Color.accentColor.opacity(0.2))
+                                                    .matchedGeometryEffect(id: "tabHighlight", in: tabNamespace)
                                             }
-                                            playerManager.playSong(song, from: songsFromSearch)
-                                            playerManager.isPlayingFromAlbum = false
-                                            playerManager.bottomMessage = nil
-                                        case .album(let album):
-                                            navigationPath.append(album)
                                         }
-                                    }
-                                    .padding(.vertical, 5)
-                                    .background(Color(.systemBackground))
-                                }
+                                    )
                             }
-                            .padding(.bottom, bottomPlayerHeight)
-                            .background(
-                                GeometryReader { geo in
-                                    Color.clear
-                                        .preference(key: ScrollOffsetKey.self, value: geo.frame(in: .named("scroll")).minY)
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    
+                    Divider()
+                    
+                    // MARK: - Content
+                    if isSearching {
+                        ProgressView("Searching…")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if filteredResults.isEmpty && !searchQuery.isEmpty {
+                        Spacer()
+                        Text("No results found")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                        Spacer()
+                    } else {
+                        ScrollViewReader { proxy in
+                            ScrollView(.vertical, showsIndicators: true) {
+                                VStack(spacing: 0) {
+                                    ForEach(filteredResults) { item in
+                                        SongRowLikeView(
+                                            title: item.title,
+                                            artistName: item.artistName,
+                                            artworkURL: item.artworkURL,
+                                            currentlyPlayingSong: $playerManager.currentlyPlayingSong
+                                        )
+                                        .id(item.id)
+                                        .onTapGesture {
+                                            switch item {
+                                            case .song(let song):
+                                                let songsFromSearch = filteredResults.compactMap { r -> Song? in
+                                                    if case .song(let s) = r { return s } else { return nil }
+                                                }
+                                                playerManager.playSong(song, from: songsFromSearch)
+                                                playerManager.isPlayingFromAlbum = false
+                                                playerManager.bottomMessage = nil
+                                            case .album(let album):
+                                                DispatchQueue.main.async {
+                                                    navigationPath.append(album)
+                                                }
+                                            }
+                                        }
+                                        .padding(.vertical, 5)
+                                        .background(Color(.systemBackground))
+                                    }
                                 }
-                            )
-                        }
-                        .coordinateSpace(name: "scroll")
-                        .onPreferenceChange(ScrollOffsetKey.self) { value in
-                            scrollOffsets[selectedTab] = value
-                        }
-                        .onChange(of: selectedTab) {
-                            // restore scroll position per tab
-                            if let firstItem = filteredResults.first {
-                                withAnimation {
-                                    proxy.scrollTo(firstItem.id, anchor: .top)
+                                .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
+                            }
+                            .onChange(of: selectedTab) {
+                                if let firstItem = filteredResults.first {
+                                    withAnimation {
+                                        proxy.scrollTo(firstItem.id, anchor: .top)
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            .navigationDestination(for: Album.self) { album in
-                AlbumDetailView(
-                    album: album,
-                    playSong: { song in
-                        let songsFromResults = searchResults.compactMap { item -> Song? in
-                            if case .song(let s) = item { return s } else { return nil }
-                        }
-                        playerManager.playSong(
-                            song,
-                            from: songsFromResults,
-                            albumWithTracks: playerManager.albumWithTracks,
-                            playFromAlbum: true,
-                            networkMonitor: networkMonitor
-                        )
-                    },
-                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                    bottomMessage: $playerManager.bottomMessage,
-                    albumWithTracks: $playerManager.albumWithTracks,
-                    networkMonitor: networkMonitor,
-                    playerManager: playerManager
-                )
-            }
-            .navigationTitle("Search")
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchQuery, prompt: "Search Christian music")
-            .onSubmit(of: .search) {
-                Task { await performSearch() }
+                .navigationDestination(for: Album.self) { album in
+                    AlbumDetailView(
+                        album: album,
+                        playSong: { song in
+                            let songsFromResults = searchResults.compactMap { item -> Song? in
+                                if case .song(let s) = item { return s } else { return nil }
+                            }
+                            playerManager.playSong(
+                                song,
+                                from: songsFromResults,
+                                albumWithTracks: playerManager.albumWithTracks,
+                                playFromAlbum: true,
+                                networkMonitor: networkMonitor
+                            )
+                        },
+                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                        bottomMessage: $playerManager.bottomMessage,
+                        albumWithTracks: $playerManager.albumWithTracks,
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
+                    )
+                }
+                .navigationTitle("Search")
+                .navigationBarTitleDisplayMode(.inline)
+                .searchable(text: $searchQuery, prompt: "Search Christian music")
+                .onSubmit(of: .search) {
+                    Task { await performSearch() }
+                }
             }
         }
     }
@@ -233,7 +223,7 @@ struct SearchView: View {
                     .background(Color(.systemBackground))
                 }
             }
-            .padding(.bottom, bottomPlayerHeight)
+            .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
         }
     }
     
@@ -250,10 +240,14 @@ struct SearchView: View {
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
             Spacer()
-            Color.clear.frame(height: bottomPlayerHeight)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
+        .safeAreaInset(edge: .bottom) {
+                if playerManager.currentlyPlayingSong != nil {
+                    Color.clear.frame(height: bottomPlayerHeight) // leave space for BottomPlayerView
+                }
+            }
     }
     
     // MARK: - Perform Search

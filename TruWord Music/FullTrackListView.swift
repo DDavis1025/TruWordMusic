@@ -16,6 +16,7 @@ struct FullTrackListView: View {
     @Binding var bottomMessage: String?
     
     @ObservedObject var networkMonitor: NetworkMonitor
+    @ObservedObject var playerManager: PlayerManager
     
     @State private var searchQuery: String = "" // State for search query
     
@@ -48,13 +49,14 @@ struct FullTrackListView: View {
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
                     Spacer()
-                    
-                    // Add padding equal to the BottomPlayerView height
-                    Color.clear
-                        .frame(height: bottomPlayerHeight)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
+                .safeAreaInset(edge: .bottom) {
+                        if playerManager.currentlyPlayingSong != nil {
+                            Color.clear.frame(height: bottomPlayerHeight) // leave space for BottomPlayerView
+                        }
+                    }
             } else if filteredSongs.isEmpty {
                 Spacer()
                 Text("No tracks found")
@@ -80,6 +82,11 @@ struct FullTrackListView: View {
                             .padding(.vertical, 5)
                             .background(Color(.systemBackground))
                         }
+                    }
+                }
+                .safeAreaInset(edge: .bottom) {
+                    if playerManager.currentlyPlayingSong != nil {
+                        Color.clear.frame(height: bottomPlayerHeight)
                     }
                 }
             }

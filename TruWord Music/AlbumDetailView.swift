@@ -19,6 +19,8 @@ struct AlbumDetailView: View {
     @Binding var albumWithTracks: AlbumWithTracks?
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
+    
+    private let bottomPlayerHeight: CGFloat = 80
 
     
     var body: some View {
@@ -91,7 +93,11 @@ struct AlbumDetailView: View {
                         .disabled(!isPlayable || !networkMonitor.isConnected)
                     }
                 }
-
+                .safeAreaInset(edge: .bottom) {
+                    if playerManager.currentlyPlayingSong != nil {
+                        Color.clear.frame(height: bottomPlayerHeight) // match BottomPlayerView height
+                    }
+                }
             }
         }
         .navigationTitle("Album")

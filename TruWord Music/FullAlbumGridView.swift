@@ -12,6 +12,7 @@ struct FullAlbumGridView: View {
     let albums: [Album]
     let onAlbumSelected: (Album) -> Void
     @ObservedObject var networkMonitor: NetworkMonitor
+    @ObservedObject var playerManager: PlayerManager
     
     @State private var searchQuery: String = ""
     
@@ -50,13 +51,14 @@ struct FullAlbumGridView: View {
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
                     Spacer()
-                    
-                    // Add padding equal to the BottomPlayerView height
-                    Color.clear
-                        .frame(height: bottomPlayerHeight)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
+                .safeAreaInset(edge: .bottom) {
+                        if playerManager.currentlyPlayingSong != nil {
+                            Color.clear.frame(height: bottomPlayerHeight) // leave space for BottomPlayerView
+                        }
+                    }
             } else if filteredAlbums.isEmpty {
                 Spacer()
                 Text("No albums found")
@@ -91,6 +93,11 @@ struct FullAlbumGridView: View {
                         }
                     }
                     .padding()
+                }
+                .safeAreaInset(edge: .bottom) {
+                    if playerManager.currentlyPlayingSong != nil {
+                        Color.clear.frame(height: bottomPlayerHeight)
+                    }
                 }
             }
         }

@@ -56,7 +56,8 @@ struct ContentView: View {
                         onAlbumSelected: {
                             album in navigationPath.append(album)
                         },
-                        networkMonitor: networkMonitor
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
                     )
                 }
             }
@@ -113,10 +114,14 @@ struct ContentView: View {
                 .font(.subheadline)
                 .foregroundColor(.gray)
             Spacer()
-            Color.clear.frame(height: bottomPlayerHeight)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
+        .safeAreaInset(edge: .bottom) {
+                if playerManager.currentlyPlayingSong != nil {
+                    Color.clear.frame(height: bottomPlayerHeight) // leave space for BottomPlayerView
+                }
+            }
     }
     
     private var mainScrollView: some View {
@@ -140,7 +145,7 @@ struct ContentView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, bottomPlayerHeight + 16) // important!
+            .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
         }
     }
     
@@ -165,9 +170,10 @@ struct ContentView: View {
                         ForEach(albums.prefix(5), id: \.id) { album in
                             AlbumCarouselItemView(album: album)
                                 .onTapGesture {
-                                    navigationPath.append(album)
-                                    playerManager.selectedAlbum = album
-                                }
+                                    DispatchQueue.main.async {
+                                        navigationPath.append(album)
+                                    }
+                            }
                         }
                     }
                     .padding(.horizontal)
@@ -193,7 +199,8 @@ struct ContentView: View {
                             currentPlayingSong: $playerManager.currentlyPlayingSong,
                             isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                             bottomMessage: $playerManager.bottomMessage,
-                            networkMonitor: networkMonitor
+                            networkMonitor: networkMonitor,
+                            playerManager: playerManager
                         )
                     }
                     .foregroundColor(.blue)
