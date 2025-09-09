@@ -15,12 +15,11 @@ struct AlbumDetailView: View {
     @State private var tracks: [Song] = []
     @State private var isLoadingTracks: Bool = true
     @Binding var isPlayingFromAlbum: Bool // Added binding
-    @Binding var bottomMessage: String?
     @Binding var albumWithTracks: AlbumWithTracks?
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
-    private let bottomPlayerHeight: CGFloat = 80
+    private let bottomPlayerHeight: CGFloat = 60
 
     
     var body: some View {
@@ -75,7 +74,6 @@ struct AlbumDetailView: View {
                             
                             // Update UI state
                             isPlayingFromAlbum = true
-                            bottomMessage = nil
                             
                         } label: {
                             VStack(alignment: .leading) {

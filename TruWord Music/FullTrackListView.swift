@@ -13,14 +13,13 @@ struct FullTrackListView: View {
     let playSong: (Song) -> Void
     @Binding var currentPlayingSong: Song?
     @Binding var isPlayingFromAlbum: Bool
-    @Binding var bottomMessage: String?
     
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
     @State private var searchQuery: String = "" // State for search query
     
-    private let bottomPlayerHeight: CGFloat = 80
+    private let bottomPlayerHeight: CGFloat = 60
     
     // Filtered songs based on search query (title or artist name)
     var filteredSongs: [Song] {
@@ -77,7 +76,6 @@ struct FullTrackListView: View {
                             .onTapGesture {
                                 playSong(song)
                                 isPlayingFromAlbum = false
-                                bottomMessage = nil
                             }
                             .padding(.vertical, 5)
                             .background(Color(.systemBackground))

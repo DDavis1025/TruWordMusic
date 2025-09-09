@@ -34,7 +34,7 @@ struct ContentView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     
-    private let bottomPlayerHeight: CGFloat = 80
+    private let bottomPlayerHeight: CGFloat = 60
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -74,7 +74,6 @@ struct ContentView: View {
                         )
                     },
                     isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                    bottomMessage: $playerManager.bottomMessage,
                     albumWithTracks: $playerManager.albumWithTracks,
                     networkMonitor: networkMonitor,
                     playerManager: playerManager
@@ -198,7 +197,6 @@ struct ContentView: View {
                             },
                             currentPlayingSong: $playerManager.currentlyPlayingSong,
                             isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                            bottomMessage: $playerManager.bottomMessage,
                             networkMonitor: networkMonitor,
                             playerManager: playerManager
                         )
@@ -214,7 +212,6 @@ struct ContentView: View {
                     .onTapGesture {
                         playerManager.playSong(song, from: songs)
                         playerManager.isPlayingFromAlbum = false
-                        playerManager.bottomMessage = nil
                     }
              }
         }

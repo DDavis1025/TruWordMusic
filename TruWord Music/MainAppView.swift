@@ -11,47 +11,47 @@ import MusicKit
 struct MainAppView: View {
     @StateObject private var networkMonitor = NetworkMonitor()
     @StateObject private var playerManager = PlayerManager()
-
+    @StateObject private var keyboardObserver = KeyboardObserver()
+    
     @State private var selectedSongForDetail: Song? = nil
     @State private var navigationPath = NavigationPath()
     
     private let tabBarHeight: CGFloat = 49
-
+    
     var body: some View {
         ZStack(alignment: .bottom) {
-            // MARK: - Tabs
+            // MARK: - Main TabView
             TabView {
                 ContentView(playerManager: playerManager, networkMonitor: networkMonitor, navigationPath: $navigationPath)
                     .tabItem { Label("Home", systemImage: "house.fill") }
 
-                SearchView(playerManager: playerManager, networkMonitor: networkMonitor, navigationPath: $navigationPath)
+                SearchView(playerManager: playerManager, networkMonitor: networkMonitor, keyboardObserver: keyboardObserver, navigationPath: $navigationPath)
                     .tabItem { Label("Search", systemImage: "magnifyingglass") }
             }
-
-            // MARK: - Bottom Player Overlay
-            if let song = playerManager.currentlyPlayingSong {
-                Button(action: {
-                    selectedSongForDetail = song
-                }) {
+            .background(Color(.systemGray6).opacity(0.97).ignoresSafeArea(edges: .bottom))
+            
+            // MARK: - Bottom Player
+            if let song = playerManager.currentlyPlayingSong,
+               !keyboardObserver.isKeyboardVisible {
+                Button(action: { selectedSongForDetail = song }) {
                     BottomPlayerView(
                         song: song,
                         isPlaying: $playerManager.isPlaying,
                         togglePlayPause: playerManager.togglePlayPause,
                         playerIsReady: playerManager.playerIsReady
                     )
-                    .id(song.id) // <-- This forces SwiftUI to reload the view when song changes
+                    .id(song.id)
                 }
                 .buttonStyle(.plain)
-                .padding(.bottom, tabBarHeight) // Push above TabBar
+                .padding(.bottom, tabBarHeight)
             }
         }
-        // MARK: - Full Screen Track Detail
+        // MARK: - Track Detail Full Screen Cover
         .fullScreenCover(item: $selectedSongForDetail) { song in
             TrackDetailView(
                 song: song,
                 isPlaying: $playerManager.isPlaying,
                 togglePlayPause: playerManager.togglePlayPause,
-                bottomMessage: $playerManager.bottomMessage,
                 isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                 albumWithTracks: $playerManager.albumWithTracks,
                 playSong: { s in playerManager.playSong(s, from: []) },
@@ -63,10 +63,13 @@ struct MainAppView: View {
                 selectedAlbum: $playerManager.selectedAlbum
             )
         }
-
-        .animation(.spring(), value: playerManager.currentlyPlayingSong) // Smooth show/hide
+        .animation(.spring(), value: playerManager.currentlyPlayingSong)
+        .animation(.spring(), value: keyboardObserver.isKeyboardVisible)
     }
 }
+
+
+
 
 extension View {
     @ViewBuilder

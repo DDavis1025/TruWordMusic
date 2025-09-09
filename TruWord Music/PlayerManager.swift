@@ -15,7 +15,6 @@ class PlayerManager: ObservableObject {
     @Published var currentlyPlayingSong: Song? = nil
     @Published var isPlaying: Bool = false
     @Published var playerIsReady: Bool = true
-    @Published var bottomMessage: String? = nil
     @Published var isPlayingFromAlbum: Bool = false
     @Published var albumWithTracks: AlbumWithTracks?
     @Published var appleMusicSubscription: Bool = false
@@ -62,7 +61,6 @@ class PlayerManager: ObservableObject {
                 audioPlayer.pause()
             } else {
                 audioPlayer.play()
-                bottomMessage = nil
             }
             isPlaying.toggle()
         }
@@ -107,19 +105,6 @@ class PlayerManager: ObservableObject {
         }
     }
     
-    func showSubscriptionMessage() {
-        if !appleMusicSubscription {
-            withAnimation {
-                bottomMessage = "Preview ended. Log in or subscribe to Apple Music to play the full song."
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 11) {
-                withAnimation { self.bottomMessage = nil }
-            }
-        } else {
-            bottomMessage = nil
-        }
-    }
-    
     // MARK: - Private Methods
     
     private func playWithApplicationMusicPlayer(_ song: Song, songs: [Song], albumWithTracks: AlbumWithTracks?, playFromAlbum: Bool) {
@@ -137,7 +122,6 @@ class PlayerManager: ObservableObject {
         let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
         player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
         
-        bottomMessage = nil
         Task { @MainActor in
             self.currentlyPlayingSong = song
         }
@@ -175,7 +159,6 @@ class PlayerManager: ObservableObject {
                 guard let self else { return }
                 Task { @MainActor in
                     self.previewDidEnd(player: self.audioPlayer!)
-                    self.showSubscriptionMessage()
                 }
             }
         }

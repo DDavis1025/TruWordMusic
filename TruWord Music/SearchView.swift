@@ -54,6 +54,7 @@ enum SearchTab: String, CaseIterable, Identifiable {
 struct SearchView: View {
     @ObservedObject var playerManager: PlayerManager
     @ObservedObject var networkMonitor: NetworkMonitor
+    @ObservedObject var keyboardObserver = KeyboardObserver()
     @Binding var navigationPath: NavigationPath
     
     @State private var searchQuery: String = ""
@@ -63,7 +64,7 @@ struct SearchView: View {
     @State private var scrollOffsets: [SearchTab: CGFloat] = [:]
     
     @Namespace private var tabNamespace
-    private let bottomPlayerHeight: CGFloat = 80
+    private let bottomPlayerHeight: CGFloat = 60
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -118,12 +119,21 @@ struct SearchView: View {
                                     ForEach(filteredResults) { item in
                                         SongRowLikeView(
                                             title: item.title,
-                                            artistName: item.artistName,
+                                            artistName: {
+                                                        switch item {
+                                                        case .song:
+                                                            return "Song | \(item.artistName)"
+                                                        case .album:
+                                                            return "Album | \(item.artistName)"
+                                                        }
+                                                    }(),
                                             artworkURL: item.artworkURL,
                                             currentlyPlayingSong: $playerManager.currentlyPlayingSong
                                         )
                                         .id(item.id)
                                         .onTapGesture {
+                                            // Dismiss keyboard
+                                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                                             switch item {
                                             case .song(let song):
                                                 let songsFromSearch = filteredResults.compactMap { r -> Song? in
@@ -131,7 +141,6 @@ struct SearchView: View {
                                                 }
                                                 playerManager.playSong(song, from: songsFromSearch)
                                                 playerManager.isPlayingFromAlbum = false
-                                                playerManager.bottomMessage = nil
                                             case .album(let album):
                                                 DispatchQueue.main.async {
                                                     navigationPath.append(album)
@@ -142,7 +151,7 @@ struct SearchView: View {
                                         .background(Color(.systemBackground))
                                     }
                                 }
-                                .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
+                                .padding(.bottom, playerManager.currentlyPlayingSong != nil && !keyboardObserver.isKeyboardVisible ? bottomPlayerHeight : 0)
                             }
                             .onChange(of: selectedTab) {
                                 if let firstItem = filteredResults.first {
@@ -170,7 +179,6 @@ struct SearchView: View {
                             )
                         },
                         isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                        bottomMessage: $playerManager.bottomMessage,
                         albumWithTracks: $playerManager.albumWithTracks,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
@@ -202,7 +210,14 @@ struct SearchView: View {
                 ForEach(filteredResults) { item in
                     SongRowLikeView(
                         title: item.title,
-                        artistName: item.artistName,
+                        artistName: {
+                                    switch item {
+                                    case .song:
+                                        return "Song | \(item.artistName)"
+                                    case .album:
+                                        return "Album | \(item.artistName)"
+                                    }
+                                }(),
                         artworkURL: item.artworkURL,
                         currentlyPlayingSong: $playerManager.currentlyPlayingSong
                     )
@@ -214,7 +229,6 @@ struct SearchView: View {
                             }
                             playerManager.playSong(song, from: songsFromSearch)
                             playerManager.isPlayingFromAlbum = false
-                            playerManager.bottomMessage = nil
                         case .album(let album):
                             navigationPath.append(album)
                         }
@@ -324,5 +338,12 @@ struct SongRowLikeView: View {
         static var defaultValue: CGFloat = 0
         static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
     }
+
+extension View {
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                        to: nil, from: nil, for: nil)
+    }
+}
 
 

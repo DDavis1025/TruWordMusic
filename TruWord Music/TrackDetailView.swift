@@ -12,7 +12,6 @@ struct TrackDetailView: View {
     let song: Song
     @Binding var isPlaying: Bool
     let togglePlayPause: () -> Void
-    @Binding var bottomMessage: String?
     @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
     let playSong: (Song) -> Void
@@ -189,7 +188,6 @@ struct TrackDetailView: View {
                 let isPlayable = (previousSong.releaseDate.map { $0 <= Date() } ?? false) && previousSong.playParameters != nil
                 if isPlayable {
                     playSong(previousSong)
-                    bottomMessage = nil
                     return
                 }
                 previousIndex -= 1
@@ -225,7 +223,6 @@ struct TrackDetailView: View {
                 let isPlayable = (song.releaseDate.map { $0 <= Date() } ?? false) && nextSong.playParameters != nil
                 if isPlayable {
                     playSong(nextSong)
-                    bottomMessage = nil
                     return
                 }
                 nextIndex += 1
