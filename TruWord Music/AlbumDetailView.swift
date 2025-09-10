@@ -86,7 +86,7 @@ struct AlbumDetailView: View {
                                     .lineLimit(1)
                                     .foregroundColor(isPlayable && networkMonitor.isConnected ? Color(white: 0.48) : Color(UIColor.lightGray))
                             }
-                            .padding(.vertical, 3)
+                            .padding(.vertical, 4)
                         }
                         .disabled(!isPlayable || !networkMonitor.isConnected)
                     }

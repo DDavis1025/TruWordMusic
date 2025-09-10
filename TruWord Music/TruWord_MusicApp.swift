@@ -9,6 +9,15 @@ import SwiftUI
 
 @main
 struct TruWord_MusicApp: App {
+    init() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithDefaultBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemChromeMaterial)
+        appearance.backgroundColor = UIColor.systemGray6.withAlphaComponent(0.35)
+
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
     var body: some Scene {
         WindowGroup {
             MainAppView()

@@ -78,6 +78,7 @@ struct ContentView: View {
                     networkMonitor: networkMonitor,
                     playerManager: playerManager
                 )
+                .id(album.id)
             }
             .task {
                 isLoading = true
@@ -162,7 +163,7 @@ struct ContentView: View {
                             .font(.system(size: 15))
                     }
                 }
-                .padding(.vertical, 5)
+                .padding(.vertical, 4)
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
@@ -205,7 +206,7 @@ struct ContentView: View {
                     .font(.system(size: 15))
                 }
             }
-            .padding(.vertical, 5)
+            .padding(.vertical, 4)
             
             ForEach(songs.prefix(5), id: \.id) { song in
                 SongRowView(song: song, currentPlayingSong: $playerManager.currentlyPlayingSong)

@@ -193,6 +193,7 @@ class PlayerManager: ObservableObject {
         isPlaying = true
     }
     
+    
     func playWithPreview(_ song: Song, networkMonitor: NetworkMonitor?) {
         guard let previewURL = song.previewAssets?.first?.url else {
             clearApplicationMusicPlayer()
@@ -208,16 +209,21 @@ class PlayerManager: ObservableObject {
         
         audioPlayer = AVPlayer(url: previewURL)
         
-        if let playerItem = audioPlayer?.currentItem {
+        guard let audioPlayer = audioPlayer else {
+            print("Error: AVPlayer failed to initialize.")
+            return
+        }
+        
+        if let playerItem = audioPlayer.currentItem {
             NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: playerItem, queue: .main) { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
-                    self.previewDidEnd(player: self.audioPlayer!)
+                    self.previewDidEnd(player: audioPlayer)
                 }
             }
         }
         
-        audioPlayer?.play()
+        audioPlayer.play()
         
         Task { @MainActor in
             self.currentlyPlayingSong = song

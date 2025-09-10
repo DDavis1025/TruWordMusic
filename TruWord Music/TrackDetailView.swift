@@ -20,8 +20,11 @@ struct TrackDetailView: View {
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     @Binding var appleMusicSubscription: Bool
-    @Binding var navigationPath: NavigationPath
     @Binding var selectedAlbum: Album?
+    
+    @Binding var activeTab: AppTab
+    @Binding var homeNavigationPath: NavigationPath
+    @Binding var searchNavigationPath:NavigationPath
     
     @Environment(\.dismiss) private var dismiss
     
@@ -105,10 +108,24 @@ struct TrackDetailView: View {
                         Button(action: {
                             if let albumWithTracks,
                                albumWithTracks.tracks.contains(where: { $0.id == song.id }) {
-
-                                if selectedAlbum?.id != albumWithTracks.album.id || navigationPath.isEmpty {
-                                    navigationPath.append(albumWithTracks.album)
+                                
+                                switch activeTab {
+                                case .home:
+                                    if homeNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
+                                        homeNavigationPath.append(albumWithTracks.album)
+                                        print("1 home \(homeNavigationPath.isEmpty) \(selectedAlbum?.id != albumWithTracks.album.id)")
+                                    } else {
+                                        print("2 home \(homeNavigationPath.isEmpty) \(selectedAlbum?.id != albumWithTracks.album.id)")
+                                    }
+                                case .search:
+                                    if searchNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
+                                        searchNavigationPath.append(albumWithTracks.album)
+                                        print("1 search \(searchNavigationPath.isEmpty) \(selectedAlbum?.id != albumWithTracks.album.id)")
+                                    } else {
+                                        print("2 search \(searchNavigationPath.isEmpty) \(selectedAlbum?.id != albumWithTracks.album.id)")
+                                    }
                                 }
+
                             }
                             dismiss()
                         }) {

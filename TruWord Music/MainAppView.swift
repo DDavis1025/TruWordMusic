@@ -8,6 +8,11 @@
 import SwiftUI
 import MusicKit
 
+enum AppTab {
+    case home
+    case search
+}
+
 struct MainAppView: View {
     @Environment(\.scenePhase) private var scenePhase  // <-- add this
     
@@ -16,21 +21,25 @@ struct MainAppView: View {
     @StateObject private var keyboardObserver = KeyboardObserver()
     
     @State private var selectedSongForDetail: Song? = nil
-    @State private var navigationPath = NavigationPath()
+    
+    @State private var selectedTab:AppTab = .home
+    @State private var homeNavigationPath = NavigationPath()
+    @State private var searchNavigationPath = NavigationPath()
     
     private let tabBarHeight: CGFloat = 49
     
     var body: some View {
         ZStack(alignment: .bottom) {
             // MARK: - Main TabView
-            TabView {
-                ContentView(playerManager: playerManager, networkMonitor: networkMonitor, navigationPath: $navigationPath)
+            TabView(selection: $selectedTab) {
+                ContentView(playerManager: playerManager, networkMonitor: networkMonitor, navigationPath: $homeNavigationPath)
                     .tabItem { Label("Home", systemImage: "house.fill") }
+                    .tag(AppTab.home)
                 
-                SearchView(playerManager: playerManager, networkMonitor: networkMonitor, keyboardObserver: keyboardObserver, navigationPath: $navigationPath)
+                SearchView(playerManager: playerManager, networkMonitor: networkMonitor, keyboardObserver: keyboardObserver, navigationPath: $searchNavigationPath)
                     .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                    .tag(AppTab.search)
             }
-            .background(Color(.systemGray6).opacity(0.97).ignoresSafeArea(edges: .bottom))
             
             // MARK: - Bottom Player
             if let song = playerManager.currentlyPlayingSong,
@@ -66,8 +75,10 @@ struct MainAppView: View {
                     networkMonitor: networkMonitor,
                     playerManager: playerManager,
                     appleMusicSubscription: $playerManager.appleMusicSubscription,
-                    navigationPath: $navigationPath,
-                    selectedAlbum: $playerManager.selectedAlbum
+                    selectedAlbum: $playerManager.selectedAlbum,
+                    activeTab: $selectedTab,
+                    homeNavigationPath: $homeNavigationPath,
+                    searchNavigationPath: $searchNavigationPath
                 )
             }
         }

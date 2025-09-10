@@ -57,11 +57,11 @@ struct BottomPlayerView: View {
                         .frame(width: 32, height: 32)
                 }
             }
-            .padding(.horizontal, 12) // 👈 reduced padding for wider content
+            .padding(.horizontal, 9.5) // 👈 reduced padding for wider content
             .padding(.vertical, 8)
         }
         .frame(maxWidth: .infinity)
-        .background(Color(.systemGray6).opacity(0.974))
+        .background(Color(UIColor.systemGray6.withAlphaComponent(0.977)))
         .cornerRadius(12)
         .shadow(radius: 2)
         .padding(.horizontal, 7) // 👈 smaller outer inset to give more width

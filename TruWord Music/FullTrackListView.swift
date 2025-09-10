@@ -74,10 +74,11 @@ struct FullTrackListView: View {
                                 rightPadding: 8
                             )
                             .onTapGesture {
+                                UIApplication.shared.dismissKeyboard()
                                 playSong(song)
                                 isPlayingFromAlbum = false
                             }
-                            .padding(.vertical, 5)
+                            .padding(.vertical, 4)
                             .background(Color(.systemBackground))
                         }
                     }
@@ -98,4 +99,8 @@ struct FullTrackListView: View {
     }
 }
 
-
+extension UIApplication {
+    func dismissKeyboard() {
+        sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}

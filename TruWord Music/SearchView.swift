@@ -147,19 +147,20 @@ struct SearchView: View {
                                                 }
                                             }
                                         }
-                                        .padding(.vertical, 5)
+                                        .padding(.vertical, 4)
                                         .background(Color(.systemBackground))
                                     }
                                 }
                                 .padding(.bottom, playerManager.currentlyPlayingSong != nil && !keyboardObserver.isKeyboardVisible ? bottomPlayerHeight : 0)
                             }
                             .onChange(of: selectedTab) {
-                                if let firstItem = filteredResults.first {
-                                    withAnimation {
-                                        proxy.scrollTo(firstItem.id, anchor: .top)
-                                    }
+                                guard !filteredResults.isEmpty else { return }
+                                withAnimation {
+                                    proxy.scrollTo(filteredResults.first!.id, anchor: .top)
                                 }
                             }
+
+
                         }
                     }
                 }
@@ -196,6 +197,7 @@ struct SearchView: View {
     
     // MARK: - Filtered Results
         private var filteredResults: [SearchResultItem] {
+            guard networkMonitor.isConnected else { return [] } // offline-safe
             switch selectedTab {
             case .all: return searchResults
             case .songs: return searchResults.compactMap { if case .song(let s) = $0 { return .song(s) } else { return nil } }
@@ -233,7 +235,7 @@ struct SearchView: View {
                             navigationPath.append(album)
                         }
                     }
-                    .padding(.vertical, 5)
+                    .padding(.vertical, 4)
                     .background(Color(.systemBackground))
                 }
             }
@@ -267,8 +269,11 @@ struct SearchView: View {
     // MARK: - Perform Search
     private func performSearch() async {
         guard !searchQuery.isEmpty else { return }
+        guard networkMonitor.isConnected else { return }
         isSearching = true
         searchResults = []
+        
+        defer { isSearching = false }
         
         do {
             var request = MusicCatalogSearchRequest(term: searchQuery, types: [Song.self, Album.self])
@@ -290,9 +295,8 @@ struct SearchView: View {
             searchResults = results
         } catch {
             print("Error searching MusicKit: \(error)")
+            searchResults = []
         }
-        
-        isSearching = false
     }
 }
 

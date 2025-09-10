@@ -47,7 +47,7 @@ struct SongRowView: View {
             Spacer()
             
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 4)
     }
 }
 
