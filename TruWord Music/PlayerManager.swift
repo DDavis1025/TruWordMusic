@@ -20,6 +20,7 @@ class PlayerManager: ObservableObject {
     @Published var appleMusicSubscription: Bool = false
     @Published var showTrackDetail: Bool = false
     @Published var selectedAlbum: Album? = nil
+    @Published var songs: [Song] = []
     // MARK: - Private
     private var audioPlayer: AVPlayer?
     private var previewDidEnd: Bool = false
@@ -29,12 +30,34 @@ class PlayerManager: ObservableObject {
     
     // MARK: - Public API
     
+    // Function to call when the app enters the foreground
+    func onAppForeground() {
+        Task {
+            await checkAppleMusicStatus() // Refresh subscription status
+            refreshCurrentSong()
+            if appleMusicSubscription {
+                await stopAndReplaceAVPlayer()
+                monitorMusicPlayerState()
+            } else {
+                stopApplicationMusicPlayer()
+            }
+        }
+    }
+    
     func playSong(_ song: Song, from songs: [Song], albumWithTracks: AlbumWithTracks? = nil, playFromAlbum: Bool = false, networkMonitor: NetworkMonitor? = nil) {
         Task {
             await checkAppleMusicStatus()
             
+            // Ensure we have a valid songs array for the queue
+            var validSongs = songs
+            
+            if !playFromAlbum && validSongs.isEmpty {
+                // If not playing from album but no songs provided, create a single-song array
+                validSongs = [song]
+            }
+            
             if appleMusicSubscription {
-                playWithApplicationMusicPlayer(song, songs: songs, albumWithTracks: albumWithTracks, playFromAlbum: playFromAlbum)
+                playWithApplicationMusicPlayer(song, songs: validSongs, albumWithTracks: albumWithTracks, playFromAlbum: playFromAlbum)
             } else {
                 playWithPreview(song, networkMonitor: networkMonitor)
             }
@@ -91,7 +114,28 @@ class PlayerManager: ObservableObject {
         }
     }
     
-    // MARK: - Helpers
+    func monitorMusicPlayerState() {
+        // Cancel the previous task if it exists
+        playerStateTask?.cancel()
+        
+        // Start a new task
+        playerStateTask = Task {
+            let player = ApplicationMusicPlayer.shared
+            while true {
+                // Check for cancellation
+                if Task.isCancelled {
+                    break
+                }
+                
+                let state = player.state
+                DispatchQueue.main.async {
+                    self.isPlaying = (state.playbackStatus == .playing)
+                }
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
+            }
+        }
+    }
+    
     
     func refreshCurrentSong() {
         if appleMusicSubscription {
@@ -108,6 +152,7 @@ class PlayerManager: ObservableObject {
     // MARK: - Private Methods
     
     private func playWithApplicationMusicPlayer(_ song: Song, songs: [Song], albumWithTracks: AlbumWithTracks?, playFromAlbum: Bool) {
+        
         let player = ApplicationMusicPlayer.shared
         let queueSongs: [Song]
         
@@ -117,15 +162,25 @@ class PlayerManager: ObservableObject {
             queueSongs = songs
         }
         
-        guard let startIndex = queueSongs.firstIndex(of: song) else { return }
-        
-        let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
-        player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
-        
         Task { @MainActor in
             self.currentlyPlayingSong = song
         }
         
+        guard let startIndex = queueSongs.firstIndex(of: song) else {
+            print("ERROR: Song not found in queueSongs! Falling back to single song.")
+            // Fallback: create a queue with just this song
+            player.queue = ApplicationMusicPlayer.Queue(for: [song])
+            startPlayback()
+            return
+        }
+        
+        let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
+        
+        player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
+        startPlayback()
+    }
+    
+    private func startPlayback() {
         if !previewDidEnd {
             playerPreparationTask?.cancel()
             playerPreparationTask = Task { await ensurePlayerPlays() }
@@ -136,7 +191,6 @@ class PlayerManager: ObservableObject {
         }
         
         isPlaying = true
-        observePlaybackState(songs: songs, albumWithTracks: albumWithTracks, playFromAlbum: playFromAlbum)
     }
     
     func playWithPreview(_ song: Song, networkMonitor: NetworkMonitor?) {
@@ -172,7 +226,7 @@ class PlayerManager: ObservableObject {
         
         clearApplicationMusicPlayer()
     }
-
+    
     
     private func previewDidEnd(player: AVPlayer) {
         guard let currentSong = currentlyPlayingSong else { return }

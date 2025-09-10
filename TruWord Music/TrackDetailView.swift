@@ -9,15 +9,16 @@ import SwiftUI
 import MusicKit
 
 struct TrackDetailView: View {
-    let song: Song
+    @Binding var song: Song
     @Binding var isPlaying: Bool
     let togglePlayPause: () -> Void
     @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
-    let playSong: (Song) -> Void
     @Binding var songs: [Song]
     @Binding var playerIsReady: Bool
+    
     @ObservedObject var networkMonitor: NetworkMonitor
+    @ObservedObject var playerManager: PlayerManager
     @Binding var appleMusicSubscription: Bool
     @Binding var navigationPath: NavigationPath
     @Binding var selectedAlbum: Album?
@@ -161,74 +162,60 @@ struct TrackDetailView: View {
         }
     }
     
-    private func playPreviousSong() {
-        guard networkMonitor.isConnected else { return }
-        animateTitle = false
-        animateArtist = false
-        
-        if isPlayingFromAlbum,
-           let albumWithTracks,
-           let currentIndex = albumWithTracks.tracks.firstIndex(where: { $0.id == song.id }) {
-            
-            var previousIndex = currentIndex - 1
-            while previousIndex >= 0 {
-                let previousSong = albumWithTracks.tracks[previousIndex]
-                let isPlayable = (previousSong.releaseDate.map { $0 <= Date() } ?? false) && previousSong.playParameters != nil
-                if isPlayable {
-                    playSong(previousSong)
-                    return
-                }
-                previousIndex -= 1
-            }
-            
-        } else if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
-            var previousIndex = currentIndex - 1
-            while previousIndex >= 0 {
-                let previousSong = songs[previousIndex]
-                let isPlayable = (previousSong.releaseDate.map { $0 <= Date() } ?? false) && previousSong.playParameters != nil
-                if isPlayable {
-                    playSong(previousSong)
-                    return
-                }
-                previousIndex -= 1
-            }
-        }
-    }
-    
-    
     private func playNextSong() {
         guard networkMonitor.isConnected else { return }
         animateTitle = false
         animateArtist = false
         
-        if isPlayingFromAlbum,
-           let albumWithTracks,
-           let currentIndex = albumWithTracks.tracks.firstIndex(where: { $0.id == song.id }) {
-            
-            var nextIndex = currentIndex + 1
-            while nextIndex < albumWithTracks.tracks.count {
-                let nextSong = albumWithTracks.tracks[nextIndex]
-                let isPlayable = (song.releaseDate.map { $0 <= Date() } ?? false) && nextSong.playParameters != nil
-                if isPlayable {
-                    playSong(nextSong)
-                    return
-                }
-                nextIndex += 1
+        // Determine which list to use
+        let currentList: [Song]
+        if isPlayingFromAlbum, let album = albumWithTracks {
+            currentList = album.tracks
+        } else {
+            currentList = songs
+        }
+        
+        guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
+        
+        var nextIndex = currentIndex + 1
+        while nextIndex < currentList.count {
+            let nextSong = currentList[nextIndex]
+            let isPlayable = (nextSong.releaseDate.map { $0 <= Date() } ?? false) && nextSong.playParameters != nil
+            if isPlayable {
+                playerManager.playSong(nextSong, from: currentList)
+                return
             }
-            
-        } else if let currentIndex = songs.firstIndex(where: { $0.id == song.id }) {
-            var nextIndex = currentIndex + 1
-            while nextIndex < songs.count {
-                let nextSong = songs[nextIndex]
-                let isPlayable = (song.releaseDate.map { $0 <= Date() } ?? false) && nextSong.playParameters != nil
-                if isPlayable {
-                    playSong(nextSong)
-                    return
-                }
-                nextIndex += 1
-            }
+            nextIndex += 1
         }
     }
+
+    private func playPreviousSong() {
+        guard networkMonitor.isConnected else { return }
+        animateTitle = false
+        animateArtist = false
+        
+        // Determine which list to use
+        let currentList: [Song]
+        if isPlayingFromAlbum, let album = albumWithTracks {
+            currentList = album.tracks
+        } else {
+            currentList = songs
+        }
+        
+        guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
+        
+        var previousIndex = currentIndex - 1
+        while previousIndex >= 0 {
+            let previousSong = currentList[previousIndex]
+            let isPlayable = (previousSong.releaseDate.map { $0 <= Date() } ?? false) && previousSong.playParameters != nil
+            if isPlayable {
+                playerManager.playSong(previousSong, from: currentList)
+                return
+            }
+            previousIndex -= 1
+        }
+    }
+
     
 
 }

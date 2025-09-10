@@ -9,6 +9,8 @@ import SwiftUI
 import MusicKit
 
 struct MainAppView: View {
+    @Environment(\.scenePhase) private var scenePhase  // <-- add this
+    
     @StateObject private var networkMonitor = NetworkMonitor()
     @StateObject private var playerManager = PlayerManager()
     @StateObject private var keyboardObserver = KeyboardObserver()
@@ -24,7 +26,7 @@ struct MainAppView: View {
             TabView {
                 ContentView(playerManager: playerManager, networkMonitor: networkMonitor, navigationPath: $navigationPath)
                     .tabItem { Label("Home", systemImage: "house.fill") }
-
+                
                 SearchView(playerManager: playerManager, networkMonitor: networkMonitor, keyboardObserver: keyboardObserver, navigationPath: $navigationPath)
                     .tabItem { Label("Search", systemImage: "magnifyingglass") }
             }
@@ -47,27 +49,45 @@ struct MainAppView: View {
             }
         }
         // MARK: - Track Detail Full Screen Cover
-        .fullScreenCover(item: $selectedSongForDetail) { song in
-            TrackDetailView(
-                song: song,
-                isPlaying: $playerManager.isPlaying,
-                togglePlayPause: playerManager.togglePlayPause,
-                isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                albumWithTracks: $playerManager.albumWithTracks,
-                playSong: { s in playerManager.playSong(s, from: []) },
-                songs: .constant([]),
-                playerIsReady: $playerManager.playerIsReady,
-                networkMonitor: networkMonitor,
-                appleMusicSubscription: $playerManager.appleMusicSubscription,
-                navigationPath: $navigationPath,
-                selectedAlbum: $playerManager.selectedAlbum
-            )
+        
+        .fullScreenCover(item: $selectedSongForDetail) { _ in
+            if let _ = playerManager.currentlyPlayingSong {
+                TrackDetailView(
+                    song: Binding(
+                        get: { playerManager.currentlyPlayingSong! },
+                        set: { playerManager.currentlyPlayingSong = $0 }
+                    ),
+                    isPlaying: $playerManager.isPlaying,
+                    togglePlayPause: playerManager.togglePlayPause,
+                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                    albumWithTracks: $playerManager.albumWithTracks,
+                    songs: $playerManager.songs,
+                    playerIsReady: $playerManager.playerIsReady,
+                    networkMonitor: networkMonitor,
+                    playerManager: playerManager,
+                    appleMusicSubscription: $playerManager.appleMusicSubscription,
+                    navigationPath: $navigationPath,
+                    selectedAlbum: $playerManager.selectedAlbum
+                )
+            }
         }
         .animation(.spring(), value: playerManager.currentlyPlayingSong)
         .animation(.spring(), value: keyboardObserver.isKeyboardVisible)
+        // MARK: - Scene Phase Listener
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            if newPhase == .active {
+                playerManager.onAppForeground()
+            }
+        }
     }
-}
-
+    
+    // MARK: - Function to call when the app enters the foreground
+        private func onAppForeground() {
+            Task {
+                playerManager.onAppForeground()
+            }
+        }
+    }
 
 
 

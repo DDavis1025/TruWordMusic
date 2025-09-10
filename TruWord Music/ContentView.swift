@@ -19,23 +19,23 @@ struct AlbumWithTracks {
 struct ContentView: View {
     @ObservedObject var playerManager: PlayerManager
     @ObservedObject var networkMonitor: NetworkMonitor
-
+    
     // Authorization & Data
     @State private var musicAuthorized = false
     @State private var hasRequestedMusicAuthorization = false
     @State private var isLoading = false
-
+    
     // Songs & Albums
     @State private var songs: [Song] = []
     @State private var albums: [Album] = []
-
+    
     // UI State
     @Binding var navigationPath: NavigationPath // shared
-
+    
     @Environment(\.scenePhase) private var scenePhase
     
     private let bottomPlayerHeight: CGFloat = 60
-
+    
     var body: some View {
         NavigationStack(path: $navigationPath) {
             Group {
@@ -98,8 +98,8 @@ struct ContentView: View {
             }
         }
     }
-
-
+    
+    
     
     // MARK: - UI
     
@@ -117,10 +117,10 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
         .safeAreaInset(edge: .bottom) {
-                if playerManager.currentlyPlayingSong != nil {
-                    Color.clear.frame(height: bottomPlayerHeight) // leave space for BottomPlayerView
-                }
+            if playerManager.currentlyPlayingSong != nil {
+                Color.clear.frame(height: bottomPlayerHeight) // leave space for BottomPlayerView
             }
+        }
     }
     
     private var mainScrollView: some View {
@@ -172,13 +172,13 @@ struct ContentView: View {
                                     DispatchQueue.main.async {
                                         navigationPath.append(album)
                                     }
-                            }
+                                }
                         }
                     }
                     .padding(.horizontal)
                 }
             }
-            .padding(.bottom, 16)
+                .padding(.bottom, 16)
         )
     }
     
@@ -213,10 +213,10 @@ struct ContentView: View {
                         playerManager.playSong(song, from: songs)
                         playerManager.isPlayingFromAlbum = false
                     }
-             }
+            }
         }
     }
-
+    
     
     // MARK: - MusicKit
     
@@ -247,7 +247,12 @@ struct ContentView: View {
             guard let genre = try await fetchChristianGenre() else { return }
             var request = MusicCatalogChartsRequest(genre: genre, types: [Song.self])
             request.limit = 50
-            songs = (try await request.response()).songCharts.flatMap { $0.items }
+            let fetchedSongs = (try await request.response()).songCharts.flatMap { $0.items }
+            
+            await MainActor.run {
+                self.songs = fetchedSongs              // ContentView state
+                self.playerManager.songs = fetchedSongs // push to PlayerManager
+            }
         } catch { print("Error fetching songs: \(error)") }
     }
     
