@@ -9,9 +9,8 @@ import SwiftUI
 import MusicKit
 
 struct AlbumDetailView: View {
-    let album: Album
+    @State var album: Album
     let playSong: (Song) -> Void
-    
     @State private var tracks: [Song] = []
     @State private var isLoadingTracks: Bool = true
     @Binding var isPlayingFromAlbum: Bool // Added binding
