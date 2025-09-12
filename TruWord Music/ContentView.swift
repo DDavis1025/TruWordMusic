@@ -40,7 +40,7 @@ struct ContentView: View {
             Group {
                 if !networkMonitor.isConnected && !isLoading {
                     noInternetView
-                } else if isLoading {
+                } else if isLoading || !hasRequestedMusicAuthorization{
                     ProgressView("Loading...")
                         .progressViewStyle(CircularProgressViewStyle())
                         .scaleEffect(1.5)
