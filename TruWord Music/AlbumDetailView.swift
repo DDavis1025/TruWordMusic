@@ -155,5 +155,3 @@ struct AlbumDetailView: View {
         isLoadingTracks = false
     }
 }
-
-

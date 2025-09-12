@@ -28,8 +28,7 @@ struct ContentView: View {
     // Songs & Albums
     @State private var songs: [Song] = []
     @State private var albums: [Album] = []
-    
-    // UI State
+
     @Binding var navigationPath: NavigationPath // shared
     
     @Environment(\.scenePhase) private var scenePhase
@@ -41,7 +40,7 @@ struct ContentView: View {
             Group {
                 if !networkMonitor.isConnected && !isLoading {
                     noInternetView
-                } else if isLoading || !hasRequestedMusicAuthorization {
+                } else if isLoading {
                     ProgressView("Loading...")
                         .progressViewStyle(CircularProgressViewStyle())
                         .scaleEffect(1.5)

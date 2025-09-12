@@ -22,7 +22,7 @@ struct MainAppView: View {
     
     @State private var selectedSongForDetail: Song? = nil
     
-    @State private var selectedTab:AppTab = .search
+    @State private var selectedTab:AppTab = .home
     @State private var homeNavigationPath = NavigationPath()
     @State private var searchNavigationPath = NavigationPath()
     
