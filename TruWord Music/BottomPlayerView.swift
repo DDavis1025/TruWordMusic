@@ -61,7 +61,7 @@ struct BottomPlayerView: View {
             .padding(.vertical, 8)
         }
         .frame(maxWidth: .infinity)
-        .background(Color(UIColor.systemGray6.withAlphaComponent(0.977)))
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(12)
         .shadow(radius: 2)
         .padding(.horizontal, 7) // 👈 smaller outer inset to give more width
