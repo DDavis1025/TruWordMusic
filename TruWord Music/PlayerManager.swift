@@ -194,19 +194,35 @@ class PlayerManager: ObservableObject {
     }
     
     
-    func playWithPreview(_ song: Song, networkMonitor: NetworkMonitor?) {
-        guard let previewURL = song.previewAssets?.first?.url else {
+   func playWithPreview(_ song: Song, networkMonitor: NetworkMonitor?) {
+        // 1️⃣ Get the preview URL
+       guard let previewURL = song.previewAssets?.first?.url else {
+            print("No preview available for song: \(song.title)")
             clearApplicationMusicPlayer()
             return
         }
         
+        // 2️⃣ Stop any existing preview
         previewDidEnd = false
         audioPlayer?.pause()
         
         if let currentItem = audioPlayer?.currentItem {
-            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: currentItem)
+            NotificationCenter.default.removeObserver(
+                self,
+                name: .AVPlayerItemDidPlayToEndTime,
+                object: currentItem
+            )
         }
         
+        // 3️⃣ Configure audio session
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("Failed to activate audio session:", error)
+        }
+        
+        // 4️⃣ Initialize AVPlayer
         audioPlayer = AVPlayer(url: previewURL)
         
         guard let audioPlayer = audioPlayer else {
@@ -214,8 +230,13 @@ class PlayerManager: ObservableObject {
             return
         }
         
+        // 5️⃣ Observe end of preview
         if let playerItem = audioPlayer.currentItem {
-            NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: playerItem, queue: .main) { [weak self] _ in
+            NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: playerItem,
+                queue: .main
+            ) { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
                     self.previewDidEnd(player: audioPlayer)
@@ -223,15 +244,20 @@ class PlayerManager: ObservableObject {
             }
         }
         
-        audioPlayer.play()
+        // 6️⃣ Play on main thread
+        DispatchQueue.main.async {
+            audioPlayer.play()
+        }
         
+        // 7️⃣ Update state
         Task { @MainActor in
             self.currentlyPlayingSong = song
             self.isPlaying = true
         }
         
-        clearApplicationMusicPlayer()
+            clearApplicationMusicPlayer()
     }
+
     
     
     private func previewDidEnd(player: AVPlayer) {

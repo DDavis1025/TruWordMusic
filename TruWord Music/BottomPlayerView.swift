@@ -57,7 +57,7 @@ struct BottomPlayerView: View {
                         .frame(width: 32, height: 32)
                 }
             }
-            .padding(.horizontal, 9.5) // 👈 reduced padding for wider content
+            .padding(.horizontal, 8) // 👈 reduced padding for wider content
             .padding(.vertical, 8)
         }
         .frame(maxWidth: .infinity)
