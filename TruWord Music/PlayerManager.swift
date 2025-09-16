@@ -12,6 +12,7 @@ import AVFoundation
 @MainActor
 class PlayerManager: ObservableObject {
     // MARK: - Published Properties
+    let networkMonitor: NetworkMonitor
     @Published var currentlyPlayingSong: Song? = nil
     @Published var isPlaying: Bool = false
     @Published var playerIsReady: Bool = true
@@ -27,6 +28,10 @@ class PlayerManager: ObservableObject {
     private var playbackObservationTask: Task<Void, Never>?
     private var playerStateTask: Task<Void, Never>?
     private var playerPreparationTask: Task<Void, Never>?
+    
+    init(networkMonitor: NetworkMonitor) {
+        self.networkMonitor = networkMonitor
+    }
     
     // MARK: - Public API
     
@@ -194,9 +199,8 @@ class PlayerManager: ObservableObject {
     }
     
     
-   func playWithPreview(_ song: Song, networkMonitor: NetworkMonitor?) {
-        // 1️⃣ Get the preview URL
-       guard let previewURL = song.previewAssets?.first?.url else {
+    func playWithPreview(_ song: Song, networkMonitor: NetworkMonitor?) {
+        guard let previewURL = song.previewAssets?.first?.url else {
             print("No preview available for song: \(song.title)")
             clearApplicationMusicPlayer()
             return
@@ -255,12 +259,18 @@ class PlayerManager: ObservableObject {
             self.isPlaying = true
         }
         
-            clearApplicationMusicPlayer()
+        clearApplicationMusicPlayer()
     }
-
+    
     
     
     private func previewDidEnd(player: AVPlayer) {
+        guard networkMonitor.isConnected else {
+            // No internet: stop playback or just reset preview
+            isPlaying = false
+            player.seek(to: .zero)
+            return
+        }
         guard let currentSong = currentlyPlayingSong else { return }
         previewDidEnd = true
         

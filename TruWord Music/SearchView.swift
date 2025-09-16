@@ -165,28 +165,6 @@ struct SearchView: View {
                             }
                         }
                     }
-                    .navigationDestination(for: Album.self) { album in
-                        AlbumDetailView(
-                            album: album,
-                            playSong: { song in
-                                let songsFromResults = searchResults.compactMap { item -> Song? in
-                                    if case .song(let s) = item { return s } else { return nil }
-                                }
-                                playerManager.playSong(
-                                    song,
-                                    from: songsFromResults,
-                                    albumWithTracks: playerManager.albumWithTracks,
-                                    playFromAlbum: true,
-                                    networkMonitor: networkMonitor
-                                )
-                            },
-                            isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                            albumWithTracks: $playerManager.albumWithTracks,
-                            networkMonitor: networkMonitor,
-                            playerManager: playerManager
-                        )
-                        .id(album.id)
-                    }
                     .navigationTitle("Search")
                     .navigationBarTitleDisplayMode(.inline)
                     .searchable(text: $searchQuery, prompt: "Search Christian music")
@@ -194,6 +172,28 @@ struct SearchView: View {
                         Task { await performSearch() }
                     }
                 }
+            }
+            .navigationDestination(for: Album.self) { album in
+                AlbumDetailView(
+                    album: album,
+                    playSong: { song in
+                        let songsFromResults = searchResults.compactMap { item -> Song? in
+                            if case .song(let s) = item { return s } else { return nil }
+                        }
+                        playerManager.playSong(
+                            song,
+                            from: songsFromResults,
+                            albumWithTracks: playerManager.albumWithTracks,
+                            playFromAlbum: true,
+                            networkMonitor: networkMonitor
+                        )
+                    },
+                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                    albumWithTracks: $playerManager.albumWithTracks,
+                    networkMonitor: networkMonitor,
+                    playerManager: playerManager
+                )
+                .id(album.id)
             }
         }
     }

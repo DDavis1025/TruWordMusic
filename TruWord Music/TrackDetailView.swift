@@ -42,15 +42,26 @@ struct TrackDetailView: View {
             ZStack {
                 VStack {
                     Spacer().frame(height: 60) // Adjust the space for the image and button
-                    
-                    // Album Artwork (Increased size)
-                    if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 1.3), height: Int(geometry.size.width * 1.3)) {
-                        CustomAsyncImage(url: artworkURL)
-                            .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
-                            .clipped()
-                            .cornerRadius(8)
-                            .id(song.id) // Unique ID to force recreation when song changes
+                    // Album Artwork with Preview Text
+                    ZStack(alignment: .topLeading) {
+                        if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 1.3),
+                                                              height: Int(geometry.size.width * 1.3)) {
+                            CustomAsyncImage(url: artworkURL)
+                                .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
+                                .clipped()
+                                .cornerRadius(8)
+                                .id(song.id)
+                        }
+                        
+                        if !appleMusicSubscription {
+                            Text("Preview")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .padding(.leading, 0) // left-aligned
+                                .offset(y: -25)        // 10 px above the artwork
+                        }
                     }
+
                     
                     Spacer().frame(height: 14) // More space between image and title
                     

@@ -17,7 +17,7 @@ struct MainAppView: View {
     @Environment(\.scenePhase) private var scenePhase  // <-- add this
     
     @StateObject private var networkMonitor = NetworkMonitor()
-    @StateObject private var playerManager = PlayerManager()
+    @StateObject private var playerManager:PlayerManager
     @StateObject private var keyboardObserver = KeyboardObserver()
     
     @State private var selectedSongForDetail: Song? = nil
@@ -27,6 +27,12 @@ struct MainAppView: View {
     @State private var searchNavigationPath = NavigationPath()
     
     private let tabBarHeight: CGFloat = 49
+    
+    init() {
+        let networkMonitor = NetworkMonitor()
+        _networkMonitor = StateObject(wrappedValue: networkMonitor)
+        _playerManager = StateObject(wrappedValue: PlayerManager(networkMonitor: networkMonitor))
+    }
     
     var body: some View {
         ZStack(alignment: .bottom) {
