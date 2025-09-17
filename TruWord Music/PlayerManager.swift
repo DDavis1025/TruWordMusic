@@ -156,34 +156,45 @@ class PlayerManager: ObservableObject {
     
     // MARK: - Private Methods
     
-    private func playWithApplicationMusicPlayer(_ song: Song, songs: [Song], albumWithTracks: AlbumWithTracks?, playFromAlbum: Bool) {
-        
+    private func playWithApplicationMusicPlayer(
+        _ song: Song,
+        songs: [Song],
+        albumWithTracks: AlbumWithTracks?,
+        playFromAlbum: Bool
+    ) {
         let player = ApplicationMusicPlayer.shared
         let queueSongs: [Song]
-        
-        if let albumWithTracks, albumWithTracks.tracks.contains(song), playFromAlbum {
+
+        if let albumWithTracks,
+           albumWithTracks.tracks.contains(song),
+           playFromAlbum {
             queueSongs = albumWithTracks.tracks
         } else {
             queueSongs = songs
         }
-        
+
         Task { @MainActor in
             self.currentlyPlayingSong = song
         }
-        
+
         guard let startIndex = queueSongs.firstIndex(of: song) else {
             print("ERROR: Song not found in queueSongs! Falling back to single song.")
-            // Fallback: create a queue with just this song
             player.queue = ApplicationMusicPlayer.Queue(for: [song])
             startPlayback()
             return
         }
-        
+
         let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
-        
         player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
+
+        // ✅ Start monitoring the queue progression
+        observePlaybackState(songs: queueSongs,
+                             albumWithTracks: albumWithTracks,
+                             playFromAlbum: playFromAlbum)
+
         startPlayback()
     }
+
     
     private func startPlayback() {
         if !previewDidEnd {

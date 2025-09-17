@@ -86,9 +86,9 @@ struct TrackDetailView: View {
                         Button(action: playPreviousSong) {
                             Image(systemName: "backward.fill")
                                 .font(.system(size: 28))
-                                .foregroundColor(networkMonitor.isConnected ? .primary : .gray)
+                                .foregroundColor(networkMonitor.isConnected || appleMusicSubscription ? .primary : .gray)
                         }
-                        .disabled(!networkMonitor.isConnected)
+                        .disabled(!networkMonitor.isConnected && !appleMusicSubscription)
                         
                         ZStack {
                             if playerIsReady {
@@ -108,9 +108,9 @@ struct TrackDetailView: View {
                         Button(action: playNextSong) {
                             Image(systemName: "forward.fill")
                                 .font(.system(size: 28))
-                                .foregroundColor(networkMonitor.isConnected ? .primary : .gray)
+                                .foregroundColor(networkMonitor.isConnected || appleMusicSubscription ? .primary : .gray)
                         }
-                        .disabled(!networkMonitor.isConnected)
+                        .disabled(!networkMonitor.isConnected && !appleMusicSubscription)
                     }
                     .padding(.bottom, 10)
                     
@@ -124,16 +124,10 @@ struct TrackDetailView: View {
                                 case .home:
                                     if homeNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
                                         homeNavigationPath.append(albumWithTracks.album)
-                                        print("1 home \(homeNavigationPath.isEmpty) \(selectedAlbum?.id != albumWithTracks.album.id)")
-                                    } else {
-                                        print("2 home \(homeNavigationPath.isEmpty) \(selectedAlbum?.id != albumWithTracks.album.id)")
                                     }
                                 case .search:
                                     if searchNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
                                         searchNavigationPath.append(albumWithTracks.album)
-                                        print("1 search \(searchNavigationPath.isEmpty) \(selectedAlbum?.id != albumWithTracks.album.id)")
-                                    } else {
-                                        print("2 search \(searchNavigationPath.isEmpty) \(selectedAlbum?.id != albumWithTracks.album.id)")
                                     }
                                 }
 
@@ -191,7 +185,10 @@ struct TrackDetailView: View {
     }
     
     private func playNextSong() {
-        guard networkMonitor.isConnected else { return }
+        // Allow offline if subscribed. Require network only if using previews.
+        guard appleMusicSubscription || networkMonitor.isConnected else {
+            return
+        }
         animateTitle = false
         animateArtist = false
         
@@ -218,7 +215,10 @@ struct TrackDetailView: View {
     }
 
     private func playPreviousSong() {
-        guard networkMonitor.isConnected else { return }
+        // Allow offline if subscribed. Require network only if using previews.
+        guard appleMusicSubscription || networkMonitor.isConnected else {
+            return
+        }
         animateTitle = false
         animateArtist = false
         
