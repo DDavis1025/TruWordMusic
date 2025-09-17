@@ -61,7 +61,7 @@ struct TrackDetailView: View {
                                 .offset(y: -25)        // 10 px above the artwork
                         }
                     }
-
+                    
                     
                     Spacer().frame(height: 14) // More space between image and title
                     
@@ -86,9 +86,9 @@ struct TrackDetailView: View {
                         Button(action: playPreviousSong) {
                             Image(systemName: "backward.fill")
                                 .font(.system(size: 28))
-                                .foregroundColor(networkMonitor.isConnected || appleMusicSubscription ? .primary : .gray)
+                                .foregroundColor(networkMonitor.isConnected ? .primary : .gray)
                         }
-                        .disabled(!networkMonitor.isConnected && !appleMusicSubscription)
+                        .disabled(!networkMonitor.isConnected)
                         
                         ZStack {
                             if playerIsReady {
@@ -108,9 +108,9 @@ struct TrackDetailView: View {
                         Button(action: playNextSong) {
                             Image(systemName: "forward.fill")
                                 .font(.system(size: 28))
-                                .foregroundColor(networkMonitor.isConnected || appleMusicSubscription ? .primary : .gray)
+                                .foregroundColor(networkMonitor.isConnected ? .primary : .gray)
                         }
-                        .disabled(!networkMonitor.isConnected && !appleMusicSubscription)
+                        .disabled(!networkMonitor.isConnected)
                     }
                     .padding(.bottom, 10)
                     
@@ -130,19 +130,20 @@ struct TrackDetailView: View {
                                         searchNavigationPath.append(albumWithTracks.album)
                                     }
                                 }
-
+                                
                             }
                             dismiss()
                         }) {
-                            Text("View Album")
-                                .font(.subheadline)
-                                .foregroundColor(networkMonitor.isConnected ? .blue : .gray)
-                                .padding(.vertical, 10)
-                                .padding(.horizontal, 16)
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(10)
+                            if (networkMonitor.isConnected) {
+                                Text("View Album")
+                                    .font(.subheadline)
+                                    .foregroundColor(networkMonitor.isConnected ? .blue : .gray)
+                                    .padding(.vertical, 10)
+                                    .padding(.horizontal, 16)
+                                    .background(Color.blue.opacity(0.1))
+                                    .cornerRadius(10)
+                            }
                         }
-                        .disabled(!networkMonitor.isConnected)
                         .padding(.top, 5)
                     }
                     
@@ -186,7 +187,7 @@ struct TrackDetailView: View {
     
     private func playNextSong() {
         // Allow offline if subscribed. Require network only if using previews.
-        guard appleMusicSubscription || networkMonitor.isConnected else {
+        guard networkMonitor.isConnected else {
             return
         }
         animateTitle = false
@@ -213,10 +214,10 @@ struct TrackDetailView: View {
             nextIndex += 1
         }
     }
-
+    
     private func playPreviousSong() {
         // Allow offline if subscribed. Require network only if using previews.
-        guard appleMusicSubscription || networkMonitor.isConnected else {
+        guard networkMonitor.isConnected else {
             return
         }
         animateTitle = false
@@ -243,8 +244,8 @@ struct TrackDetailView: View {
             previousIndex -= 1
         }
     }
-
     
-
+    
+    
 }
 
