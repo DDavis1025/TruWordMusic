@@ -206,7 +206,7 @@ struct TrackDetailView: View {
         var nextIndex = currentIndex + 1
         while nextIndex < currentList.count {
             let nextSong = currentList[nextIndex]
-            let isPlayable = (nextSong.releaseDate.map { $0 <= Date() } ?? false) && nextSong.playParameters != nil
+            let isPlayable = (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date()) && nextSong.playParameters != nil
             if isPlayable {
                 playerManager.playSong(nextSong, from: currentList)
                 return
@@ -236,7 +236,7 @@ struct TrackDetailView: View {
         var previousIndex = currentIndex - 1
         while previousIndex >= 0 {
             let previousSong = currentList[previousIndex]
-            let isPlayable = (previousSong.releaseDate.map { $0 <= Date() } ?? false) && previousSong.playParameters != nil
+            let isPlayable = (previousSong.releaseDate == nil || previousSong.releaseDate! <= Date()) && previousSong.playParameters != nil
             if isPlayable {
                 playerManager.playSong(previousSong, from: currentList)
                 return

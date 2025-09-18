@@ -57,7 +57,7 @@ struct AlbumDetailView: View {
             } else {
                 List {
                     ForEach(tracks, id: \.id) { song in
-                        let isPlayable = (song.releaseDate.map { $0 <= Date() } ?? false) && song.playParameters != nil
+                        let isPlayable = (song.releaseDate == nil || song.releaseDate! <= Date()) && song.playParameters != nil
                         
                         Button {
                             guard isPlayable && networkMonitor.isConnected else { return }
