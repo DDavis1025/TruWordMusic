@@ -64,7 +64,7 @@ struct SearchView: View {
     @State private var scrollOffsets: [SearchTab: CGFloat] = [:]
     
     @Namespace private var tabNamespace
-    private let bottomPlayerHeight: CGFloat = 60
+    private let bottomPlayerHeight: CGFloat = 70
     
     var body: some View {
         NavigationStack(path: $navigationPath) {

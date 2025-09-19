@@ -182,6 +182,11 @@ struct TrackDetailView: View {
             }
             .padding(.horizontal)
             .frame(width: geometry.size.width, height: geometry.size.height)
+            .onChange(of: playerManager.currentlyPlayingSong) {
+                if playerManager.currentlyPlayingSong == nil {
+                    dismiss()
+                }
+            }
         }
     }
     

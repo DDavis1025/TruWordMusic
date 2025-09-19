@@ -18,7 +18,7 @@ struct AlbumDetailView: View {
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
-    private let bottomPlayerHeight: CGFloat = 60
+    private let bottomPlayerHeight: CGFloat = 70
 
     
     var body: some View {

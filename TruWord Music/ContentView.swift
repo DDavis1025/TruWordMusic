@@ -33,7 +33,7 @@ struct ContentView: View {
     
     @Environment(\.scenePhase) private var scenePhase
     
-    private let bottomPlayerHeight: CGFloat = 60
+    private let bottomPlayerHeight: CGFloat = 70
     
     var body: some View {
         NavigationStack(path: $navigationPath) {

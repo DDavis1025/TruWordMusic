@@ -19,7 +19,7 @@ struct FullTrackListView: View {
     
     @State private var searchQuery: String = "" // State for search query
     
-    private let bottomPlayerHeight: CGFloat = 60
+    private let bottomPlayerHeight: CGFloat = 70
     
     // Filtered songs based on search query (title or artist name)
     var filteredSongs: [Song] {
