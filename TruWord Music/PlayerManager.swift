@@ -49,19 +49,14 @@ class PlayerManager: ObservableObject {
     
     func onAppForeground() {
         Task {
-            await waitForAppleMusicStatusUpdate()
+            await checkAppleMusicStatus()
             refreshCurrentSong()
-            if appleMusicSubscription {
-                await stopAndReplaceAVPlayer()
-                monitorMusicPlayerState()
-            } else {
-                stopApplicationMusicPlayer()
-            }
+            await waitForAppleMusicStatusUpdate()
         }
     }
     
     @MainActor
-    private func waitForAppleMusicStatusUpdate(maxRetries: Int = 11) async {
+    private func waitForAppleMusicStatusUpdate(maxRetries: Int = 14) async {
         let previousStatus = appleMusicSubscription
         
         for _ in 0..<maxRetries {
@@ -69,6 +64,11 @@ class PlayerManager: ObservableObject {
             
             // If the status changed compared to before, stop waiting
             if appleMusicSubscription != previousStatus {
+                if appleMusicSubscription {
+                    stopAndReplaceAVPlayer()
+                } else {
+                    stopApplicationMusicPlayer()
+                }
                 break
             }
             
@@ -76,7 +76,6 @@ class PlayerManager: ObservableObject {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
         }
     }
-
     
     // MARK: - Public API
     
@@ -151,10 +150,8 @@ class PlayerManager: ObservableObject {
     }
 
     
-    func stopAndReplaceAVPlayer() async {
+    func stopAndReplaceAVPlayer() {
         let player = ApplicationMusicPlayer.shared
-        await checkAppleMusicStatus()
-        guard appleMusicSubscription else { return }
         
         audioPlayer?.pause()
         audioPlayer = nil
@@ -400,6 +397,8 @@ class PlayerManager: ObservableObject {
         }
         
         await startPlaybackAndMarkReady(forcePlay: forcePlay)
+        
+        monitorMusicPlayerState()
     }
     
     @MainActor
