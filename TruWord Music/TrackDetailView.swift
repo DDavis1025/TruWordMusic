@@ -194,7 +194,10 @@ struct TrackDetailView: View {
         guard networkMonitor.isConnected else {
             return
         }
-        // If subscribed, just skip in the Apple Music queue
+        
+        animateTitle = false
+        animateArtist = false
+        
         if appleMusicSubscription {
             let player = ApplicationMusicPlayer.shared
             Task {
@@ -206,10 +209,6 @@ struct TrackDetailView: View {
             }
             return
         }
-
-
-        animateTitle = false
-        animateArtist = false
         
         // Determine which list to use
         let currentList: [Song]
@@ -239,6 +238,9 @@ struct TrackDetailView: View {
             return
         }
         
+        animateTitle = false
+        animateArtist = false
+        
         if appleMusicSubscription {
             let player = ApplicationMusicPlayer.shared
             Task {
@@ -250,9 +252,6 @@ struct TrackDetailView: View {
             }
             return
         }
-
-        animateTitle = false
-        animateArtist = false
         
         // Determine which list to use
         let currentList: [Song]
