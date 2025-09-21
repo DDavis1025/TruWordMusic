@@ -242,9 +242,9 @@ class PlayerManager: ObservableObject {
             startPlayback()
             return
         }
-        
-        let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
-        player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
+       
+        let queue = ApplicationMusicPlayer.Queue(for: queueSongs, startingAt: queueSongs[startIndex])
+        player.queue = queue
         
         observePlaybackState(
             songs: queueSongs,

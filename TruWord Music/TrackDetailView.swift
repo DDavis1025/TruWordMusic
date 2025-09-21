@@ -191,10 +191,23 @@ struct TrackDetailView: View {
     }
     
     private func playNextSong() {
-        // Allow offline if subscribed. Require network only if using previews.
         guard networkMonitor.isConnected else {
             return
         }
+        // If subscribed, just skip in the Apple Music queue
+        if appleMusicSubscription {
+            let player = ApplicationMusicPlayer.shared
+            Task {
+                do {
+                    try await player.skipToNextEntry()
+                } catch {
+                    print("ERROR: Could not skip to next entry: \(error)")
+                }
+            }
+            return
+        }
+
+
         animateTitle = false
         animateArtist = false
         
@@ -219,12 +232,25 @@ struct TrackDetailView: View {
             nextIndex += 1
         }
     }
+
     
     private func playPreviousSong() {
-        // Allow offline if subscribed. Require network only if using previews.
         guard networkMonitor.isConnected else {
             return
         }
+        
+        if appleMusicSubscription {
+            let player = ApplicationMusicPlayer.shared
+            Task {
+                do {
+                    try await player.skipToPreviousEntry()
+                } catch {
+                    print("ERROR: Could not skip to previous entry: \(error)")
+                }
+            }
+            return
+        }
+
         animateTitle = false
         animateArtist = false
         
@@ -249,6 +275,7 @@ struct TrackDetailView: View {
             previousIndex -= 1
         }
     }
+
     
     
     
