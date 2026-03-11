@@ -107,12 +107,18 @@ struct SearchView: View {
                         if isSearching {
                             ProgressView("Searching…")
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
                         } else if filteredResults.isEmpty && !searchQuery.isEmpty {
-                            Spacer()
-                            Text("No results found")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                            Spacer()
+                            VStack {
+                                Spacer()
+                                Text("No results found")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .multilineTextAlignment(.center)
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
                         } else {
                             ScrollViewReader { proxy in
                                 ScrollView(.vertical, showsIndicators: true) {
@@ -122,10 +128,8 @@ struct SearchView: View {
                                                 title: item.title,
                                                 artistName: {
                                                     switch item {
-                                                    case .song:
-                                                        return "Song | \(item.artistName)"
-                                                    case .album:
-                                                        return "Album | \(item.artistName)"
+                                                    case .song: return "Song | \(item.artistName)"
+                                                    case .album: return "Album | \(item.artistName)"
                                                     }
                                                 }(),
                                                 artworkURL: item.artworkURL,
@@ -133,8 +137,7 @@ struct SearchView: View {
                                             )
                                             .id(item.id)
                                             .onTapGesture {
-                                                // Dismiss keyboard
-                                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                                hideKeyboard()
                                                 switch item {
                                                 case .song(let song):
                                                     let songsFromSearch = filteredResults.compactMap { r -> Song? in
@@ -143,9 +146,7 @@ struct SearchView: View {
                                                     playerManager.playSong(song, from: songsFromSearch)
                                                     playerManager.isPlayingFromAlbum = false
                                                 case .album(let album):
-                                                    DispatchQueue.main.async {
-                                                        navigationPath.append(album)
-                                                    }
+                                                    navigationPath.append(album)
                                                 }
                                             }
                                             .padding(.vertical, 4)
@@ -160,10 +161,9 @@ struct SearchView: View {
                                         proxy.scrollTo(filteredResults.first!.id, anchor: .top)
                                     }
                                 }
-                                
-                                
                             }
                         }
+
                     }
                     .navigationTitle("Search")
                     .navigationBarTitleDisplayMode(.inline)

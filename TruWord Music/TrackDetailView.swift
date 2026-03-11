@@ -2,7 +2,7 @@
 //  TrackDetailView.swift
 //  TruWord Music
 //
-//  Created by Dillon Davis on 9/7/25.
+//  Updated to handle albums and playlists
 //
 
 import SwiftUI
@@ -14,6 +14,7 @@ struct TrackDetailView: View {
     let togglePlayPause: () -> Void
     @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
+    @Binding var playlistWithTracks: PlaylistWithTracks?
     @Binding var songs: [Song]
     @Binding var playerIsReady: Bool
     
@@ -24,14 +25,12 @@ struct TrackDetailView: View {
     
     @Binding var activeTab: AppTab
     @Binding var homeNavigationPath: NavigationPath
-    @Binding var searchNavigationPath:NavigationPath
+    @Binding var searchNavigationPath: NavigationPath
     
     @Environment(\.dismiss) private var dismiss
     
     @State private var animateTitle: Bool = false
     @State private var animateArtist: Bool = false
-    
-    @State private var albumStack: [Album] = []
     
     private var appleMusicURL: URL? {
         URL(string: "https://music.apple.com/us/song/\(song.id)")
@@ -41,8 +40,9 @@ struct TrackDetailView: View {
         GeometryReader { geometry in
             ZStack {
                 VStack {
-                    Spacer().frame(height: 60) // Adjust the space for the image and button
-                    // Album Artwork with Preview Text
+                    Spacer().frame(height: 60)
+                    
+                    // Artwork
                     ZStack(alignment: .topLeading) {
                         if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 1.3),
                                                               height: Int(geometry.size.width * 1.3)) {
@@ -57,31 +57,30 @@ struct TrackDetailView: View {
                             Text("Preview")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                                .padding(.leading, 0) // left-aligned
-                                .offset(y: -25)        // 10 px above the artwork
+                                .padding(.leading, 0)
+                                .offset(y: -25)
                         }
                     }
                     
-                    
-                    Spacer().frame(height: 14) // More space between image and title
+                    Spacer().frame(height: 14)
                     
                     // Song Title
                     ScrollableText(text: song.title, isAnimating: $animateTitle, scrollSpeed: 47.0)
                         .font(.title3)
                         .multilineTextAlignment(.center)
-                        .id("title-\(song.id)") // Unique ID for the title
+                        .id("title-\(song.id)")
                     
-                    Spacer().frame(height: 12) // More space between title and artist name
+                    Spacer().frame(height: 12)
                     
                     // Artist Name
                     ScrollableText(text: song.artistName, isAnimating: $animateArtist, scrollSpeed: 47.0)
                         .font(.subheadline)
                         .foregroundColor(Color(white: 0.48))
-                        .id("artist-\(song.id)") // Unique ID for the artist
+                        .id("artist-\(song.id)")
                     
-                    Spacer().frame(height: 30) // Ensures artist name is ~20 pts above play button
+                    Spacer().frame(height: 30)
                     
-                    // Controls (Previous, Play/Pause, Next)
+                    // Playback Controls
                     HStack(spacing: 40) {
                         Button(action: playPreviousSong) {
                             Image(systemName: "backward.fill")
@@ -103,7 +102,7 @@ struct TrackDetailView: View {
                                     .progressViewStyle(CircularProgressViewStyle())
                             }
                         }
-                        .frame(width: 60, height: 60) // Ensures fixed size
+                        .frame(width: 60, height: 60)
                         
                         Button(action: playNextSong) {
                             Image(systemName: "forward.fill")
@@ -114,42 +113,28 @@ struct TrackDetailView: View {
                     }
                     .padding(.bottom, 10)
                     
-                    // View Album Button
+                    // View Album / Playlist Button
                     if isPlayingFromAlbum {
                         Button(action: {
-                            if let albumWithTracks,
-                               albumWithTracks.tracks.contains(where: { $0.id == song.id }) {
-                                
-                                switch activeTab {
-                                case .home:
-                                    if homeNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
-                                        homeNavigationPath.append(albumWithTracks.album)
-                                    }
-                                case .search:
-                                    if searchNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
-                                        searchNavigationPath.append(albumWithTracks.album)
-                                    }
-                                }
-                                
-                            }
+                            navigateToAlbumOrPlaylist()
                             dismiss()
                         }) {
-                            if (networkMonitor.isConnected) {
-                                Text("View Album")
-                                    .font(.subheadline)
-                                    .foregroundColor(networkMonitor.isConnected ? .blue : .gray)
-                                    .padding(.vertical, 10)
-                                    .padding(.horizontal, 16)
-                                    .background(Color.blue.opacity(0.1))
-                                    .cornerRadius(10)
-                            }
+                            Text(networkMonitor.isConnected
+                                 ? (playerManager.playlistWithTracks != nil ? "View Playlist" : "View Album")
+                                 : "")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(10)
                         }
                         .padding(.top, 5)
                     }
                     
                     Spacer()
                     
-                    // Subscription Message at the Bottom
+                    // Apple Music Preview Link
                     if let appleMusicURL, !appleMusicSubscription {
                         HStack {
                             Link(destination: appleMusicURL) {
@@ -168,9 +153,7 @@ struct TrackDetailView: View {
                 VStack {
                     HStack {
                         Spacer()
-                        Button(action: {
-                            dismiss()
-                        }) {
+                        Button(action: { dismiss() }) {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 28))
                                 .foregroundColor(.primary)
@@ -183,92 +166,92 @@ struct TrackDetailView: View {
             .padding(.horizontal)
             .frame(width: geometry.size.width, height: geometry.size.height)
             .onChange(of: playerManager.currentlyPlayingSong) {
-                if playerManager.currentlyPlayingSong == nil {
-                    dismiss()
-                }
+                if playerManager.currentlyPlayingSong == nil { dismiss() }
             }
         }
     }
     
+    // MARK: - Playback Navigation
+
     private func playNextSong() {
-        guard networkMonitor.isConnected else {
-            return
-        }
-        
+        guard networkMonitor.isConnected else { return }
         animateTitle = false
         animateArtist = false
         
         if appleMusicSubscription {
-            let player = ApplicationMusicPlayer.shared
-            Task {
-                do {
-                    try await player.skipToNextEntry()
-                } catch {
-                    print("ERROR: Could not skip to next entry: \(error)")
-                }
-            }
+            Task { try? await ApplicationMusicPlayer.shared.skipToNextEntry() }
             return
         }
         
-        // Determine which list to use
+        // Determine current list: album tracks, playlist tracks, or just songs
         let currentList: [Song]
-        if isPlayingFromAlbum, let album = albumWithTracks {
-            currentList = album.tracks
+        if isPlayingFromAlbum {
+            if let albumTracks = albumWithTracks?.tracks {
+                currentList = albumTracks
+            } else if let playlistTracks = playlistWithTracks?.tracks {
+                currentList = playlistTracks
+            } else {
+                currentList = songs
+            }
         } else {
             currentList = songs
         }
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
-        
         var nextIndex = currentIndex + 1
         while nextIndex < currentList.count {
             let nextSong = currentList[nextIndex]
             let isPlayable = (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date()) && nextSong.playParameters != nil
             if isPlayable {
-                playerManager.playSong(nextSong, from: currentList)
+                playerManager.playSong(
+                    nextSong,
+                    from: currentList,
+                    albumWithTracks: albumWithTracks,
+                    playlistWithTracks: playlistWithTracks,
+                    playFromAlbum: isPlayingFromAlbum
+                )
                 return
             }
             nextIndex += 1
         }
     }
 
-    
     private func playPreviousSong() {
-        guard networkMonitor.isConnected else {
-            return
-        }
-        
+        guard networkMonitor.isConnected else { return }
         animateTitle = false
         animateArtist = false
         
         if appleMusicSubscription {
-            let player = ApplicationMusicPlayer.shared
-            Task {
-                do {
-                    try await player.skipToPreviousEntry()
-                } catch {
-                    print("ERROR: Could not skip to previous entry: \(error)")
-                }
-            }
+            Task { try? await ApplicationMusicPlayer.shared.skipToPreviousEntry() }
             return
         }
         
-        // Determine which list to use
         let currentList: [Song]
-        if isPlayingFromAlbum, let album = albumWithTracks {
-            currentList = album.tracks
+        if isPlayingFromAlbum {
+            if let albumTracks = albumWithTracks?.tracks {
+                currentList = albumTracks
+            } else if let playlistTracks = playlistWithTracks?.tracks {
+                currentList = playlistTracks
+            } else {
+                currentList = songs
+            }
         } else {
             currentList = songs
         }
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
-        
         var previousIndex = currentIndex - 1
         while previousIndex >= 0 {
             let previousSong = currentList[previousIndex]
             let isPlayable = (previousSong.releaseDate == nil || previousSong.releaseDate! <= Date()) && previousSong.playParameters != nil
             if isPlayable {
-                playerManager.playSong(previousSong, from: currentList)
+                playerManager.playSong(
+                    previousSong,
+                    from: currentList,
+                    albumWithTracks: albumWithTracks,
+                    playlistWithTracks: playlistWithTracks,
+                    playFromAlbum: isPlayingFromAlbum
+                )
                 return
             }
             previousIndex -= 1
@@ -276,7 +259,26 @@ struct TrackDetailView: View {
     }
 
     
-    
-    
+    // MARK: - Navigation
+    private func navigateToAlbumOrPlaylist() {
+        if let album = albumWithTracks?.album {
+            switch activeTab {
+            case .home:
+                if homeNavigationPath.isEmpty || selectedAlbum?.id != album.id {
+                    homeNavigationPath.append(album)
+                }
+            case .search:
+                if searchNavigationPath.isEmpty || selectedAlbum?.id != album.id {
+                    searchNavigationPath.append(album)
+                }
+            }
+        } else if let playlist = playlistWithTracks?.playlist {
+            switch activeTab {
+            case .home:
+                homeNavigationPath.append(playlist)
+            case .search:
+                searchNavigationPath.append(playlist)
+            }
+        }
+    }
 }
-

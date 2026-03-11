@@ -18,6 +18,7 @@ class PlayerManager: ObservableObject {
     @Published var playerIsReady: Bool = true
     @Published var isPlayingFromAlbum: Bool = false
     @Published var albumWithTracks: AlbumWithTracks?
+    @Published var playlistWithTracks: PlaylistWithTracks?
     @Published var appleMusicSubscription: Bool = false
     @Published var showTrackDetail: Bool = false
     @Published var selectedAlbum: Album? = nil
@@ -83,6 +84,7 @@ class PlayerManager: ObservableObject {
         _ song: Song,
         from songs: [Song],
         albumWithTracks: AlbumWithTracks? = nil,
+        playlistWithTracks: PlaylistWithTracks? = nil,
         playFromAlbum: Bool = false,
         networkMonitor: NetworkMonitor? = nil
     ) {
@@ -99,6 +101,7 @@ class PlayerManager: ObservableObject {
                     song,
                     songs: validSongs,
                     albumWithTracks: albumWithTracks,
+                    playlistWithTracks: playlistWithTracks,
                     playFromAlbum: playFromAlbum
                 )
             } else {
@@ -216,23 +219,33 @@ class PlayerManager: ObservableObject {
         _ song: Song,
         songs: [Song],
         albumWithTracks: AlbumWithTracks?,
+        playlistWithTracks: PlaylistWithTracks?,
         playFromAlbum: Bool
     ) {
         let player = ApplicationMusicPlayer.shared
         let queueSongs: [Song]
-        
+
         if let albumWithTracks,
            albumWithTracks.tracks.contains(song),
            playFromAlbum {
             queueSongs = albumWithTracks.tracks
-        } else {
+
+        } else if let playlistWithTracks,
+                  playlistWithTracks.tracks.contains(where: { $0.id == song.id }),
+                  playFromAlbum {
+            queueSongs = playlistWithTracks.tracks
+
+
+          } else {
             queueSongs = songs
         }
+
         
         Task { @MainActor in
             self.currentlyPlayingSong = song
             self.lastPlayedSongs = songs
             self.lastAlbumWithTracks = albumWithTracks
+            self.playlistWithTracks = playlistWithTracks
             self.lastPlayFromAlbum = playFromAlbum
         }
         
@@ -464,16 +477,19 @@ class PlayerManager: ObservableObject {
                 if let currentEntry = player.queue.currentEntry {
                     switch currentEntry.item {
                     case .song(let song):
-                        let matchedSong: Song?
-                        if playFromAlbum, let albumWithTracks {
-                            matchedSong = albumWithTracks.tracks.first(where: { $0.id == song.id })
-                        } else {
-                            matchedSong = songs.first(where: { $0.id == song.id })
-                        }
+                        let matchedSong: Song? = {
+                            if playFromAlbum, let albumWithTracks {
+                                return albumWithTracks.tracks.first(where: { $0.id == song.id })
+                            } else if let playlistWithTracks {
+                                return playlistWithTracks.tracks.first(where: { $0.id == song.id })
+                            } else {
+                                return songs.first(where: { $0.id == song.id })
+                            }
+                        }()
                         
-                        if let matchedSong, matchedSong != previousSong {
-                            previousSong = matchedSong
-                            currentlyPlayingSong = matchedSong
+                        if let actualSong = matchedSong, actualSong != previousSong {
+                            previousSong = actualSong
+                            currentlyPlayingSong = actualSong
                             isPlaying = true
                         }
                     default: break

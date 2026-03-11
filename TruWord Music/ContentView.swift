@@ -11,28 +11,23 @@ import AVFoundation
 
 // MARK: - Main ContentView
 
-struct AlbumWithTracks {
-    var album: Album
-    var tracks: [Song]
-}
-
 struct ContentView: View {
     @ObservedObject var playerManager: PlayerManager
     @ObservedObject var networkMonitor: NetworkMonitor
     
-    // Authorization & Data
+    // Authorization & Loading
     @State private var musicAuthorized = false
     @State private var hasRequestedMusicAuthorization = false
     @State private var isLoading = false
     
-    // Songs & Albums
+    // Music Data
     @State private var songs: [Song] = []
     @State private var albums: [Album] = []
-
-    @Binding var navigationPath: NavigationPath // shared
+    @State private var playlists: [Playlist] = []
+    
+    @Binding var navigationPath: NavigationPath
     
     @Environment(\.scenePhase) private var scenePhase
-    
     private let bottomPlayerHeight: CGFloat = 70
     
     var body: some View {
@@ -40,7 +35,7 @@ struct ContentView: View {
             Group {
                 if !networkMonitor.isConnected && !isLoading {
                     noInternetView
-                } else if isLoading || !hasRequestedMusicAuthorization{
+                } else if isLoading || !hasRequestedMusicAuthorization {
                     ProgressView("Loading...")
                         .progressViewStyle(CircularProgressViewStyle())
                         .scaleEffect(1.5)
@@ -48,18 +43,7 @@ struct ContentView: View {
                     mainScrollView
                 }
             }
-            .navigationDestination(for: String.self) { value in
-                if value == "fullAlbumGrid" {
-                    FullAlbumGridView(
-                        albums: albums,
-                        onAlbumSelected: {
-                            album in navigationPath.append(album)
-                        },
-                        networkMonitor: networkMonitor,
-                        playerManager: playerManager
-                    )
-                }
-            }
+            // MARK: - Navigation Destinations
             .navigationDestination(for: Album.self) { album in
                 AlbumDetailView(
                     album: album,
@@ -79,6 +63,63 @@ struct ContentView: View {
                 )
                 .id(album.id)
             }
+            .navigationDestination(for: Playlist.self) { playlist in
+                PlaylistDetailView(
+                    playlist: playlist,
+                    playSong: { track in
+                        if case let .song(song) = track {
+                            let songList = tracks(for: playlist)
+
+                            // ✅ Build PlaylistWithTracks
+                            let currentPlaylistWithTracks = PlaylistWithTracks(
+                                playlist: playlist,
+                                tracks: songList
+                            )
+
+                            // ✅ Update PlayerManager
+                            playerManager.playlistWithTracks = currentPlaylistWithTracks
+                            playerManager.albumWithTracks = nil   // optional: clear album to avoid confusion
+                            playerManager.isPlayingFromAlbum = true
+
+                            // ✅ Play song from playlist
+                            playerManager.playSong(
+                                song,
+                                from: songList,
+                                playlistWithTracks: currentPlaylistWithTracks,
+                                playFromAlbum: true
+                            )
+                        }
+                    },
+                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                    playlistWithTracks: $playerManager.playlistWithTracks,
+                    networkMonitor: networkMonitor,
+                    playerManager: playerManager
+                )
+                .id(playlist.id)
+            }
+
+            .navigationDestination(for: String.self) { value in
+                if value == "fullPlaylistGrid" {
+                    FullGridView(
+                        items: playlists,
+                        onItemSelected: { playlist in
+                            navigationPath.append(playlist)
+                        },
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
+                    )
+                } else if value == "fullAlbumGrid" {
+                    FullGridView(
+                        items: albums,
+                        onItemSelected: { album in
+                            navigationPath.append(album)
+                        },
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
+                    )
+                }
+            }
+            // MARK: - Tasks
             .task {
                 isLoading = true
                 await requestMusicAuthorization()
@@ -87,6 +128,7 @@ struct ContentView: View {
                         group.addTask { await checkAppleMusicStatus() }
                         group.addTask { await fetchChristianSongs() }
                         group.addTask { await fetchChristianAlbums() }
+                        group.addTask { await fetchChristianPlaylists() }
                     }
                 }
                 isLoading = false
@@ -99,53 +141,55 @@ struct ContentView: View {
         }
     }
     
-    
-    
-    // MARK: - UI
-    
-    private var noInternetView: some View {
-        VStack(spacing: 8) {
-            Spacer()
-            Text("No Internet connection")
-                .font(.headline)
-                .foregroundColor(.black)
-            Text("Your device is not connected to the internet")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
-        .safeAreaInset(edge: .bottom) {
-            if playerManager.currentlyPlayingSong != nil {
-                Color.clear.frame(height: bottomPlayerHeight) // leave space for BottomPlayerView
-            }
-        }
-    }
-    
+    // MARK: - ScrollView
     private var mainScrollView: some View {
         ScrollView {
-            VStack {
+            VStack(spacing: 16) {
                 if musicAuthorized {
+                    playlistsSection
                     albumsSection
                     songsSection
                 } else {
-                    Text("Please allow Apple Music access to continue using this app.")
-                        .foregroundColor(.black)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                    
-                    Button("Enable in Settings") {
-                        if let url = URL(string: UIApplication.openSettingsURLString) {
-                            UIApplication.shared.open(url)
-                        }
-                    }
-                    .foregroundColor(.blue)
+                    authorizationView
                 }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
         }
+    }
+    
+    // MARK: - Sections
+    
+    private var playlistsSection: some View {
+        if playlists.isEmpty { return AnyView(EmptyView()) }
+        return AnyView(
+            VStack(alignment: .leading) {
+                HStack {
+                    Text("Top Christian Playlists")
+                        .font(.system(size: 18)).bold()
+                    Spacer()
+                    if playlists.count > 10 {
+                        NavigationLink("View More", value: "fullPlaylistGrid")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 15))
+                    }
+                }
+                .padding(.vertical, 4)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(playlists.prefix(10), id: \.id) { playlist in
+                            PlaylistCarouselItemView(playlist: playlist)
+                                .onTapGesture {
+                                    navigationPath.append(playlist)
+                                }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.bottom, 10)
+        )
     }
     
     private var albumsSection: some View {
@@ -156,7 +200,7 @@ struct ContentView: View {
                     Text("Top Christian Albums")
                         .font(.system(size: 18)).bold()
                     Spacer()
-                    if albums.count > 5 {
+                    if albums.count > 10 {
                         NavigationLink("View More", value: "fullAlbumGrid")
                             .foregroundColor(.blue)
                             .font(.system(size: 15))
@@ -166,19 +210,17 @@ struct ContentView: View {
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
-                        ForEach(albums.prefix(5), id: \.id) { album in
+                        ForEach(albums.prefix(10), id: \.id) { album in
                             AlbumCarouselItemView(album: album)
                                 .onTapGesture {
-                                    DispatchQueue.main.async {
-                                        navigationPath.append(album)
-                                    }
+                                    navigationPath.append(album)
                                 }
                         }
                     }
                     .padding(.horizontal)
                 }
             }
-                .padding(.bottom, 16)
+            .padding(.bottom, 10)
         )
     }
     
@@ -217,6 +259,56 @@ struct ContentView: View {
         }
     }
     
+    // MARK: - Helper Views
+    
+    private var noInternetView: some View {
+        VStack(spacing: 8) {
+            Spacer()
+            Text("No Internet connection")
+                .font(.headline)
+                .foregroundColor(.black)
+            Text("Your device is not connected to the internet")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+        .safeAreaInset(edge: .bottom) {
+            if playerManager.currentlyPlayingSong != nil {
+                Color.clear.frame(height: bottomPlayerHeight)
+            }
+        }
+    }
+    
+    private var authorizationView: some View {
+        VStack(spacing: 12) {
+            Text("Please allow Apple Music access to continue using this app.")
+                .foregroundColor(.black)
+                .multilineTextAlignment(.center)
+                .padding()
+            
+            Button("Enable in Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            .foregroundColor(.blue)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    // MARK: - Playlist Tracks Helper
+    
+    private func tracks(for playlist: Playlist) -> [Song] {
+        // Return the cached tracks for the given playlist, or empty array if not loaded
+        if let playlistTracks = playerManager.playlistWithTracks,
+           playlistTracks.playlist.id == playlist.id {
+            return playlistTracks.tracks
+        }
+        return []
+    }
+
     
     // MARK: - MusicKit
     
@@ -248,10 +340,9 @@ struct ContentView: View {
             var request = MusicCatalogChartsRequest(genre: genre, types: [Song.self])
             request.limit = 50
             let fetchedSongs = (try await request.response()).songCharts.flatMap { $0.items }
-            
             await MainActor.run {
-                self.songs = fetchedSongs              // ContentView state
-                self.playerManager.songs = fetchedSongs // push to PlayerManager
+                self.songs = fetchedSongs
+                self.playerManager.songs = fetchedSongs
             }
         } catch { print("Error fetching songs: \(error)") }
     }
@@ -264,5 +355,17 @@ struct ContentView: View {
             albums = (try await request.response()).albumCharts.flatMap { $0.items }
         } catch { print("Error fetching albums: \(error)") }
     }
+    
+    private func fetchChristianPlaylists() async {
+        do {
+            guard let genre = try await fetchChristianGenre() else { return }
+            var request = MusicCatalogSearchRequest(term: genre.name, types: [Playlist.self])
+            request.limit = 20
+            let response = try await request.response()
+            playlists = Array(response.playlists)
+        } catch {
+            print("Error fetching playlists: \(error)")
+            playlists = []
+        }
+    }
 }
-

@@ -71,6 +71,7 @@ struct MainAppView: View {
                     togglePlayPause: playerManager.togglePlayPause,
                     isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                     albumWithTracks: $playerManager.albumWithTracks,
+                    playlistWithTracks: $playerManager.playlistWithTracks,
                     songs: $playerManager.songs,
                     playerIsReady: $playerManager.playerIsReady,
                     networkMonitor: networkMonitor,
