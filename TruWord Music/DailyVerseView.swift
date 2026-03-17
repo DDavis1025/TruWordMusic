@@ -14,29 +14,42 @@ struct DailyVerseView: View {
     var body: some View {
         if let verse = manager.verse {
             VStack(alignment: .leading, spacing: 8) {
-
-                // Bold label on top
-                Text("Verse of the Day")
-                    .font(.system(size: 18)).bold()
-                    .bold()
-                    .foregroundColor(.black)
-
+                
+                // Title + refresh button
+                HStack {
+                    Text("Verse of the Day")
+                        .font(.system(size: 18)).bold()
+                        .foregroundColor(.black)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        manager.refreshIfNewDay()
+                    }) {
+                        Image(systemName: "arrow.clockwise.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                // Verse card
                 Button(action: { showFullVerse.toggle() }) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(verse.reference)
                             .font(.subheadline)
                             .foregroundColor(.black)
-
+                        
                         Text(verse.text)
                             .font(.body)
                             .foregroundColor(.black)
-                            .lineLimit(2)               // limit to 2 lines
-                            .truncationMode(.tail)      // show "..." if overflowing
+                            .lineLimit(2)
+                            .truncationMode(.tail)
                             .multilineTextAlignment(.leading)
                     }
                     .padding()
                     .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
-                    .background(Color.white)       // white box
+                    .background(Color.white)
                     .cornerRadius(12)
                     .shadow(color: Color.black.opacity(0.5), radius: 8, x: 0, y: 4)
                 }
