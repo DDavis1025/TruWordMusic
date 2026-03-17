@@ -11,6 +11,7 @@ import MusicKit
 struct FullTrackListView: View {
     let songs: [Song]
     let playSong: (Song) -> Void
+    let refreshSongs: () async -> Void
     @Binding var currentPlayingSong: Song?
     @Binding var isPlayingFromAlbum: Bool
     
@@ -82,6 +83,9 @@ struct FullTrackListView: View {
                             .background(Color(.systemBackground))
                         }
                     }
+                }
+                .refreshable {
+                    await refreshSongs()
                 }
                 .safeAreaInset(edge: .bottom) {
                     if playerManager.currentlyPlayingSong != nil {

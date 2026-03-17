@@ -11,6 +11,7 @@ import MusicKit
 struct FullAlbumGridView: View {
     let albums: [Album]
     let onAlbumSelected: (Album) -> Void
+    let refreshAlbums: () async -> Void
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
@@ -93,6 +94,9 @@ struct FullAlbumGridView: View {
                         }
                     }
                     .padding()
+                }
+                .refreshable {
+                    await refreshAlbums()
                 }
                 .safeAreaInset(edge: .bottom) {
                     if playerManager.currentlyPlayingSong != nil {

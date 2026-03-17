@@ -108,11 +108,20 @@ struct SearchView: View {
                             ProgressView("Searching…")
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if filteredResults.isEmpty && !searchQuery.isEmpty {
-                            Spacer()
-                            Text("No results found")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                            Spacer()
+                            VStack {
+                                    Spacer()
+
+                                    Text("No results found")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+
+                                    Spacer()
+                                }
+                                .padding(.bottom,
+                                    playerManager.currentlyPlayingSong != nil && !keyboardObserver.isKeyboardVisible
+                                    ? bottomPlayerHeight
+                                    : 0
+                                )
                         } else {
                             ScrollViewReader { proxy in
                                 ScrollView(.vertical, showsIndicators: true) {
