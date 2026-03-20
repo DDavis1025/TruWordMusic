@@ -49,16 +49,15 @@ class PlayerManager: ObservableObject {
     
     func onAppForeground() {
         Task {
+            let previousStatus = appleMusicSubscription
             await checkAppleMusicStatus()
             refreshCurrentSong()
-            await waitForAppleMusicStatusUpdate()
+            await waitForAppleMusicStatusUpdate(previousStatus: previousStatus)
         }
     }
     
     @MainActor
-    private func waitForAppleMusicStatusUpdate(maxRetries: Int = 14) async {
-        let previousStatus = appleMusicSubscription
-        
+    private func waitForAppleMusicStatusUpdate(previousStatus: Bool, maxRetries: Int = 14) async {
         for _ in 0..<maxRetries {
             await checkAppleMusicStatus()
             
@@ -142,11 +141,8 @@ class PlayerManager: ObservableObject {
     func stopApplicationMusicPlayer() {
         let player = ApplicationMusicPlayer.shared
         // Check if player has something queued and is either playing or paused
-        if !player.queue.entries.isEmpty,
-           player.state.playbackStatus != .stopped {
             currentlyPlayingSong = nil
             clearApplicationMusicPlayer()
-        }
     }
 
     
@@ -158,7 +154,7 @@ class PlayerManager: ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         
         previewDidEnd = false
-        
+       
         if let currentSong = currentlyPlayingSong {
             if player.state.playbackStatus == .stopped || player.queue.entries.isEmpty {
                 // ✅ Use last known context instead of empty

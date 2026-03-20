@@ -55,9 +55,6 @@ struct ContentView: View {
                     FullAlbumGridView(
                         albums: albums,
                         onAlbumSelected: { album in navigationPath.append(album) },
-                        refreshAlbums: {
-                                await fetchChristianAlbums()
-                            },
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
                     )
@@ -134,7 +131,7 @@ struct ContentView: View {
                     albumsSection
                     songsSection
                 } else {
-                    Text("Please allow Apple Music access to continue using this app.")
+                    Text("Please allow Apple Music to show top Christian music.")
                         .foregroundColor(.black)
                         .multilineTextAlignment(.center)
                         .padding()
@@ -154,9 +151,6 @@ struct ContentView: View {
                     Color.clear.frame(height: bottomPlayerHeight)
                 }
             }
-        .refreshable {
-            await refreshContent()
-        }
     }
 
     private var albumsSection: some View {
@@ -204,9 +198,6 @@ struct ContentView: View {
                             playSong: { song in
                                 playerManager.playSong(song, from: songs, networkMonitor: networkMonitor)
                             },
-                            refreshSongs: {
-                                    await fetchChristianSongs()
-                                },
                             currentPlayingSong: $playerManager.currentlyPlayingSong,
                             isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                             networkMonitor: networkMonitor,
