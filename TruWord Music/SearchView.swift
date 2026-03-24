@@ -56,6 +56,7 @@ struct SearchView: View {
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var keyboardObserver: KeyboardObserver
     @Binding var navigationPath: NavigationPath
+    @Binding var musicAuthorized: Bool   // 👈 ADDED
     
     @State private var searchQuery: String = ""
     @State private var searchResults: [SearchResultItem] = []
@@ -71,13 +72,23 @@ struct SearchView: View {
             Group {
                 if !networkMonitor.isConnected {
                     noInternetView
+                    
+                } else if !musicAuthorized {
+                    MusicAuthorizationView(
+                        bottomPlayerHeight: bottomPlayerHeight,
+                        hasPlayer: playerManager.currentlyPlayingSong != nil
+                    )
+                    .padding(.horizontal, 16)
                 } else {
                     VStack(spacing: 0) {
+                        
                         // MARK: - Tab Bar
                         HStack(spacing: 0) {
                             ForEach(SearchTab.allCases) { tab in
                                 Button {
-                                    withAnimation(.spring()) { selectedTab = tab }
+                                    withAnimation(.spring()) {
+                                        selectedTab = tab
+                                    }
                                 } label: {
                                     Text(tab.rawValue)
                                         .font(.subheadline)
@@ -107,21 +118,23 @@ struct SearchView: View {
                         if isSearching {
                             ProgressView("Searching…")
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                
                         } else if filteredResults.isEmpty && !searchQuery.isEmpty {
                             VStack {
-                                    Spacer()
-
-                                    Text("No results found")
-                                        .font(.subheadline)
-                                        .foregroundColor(.gray)
-
-                                    Spacer()
-                                }
-                                .padding(.bottom,
-                                    playerManager.currentlyPlayingSong != nil && !keyboardObserver.isKeyboardVisible
-                                    ? bottomPlayerHeight
-                                    : 0
-                                )
+                                Spacer()
+                                
+                                Text("No results found")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                
+                                Spacer()
+                            }
+                            .padding(.bottom,
+                                playerManager.currentlyPlayingSong != nil && !keyboardObserver.isKeyboardVisible
+                                ? bottomPlayerHeight
+                                : 0
+                            )
+                            
                         } else {
                             ScrollViewReader { proxy in
                                 ScrollView(.vertical, showsIndicators: true) {
@@ -143,14 +156,23 @@ struct SearchView: View {
                                             .id(item.id)
                                             .onTapGesture {
                                                 // Dismiss keyboard
-                                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                                UIApplication.shared.sendAction(
+                                                    #selector(UIResponder.resignFirstResponder),
+                                                    to: nil,
+                                                    from: nil,
+                                                    for: nil
+                                                )
+                                                
                                                 switch item {
                                                 case .song(let song):
                                                     let songsFromSearch = filteredResults.compactMap { r -> Song? in
-                                                        if case .song(let s) = r { return s } else { return nil }
+                                                        if case .song(let s) = r { return s }
+                                                        return nil
                                                     }
+                                                    
                                                     playerManager.playSong(song, from: songsFromSearch)
                                                     playerManager.isPlayingFromAlbum = false
+                                                    
                                                 case .album(let album):
                                                     DispatchQueue.main.async {
                                                         navigationPath.append(album)
@@ -161,16 +183,19 @@ struct SearchView: View {
                                             .background(Color(.systemBackground))
                                         }
                                     }
-                                    .padding(.bottom, playerManager.currentlyPlayingSong != nil && !keyboardObserver.isKeyboardVisible ? bottomPlayerHeight : 0)
+                                    .padding(.bottom,
+                                        playerManager.currentlyPlayingSong != nil &&
+                                        !keyboardObserver.isKeyboardVisible
+                                        ? bottomPlayerHeight
+                                        : 0
+                                    )
                                 }
                                 .onChange(of: selectedTab) {
-                                    guard !filteredResults.isEmpty else { return }
+                                    guard let first = filteredResults.first else { return }
                                     withAnimation {
-                                        proxy.scrollTo(filteredResults.first!.id, anchor: .top)
+                                        proxy.scrollTo(first.id, anchor: .top)
                                     }
                                 }
-                                
-                                
                             }
                         }
                     }
@@ -187,8 +212,10 @@ struct SearchView: View {
                     album: album,
                     playSong: { song in
                         let songsFromResults = searchResults.compactMap { item -> Song? in
-                            if case .song(let s) = item { return s } else { return nil }
+                            if case .song(let s) = item { return s }
+                            return nil
                         }
+                        
                         playerManager.playSong(
                             song,
                             from: songsFromResults,
@@ -208,50 +235,22 @@ struct SearchView: View {
     }
     
     // MARK: - Filtered Results
-        private var filteredResults: [SearchResultItem] {
-            guard networkMonitor.isConnected else { return [] } // offline-safe
-            switch selectedTab {
-            case .all: return searchResults
-            case .songs: return searchResults.compactMap { if case .song(let s) = $0 { return .song(s) } else { return nil } }
-            case .albums: return searchResults.compactMap { if case .album(let a) = $0 { return .album(a) } else { return nil } }
+    private var filteredResults: [SearchResultItem] {
+        guard networkMonitor.isConnected else { return [] }
+        
+        switch selectedTab {
+        case .all:
+            return searchResults
+        case .songs:
+            return searchResults.compactMap {
+                if case .song(let s) = $0 { return .song(s) }
+                return nil
             }
-        }
-    
-    // MARK: - Results List
-    private var resultsList: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                ForEach(filteredResults) { item in
-                    SongRowLikeView(
-                        title: item.title,
-                        artistName: {
-                                    switch item {
-                                    case .song:
-                                        return "Song | \(item.artistName)"
-                                    case .album:
-                                        return "Album | \(item.artistName)"
-                                    }
-                                }(),
-                        artworkURL: item.artworkURL,
-                        currentlyPlayingSong: $playerManager.currentlyPlayingSong
-                    )
-                    .onTapGesture {
-                        switch item {
-                        case .song(let song):
-                            let songsFromSearch = filteredResults.compactMap { result -> Song? in
-                                if case .song(let s) = result { return s } else { return nil }
-                            }
-                            playerManager.playSong(song, from: songsFromSearch)
-                            playerManager.isPlayingFromAlbum = false
-                        case .album(let album):
-                            navigationPath.append(album)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .background(Color(.systemBackground))
-                }
+        case .albums:
+            return searchResults.compactMap {
+                if case .album(let a) = $0 { return .album(a) }
+                return nil
             }
-            .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
         }
     }
     
@@ -259,58 +258,72 @@ struct SearchView: View {
     private var noInternetView: some View {
         VStack(spacing: 8) {
             Spacer()
+            
             Text("No Internet connection")
                 .font(.headline)
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
+            
             Text("Your device is not connected to the internet")
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
+            
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
         .safeAreaInset(edge: .bottom) {
-                if playerManager.currentlyPlayingSong != nil {
-                    Color.clear.frame(height: bottomPlayerHeight) // leave space for BottomPlayerView
-                }
+            if playerManager.currentlyPlayingSong != nil {
+                Color.clear.frame(height: bottomPlayerHeight)
             }
+        }
     }
     
     // MARK: - Perform Search
     private func performSearch() async {
         guard !searchQuery.isEmpty else { return }
         guard networkMonitor.isConnected else { return }
+        
         isSearching = true
         searchResults = []
         
         defer { isSearching = false }
         
         do {
-            var request = MusicCatalogSearchRequest(term: searchQuery, types: [Song.self, Album.self])
+            var request = MusicCatalogSearchRequest(
+                term: searchQuery,
+                types: [Song.self, Album.self]
+            )
             request.limit = 25
+            
             let response = try await request.response()
             
             var results: [SearchResultItem] = []
             
             let christianSongs = response.songs.filter {
-                $0.genreNames.contains("Christian") || $0.genreNames.contains("Christian & Gospel")
+                $0.genreNames.contains("Christian") ||
+                $0.genreNames.contains("Christian & Gospel")
             }
+            
             results.append(contentsOf: christianSongs.map { .song($0) })
             
             let christianAlbums = response.albums.filter {
-                $0.genreNames.contains("Christian") || $0.genreNames.contains("Christian & Gospel")
+                $0.genreNames.contains("Christian") ||
+                $0.genreNames.contains("Christian & Gospel")
             }
+            
             results.append(contentsOf: christianAlbums.map { .album($0) })
             
             searchResults = results
+            
         } catch {
             print("Error searching MusicKit: \(error)")
             searchResults = []
         }
     }
 }
+
 
 // MARK: - Row View (Shared by Songs & Albums)
 struct SongRowLikeView: View {

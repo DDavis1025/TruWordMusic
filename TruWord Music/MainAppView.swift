@@ -23,6 +23,8 @@ struct MainAppView: View {
     @State private var selectedTab: AppTab = .home
     @State private var homeNavigationPath = NavigationPath()
     @State private var searchNavigationPath = NavigationPath()
+    
+    @State private var musicAuthorized = false
 
     private let tabBarHeight: CGFloat = 49
 
@@ -34,11 +36,11 @@ struct MainAppView: View {
         ZStack(alignment: .bottom) {
             // MARK: - Main TabView
             TabView(selection: $selectedTab) {
-                ContentView(playerManager: playerManager, networkMonitor: networkMonitor, navigationPath: $homeNavigationPath)
+                ContentView(playerManager: playerManager, networkMonitor: networkMonitor, musicAuthorized: $musicAuthorized, navigationPath: $homeNavigationPath)
                     .tabItem { Label("Home", systemImage: "house.fill") }
                     .tag(AppTab.home)
 
-                SearchView(playerManager: playerManager, networkMonitor: networkMonitor, keyboardObserver: keyboardObserver, navigationPath: $searchNavigationPath)
+                SearchView(playerManager: playerManager, networkMonitor: networkMonitor, keyboardObserver: keyboardObserver, navigationPath: $searchNavigationPath, musicAuthorized: $musicAuthorized)
                     .tabItem { Label("Search", systemImage: "magnifyingglass") }
                     .tag(AppTab.search)
             }

@@ -139,10 +139,8 @@ class PlayerManager: ObservableObject {
     }
     
     func stopApplicationMusicPlayer() {
-        let player = ApplicationMusicPlayer.shared
-        // Check if player has something queued and is either playing or paused
-            currentlyPlayingSong = nil
-            clearApplicationMusicPlayer()
+        currentlyPlayingSong = nil
+        clearApplicationMusicPlayer()
     }
 
     
