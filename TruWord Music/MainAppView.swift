@@ -10,11 +10,13 @@ import MusicKit
 
 enum AppTab {
     case home
+    case favorites
     case search
 }
 
 struct MainAppView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @EnvironmentObject var favoriteManager: FavoritesManager
     @ObservedObject var playerManager: PlayerManager
     @ObservedObject var networkMonitor: NetworkMonitor
     @StateObject private var keyboardObserver = KeyboardObserver()
@@ -23,6 +25,7 @@ struct MainAppView: View {
     @State private var selectedTab: AppTab = .home
     @State private var homeNavigationPath = NavigationPath()
     @State private var searchNavigationPath = NavigationPath()
+    @State private var favoritesNavigationPath = NavigationPath()
     
     @State private var musicAuthorized = false
 
@@ -36,14 +39,53 @@ struct MainAppView: View {
         ZStack(alignment: .bottom) {
             // MARK: - Main TabView
             TabView(selection: $selectedTab) {
-                ContentView(playerManager: playerManager, networkMonitor: networkMonitor, musicAuthorized: $musicAuthorized, navigationPath: $homeNavigationPath)
-                    .tabItem { Label("Home", systemImage: "house.fill") }
-                    .tag(AppTab.home)
+                
+                NavigationStack {
+                    ContentView(
+                        playerManager: playerManager,
+                        networkMonitor: networkMonitor,
+                        musicAuthorized: $musicAuthorized,
+                        navigationPath: $homeNavigationPath
+                    )
+                }
+                .tabItem {
+                    Label("Home", systemImage: "house.fill")
+                }
+                .tag(AppTab.home)
 
-                SearchView(playerManager: playerManager, networkMonitor: networkMonitor, keyboardObserver: keyboardObserver, navigationPath: $searchNavigationPath, musicAuthorized: $musicAuthorized)
-                    .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                    .tag(AppTab.search)
+                
+                NavigationStack {
+                    FavoritesView(
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager,
+                        navigationPath: $favoritesNavigationPath,
+                        currentPlayingSong: $playerManager.currentlyPlayingSong,
+                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                        musicAuthorized: $musicAuthorized
+                    )
+                }
+                .tabItem {
+                    Label("Favorites", systemImage: "star.fill")
+                }
+                .tag(AppTab.favorites)
+
+                
+                NavigationStack {
+                    SearchView(
+                        playerManager: playerManager,
+                        networkMonitor: networkMonitor,
+                        keyboardObserver: keyboardObserver,
+                        navigationPath: $searchNavigationPath,
+                        musicAuthorized: $musicAuthorized
+                    )
+                }
+                .tabItem {
+                    Label("Search", systemImage: "magnifyingglass")
+                }
+                .tag(AppTab.search)
             }
+
+
 
             // MARK: - Bottom Player
             if let song = playerManager.currentlyPlayingSong,
@@ -81,7 +123,8 @@ struct MainAppView: View {
                     selectedAlbum: $playerManager.selectedAlbum,
                     activeTab: $selectedTab,
                     homeNavigationPath: $homeNavigationPath,
-                    searchNavigationPath: $searchNavigationPath
+                    searchNavigationPath: $searchNavigationPath,
+                    favoritesNavigationPath: $favoritesNavigationPath
                 )
             }
         }

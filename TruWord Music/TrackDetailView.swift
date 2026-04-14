@@ -24,9 +24,11 @@ struct TrackDetailView: View {
     
     @Binding var activeTab: AppTab
     @Binding var homeNavigationPath: NavigationPath
-    @Binding var searchNavigationPath:NavigationPath
+    @Binding var searchNavigationPath: NavigationPath
+    @Binding var favoritesNavigationPath: NavigationPath
     
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var favoritesManager: FavoritesManager
     
     @State private var animateTitle: Bool = false
     @State private var animateArtist: Bool = false
@@ -41,13 +43,17 @@ struct TrackDetailView: View {
         GeometryReader { geometry in
             ZStack {
                 VStack {
-                    Spacer().frame(height: 60) // Adjust the space for the image and button
-                    // Album Artwork with Preview Text
+                    Spacer().frame(height: 60)
+                    
+                    // Album Artwork
                     ZStack(alignment: .topLeading) {
-                        if let artworkURL = song.artwork?.url(width: Int(geometry.size.width * 1.3),
-                                                              height: Int(geometry.size.width * 1.3)) {
+                        if let artworkURL = song.artwork?.url(
+                            width: Int(geometry.size.width * 1.3),
+                            height: Int(geometry.size.width * 1.3)
+                        ) {
                             CustomAsyncImage(url: artworkURL)
-                                .frame(width: geometry.size.width * 0.85, height: geometry.size.width * 0.85)
+                                .frame(width: geometry.size.width * 0.85,
+                                       height: geometry.size.width * 0.85)
                                 .clipped()
                                 .cornerRadius(8)
                                 .id(song.id)
@@ -57,31 +63,37 @@ struct TrackDetailView: View {
                             Text("Preview")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                                .padding(.leading, 0) // left-aligned
-                                .offset(y: -25)        // 10 px above the artwork
+                                .offset(y: -25)
                         }
                     }
                     
+                    Spacer().frame(height: 14)
                     
-                    Spacer().frame(height: 14) // More space between image and title
+                    // Title
+                    ScrollableText(
+                        text: song.title,
+                        isAnimating: $animateTitle,
+                        scrollSpeed: 47.0
+                    )
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
+                    .id("title-\(song.id)")
                     
-                    // Song Title
-                    ScrollableText(text: song.title, isAnimating: $animateTitle, scrollSpeed: 47.0)
-                        .font(.title3)
-                        .multilineTextAlignment(.center)
-                        .id("title-\(song.id)") // Unique ID for the title
+                    Spacer().frame(height: 12)
                     
-                    Spacer().frame(height: 12) // More space between title and artist name
+                    // Artist
+                    ScrollableText(
+                        text: song.artistName,
+                        isAnimating: $animateArtist,
+                        scrollSpeed: 47.0
+                    )
+                    .font(.subheadline)
+                    .foregroundColor(Color(white: 0.48))
+                    .id("artist-\(song.id)")
                     
-                    // Artist Name
-                    ScrollableText(text: song.artistName, isAnimating: $animateArtist, scrollSpeed: 47.0)
-                        .font(.subheadline)
-                        .foregroundColor(Color(white: 0.48))
-                        .id("artist-\(song.id)") // Unique ID for the artist
+                    Spacer().frame(height: 30)
                     
-                    Spacer().frame(height: 30) // Ensures artist name is ~20 pts above play button
-                    
-                    // Controls (Previous, Play/Pause, Next)
+                    // Controls
                     HStack(spacing: 40) {
                         Button(action: playPreviousSong) {
                             Image(systemName: "backward.fill")
@@ -100,10 +112,9 @@ struct TrackDetailView: View {
                                 }
                             } else {
                                 ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle())
                             }
                         }
-                        .frame(width: 60, height: 60) // Ensures fixed size
+                        .frame(width: 60, height: 60)
                         
                         Button(action: playNextSong) {
                             Image(systemName: "forward.fill")
@@ -114,7 +125,7 @@ struct TrackDetailView: View {
                     }
                     .padding(.bottom, 10)
                     
-                    // View Album Button
+                    // View Album
                     if isPlayingFromAlbum {
                         Button(action: {
                             if let albumWithTracks,
@@ -125,19 +136,26 @@ struct TrackDetailView: View {
                                     if homeNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
                                         homeNavigationPath.append(albumWithTracks.album)
                                     }
+                                    
+                                case .favorites:
+                                    if favoritesNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
+                                            favoritesNavigationPath.append(albumWithTracks.album)
+                                        }
+
                                 case .search:
                                     if searchNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
                                         searchNavigationPath.append(albumWithTracks.album)
                                     }
+
                                 }
-                                
+
                             }
                             dismiss()
                         }) {
-                            if (networkMonitor.isConnected) {
+                            if networkMonitor.isConnected {
                                 Text("View Album")
                                     .font(.subheadline)
-                                    .foregroundColor(networkMonitor.isConnected ? .blue : .gray)
+                                    .foregroundColor(.blue)
                                     .padding(.vertical, 10)
                                     .padding(.horizontal, 16)
                                     .background(Color.blue.opacity(0.1))
@@ -149,36 +167,55 @@ struct TrackDetailView: View {
                     
                     Spacer()
                     
-                    // Subscription Message at the Bottom
+                    // Apple Music Link
                     if let appleMusicURL, !appleMusicSubscription {
-                        HStack {
-                            Link(destination: appleMusicURL) {
-                                Image("AppleMusicBadge")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(height: min(geometry.size.width * 0.09, 59))
-                                    .padding(.top, 10)
-                            }
-                            .padding()
+                        Link(destination: appleMusicURL) {
+                            Image("AppleMusicBadge")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: min(geometry.size.width * 0.09, 59))
+                                .padding(.top, 10)
                         }
+                        .padding()
                     }
                 }
-                
-                // Close Button
                 VStack {
                     HStack {
+                        
                         Spacer()
-                        Button(action: {
-                            dismiss()
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 28))
-                                .foregroundColor(.primary)
-                                .padding()
+                        
+                        HStack(spacing: 18) {
+                            
+                            // ⭐️ Favorite Button
+                            if (networkMonitor.isConnected) {
+                                Button(action: {
+                                    favoritesManager.toggleFavorite(song)
+                                }) {
+                                    Image(systemName: favoritesManager.isFavorite(song) ? "star.fill" : "star")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(favoritesManager.isFavorite(song) ? .yellow : .primary)
+                                        .frame(width: 44, height: 44)
+                                        .contentShape(Rectangle())
+                                }
+                            }
+                            
+                            // ❌ Close Button
+                            Button(action: {
+                                dismiss()
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.primary)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
                         }
+                        .padding(.trailing, 6)
                     }
+                    
                     Spacer()
                 }
+
             }
             .padding(.horizontal)
             .frame(width: geometry.size.width, height: geometry.size.height)
@@ -191,93 +228,66 @@ struct TrackDetailView: View {
     }
     
     private func playNextSong() {
-        guard networkMonitor.isConnected else {
-            return
-        }
-        // If subscribed, just skip in the Apple Music queue
+        guard networkMonitor.isConnected else { return }
+        
         if appleMusicSubscription {
             let player = ApplicationMusicPlayer.shared
             Task {
-                do {
-                    try await player.skipToNextEntry()
-                } catch {
-                    print("ERROR: Could not skip to next entry: \(error)")
-                }
+                try? await player.skipToNextEntry()
             }
             return
         }
-
-
+        
         animateTitle = false
         animateArtist = false
         
-        // Determine which list to use
-        let currentList: [Song]
-        if isPlayingFromAlbum, let album = albumWithTracks {
-            currentList = album.tracks
-        } else {
-            currentList = songs
-        }
+        let currentList = (isPlayingFromAlbum && albumWithTracks != nil)
+        ? albumWithTracks!.tracks
+        : songs
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
         
-        var nextIndex = currentIndex + 1
-        while nextIndex < currentList.count {
+        for nextIndex in (currentIndex + 1)..<currentList.count {
             let nextSong = currentList[nextIndex]
-            let isPlayable = (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date()) && nextSong.playParameters != nil
+            let isPlayable = (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date())
+            && nextSong.playParameters != nil
+            
             if isPlayable {
                 playerManager.playSong(nextSong, from: currentList)
                 return
             }
-            nextIndex += 1
         }
     }
-
     
     private func playPreviousSong() {
-        guard networkMonitor.isConnected else {
-            return
-        }
+        guard networkMonitor.isConnected else { return }
         
         if appleMusicSubscription {
             let player = ApplicationMusicPlayer.shared
             Task {
-                do {
-                    try await player.skipToPreviousEntry()
-                } catch {
-                    print("ERROR: Could not skip to previous entry: \(error)")
-                }
+                try? await player.skipToPreviousEntry()
             }
             return
         }
-
+        
         animateTitle = false
         animateArtist = false
         
-        // Determine which list to use
-        let currentList: [Song]
-        if isPlayingFromAlbum, let album = albumWithTracks {
-            currentList = album.tracks
-        } else {
-            currentList = songs
-        }
+        let currentList = (isPlayingFromAlbum && albumWithTracks != nil)
+        ? albumWithTracks!.tracks
+        : songs
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
         
-        var previousIndex = currentIndex - 1
-        while previousIndex >= 0 {
-            let previousSong = currentList[previousIndex]
-            let isPlayable = (previousSong.releaseDate == nil || previousSong.releaseDate! <= Date()) && previousSong.playParameters != nil
+        for previousIndex in stride(from: currentIndex - 1, through: 0, by: -1) {
+            let prevSong = currentList[previousIndex]
+            let isPlayable = (prevSong.releaseDate == nil || prevSong.releaseDate! <= Date())
+            && prevSong.playParameters != nil
+            
             if isPlayable {
-                playerManager.playSong(previousSong, from: currentList)
+                playerManager.playSong(prevSong, from: currentList)
                 return
             }
-            previousIndex -= 1
         }
     }
-
-    
-    
-    
 }
-

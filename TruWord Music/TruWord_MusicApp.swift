@@ -23,6 +23,7 @@ struct TruWord_MusicApp: App {
 
     @StateObject private var networkMonitor = NetworkMonitor()
     @StateObject private var playerManager: PlayerManager
+    @StateObject private var favoritesManager = FavoritesManager()
 
     init() {
         // Tab bar styling
@@ -43,6 +44,7 @@ struct TruWord_MusicApp: App {
             MainAppView(playerManager: playerManager, networkMonitor: networkMonitor)
                 .environmentObject(playerManager)
                 .environmentObject(networkMonitor)
+                .environmentObject(favoritesManager)
                 .onChange(of: scenePhase) { _, newPhase in
                     switch newPhase {
                     case .background:

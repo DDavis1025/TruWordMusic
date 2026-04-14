@@ -52,6 +52,8 @@ struct ContentView: View {
                     mainContent
                 }
             }
+            .navigationTitle("Home")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { value in
                 if value == "fullAlbumGrid" {
                     FullAlbumGridView(
@@ -106,51 +108,41 @@ struct ContentView: View {
     // MARK: - Main Content
 
     private var mainContent: some View {
-        ZStack(alignment: .top) {
-
-            Group {
-                if musicAuthorized {
-                    ScrollView {
-                        VStack {
-                            DailyVerseView(manager: verseManager)
-                            albumsSection
-                            songsSection
-                        }
-                        .padding(.horizontal, 16)
+        Group {
+            if musicAuthorized {
+                ScrollView {
+                    VStack {
+                        DailyVerseView(manager: verseManager)
+                        albumsSection
+                        songsSection
                     }
-                } else {
-                    ZStack {
-                        MusicAuthorizationView(
-                            bottomPlayerHeight: bottomPlayerHeight,
-                            hasPlayer: playerManager.currentlyPlayingSong != nil
-                        )
-                        .padding(.horizontal, 16)
+                    .padding(.horizontal, 16)
+                }
+            } else {
+                ZStack {
+                    MusicAuthorizationView(
+                        bottomPlayerHeight: bottomPlayerHeight,
+                        hasPlayer: playerManager.currentlyPlayingSong != nil
+                    )
+                    .padding(.horizontal, 16)
 
-                        VStack {
-                            DailyVerseView(manager: verseManager)
-                                .padding(.horizontal, 16)
-                                .padding(.top, 8)
+                    VStack {
+                        DailyVerseView(manager: verseManager)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
 
-                            Spacer()
-                        }
+                        Spacer()
                     }
                 }
             }
         }
-
-        .safeAreaInset(edge: .top) {
-            Color.clear
-                .frame(height: 0)
-                .background(.ultraThinMaterial) // 👈 blur effect
-        }
-
+        // 👇 THIS FIXES YOUR ISSUE
         .safeAreaInset(edge: .bottom) {
             if playerManager.currentlyPlayingSong != nil {
                 Color.clear.frame(height: bottomPlayerHeight)
             }
         }
     }
-
 
 
     // MARK: - No Internet View
@@ -293,7 +285,7 @@ struct ContentView: View {
                 types: [Song.self]
             )
 
-            request.limit = 50
+            request.limit = 70
 
             let fetchedSongs = (try await request.response())
                 .songCharts
@@ -318,7 +310,7 @@ struct ContentView: View {
                 types: [Album.self]
             )
 
-            request.limit = 50
+            request.limit = 70
 
             let response = try await request.response()
             let fetchedAlbums = response.albumCharts.flatMap { $0.items }

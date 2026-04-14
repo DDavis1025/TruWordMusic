@@ -56,7 +56,7 @@ struct SearchView: View {
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var keyboardObserver: KeyboardObserver
     @Binding var navigationPath: NavigationPath
-    @Binding var musicAuthorized: Bool   // 👈 ADDED
+    @Binding var musicAuthorized: Bool
     
     @State private var searchQuery: String = ""
     @State private var searchResults: [SearchResultItem] = []
@@ -199,14 +199,14 @@ struct SearchView: View {
                             }
                         }
                     }
-                    .navigationTitle("Search")
-                    .navigationBarTitleDisplayMode(.inline)
                     .searchable(text: $searchQuery, prompt: "Search Christian music")
                     .onSubmit(of: .search) {
                         Task { await performSearch() }
                     }
                 }
             }
+            .navigationTitle("Search")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Album.self) { album in
                 AlbumDetailView(
                     album: album,
