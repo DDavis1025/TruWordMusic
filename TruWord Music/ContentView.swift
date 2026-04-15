@@ -8,6 +8,7 @@
 import SwiftUI
 import MusicKit
 import AVFoundation
+import FirebaseAnalytics
 
 // MARK: - Models
 
@@ -54,6 +55,9 @@ struct ContentView: View {
             }
             .navigationTitle("Home")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                Analytics.logEvent("home_viewed", parameters: nil)
+            }
             .navigationDestination(for: String.self) { value in
                 if value == "fullAlbumGrid" {
                     FullAlbumGridView(
@@ -113,6 +117,9 @@ struct ContentView: View {
                 ScrollView {
                     VStack {
                         DailyVerseView(manager: verseManager)
+                            .onAppear {
+                                Analytics.logEvent("verse_viewed", parameters: nil)
+                            }
                         albumsSection
                         songsSection
                     }
@@ -185,6 +192,9 @@ struct ContentView: View {
 
                     if albums.count > 5 {
                         NavigationLink("View More", value: "fullAlbumGrid")
+                            .simultaneousGesture(TapGesture().onEnded {
+                                Analytics.logEvent("view_more_albums", parameters: nil)
+                            })
                             .foregroundColor(.blue)
                             .font(.system(size: 15))
                     }
@@ -197,6 +207,10 @@ struct ContentView: View {
                             AlbumCarouselItemView(album: album)
                                 .onTapGesture {
                                     navigationPath.append(album)
+                                    
+                                    Analytics.logEvent("album_opened", parameters: [
+                                            "album_name": album.title
+                                        ])
                                 }
                         }
                     }
@@ -230,6 +244,9 @@ struct ContentView: View {
                             playerManager: playerManager
                         )
                     }
+                    .simultaneousGesture(TapGesture().onEnded {
+                            Analytics.logEvent("view_more_songs", parameters: nil)
+                        })
                     .foregroundColor(.blue)
                     .font(.system(size: 15))
                 }
@@ -241,6 +258,11 @@ struct ContentView: View {
                     .onTapGesture {
                         playerManager.playSong(song, from: songs)
                         playerManager.isPlayingFromAlbum = false
+                        
+                        Analytics.logEvent("song_played", parameters: [
+                                "song_name": song.title,
+                                "artist": song.artistName
+                            ])
                     }
             }
         }

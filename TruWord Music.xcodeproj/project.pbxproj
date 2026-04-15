@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		511362802F9028CB00921890 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 5113627F2F9028CB00921890 /* FirebaseAnalytics */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		517A0B1D2D4D8824004F0A45 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				511362802F9028CB00921890 /* FirebaseAnalytics in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = "TruWord Music";
 			packageProductDependencies = (
+				5113627F2F9028CB00921890 /* FirebaseAnalytics */,
 			);
 			productName = "TruWord Music";
 			productReference = 517A0B0C2D4D8820004F0A45 /* TruWord Music.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = 517A0B032D4D8820004F0A45;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5113627E2F9028CB00921890 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 517A0B0D2D4D8820004F0A45 /* Products */;
 			projectDirPath = "";
@@ -570,6 +579,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5113627E2F9028CB00921890 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.12.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5113627F2F9028CB00921890 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5113627E2F9028CB00921890 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 517A0B042D4D8820004F0A45 /* Project object */;
 }

@@ -2,20 +2,13 @@
 //  TruWord_MusicApp.swift
 //  TruWord Music
 //
-//  Created by Dillon Davis on 1/31/25.
-//
-
-import SwiftUI
-
-//
-//  TruWord_MusicApp.swift
-//  TruWord Music
-//
 //  Created by Dillon Davis on 9/7/25.
 //
 
 import SwiftUI
 import MusicKit
+import FirebaseCore
+import FirebaseAnalytics
 
 @main
 struct TruWord_MusicApp: App {
@@ -26,6 +19,9 @@ struct TruWord_MusicApp: App {
     @StateObject private var favoritesManager = FavoritesManager()
 
     init() {
+        // ✅ Initialize Firebase FIRST
+        FirebaseApp.configure()
+        
         // Tab bar styling
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
