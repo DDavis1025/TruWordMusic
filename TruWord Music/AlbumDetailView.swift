@@ -1,28 +1,21 @@
-//
-//  AlbumDetailView.swift
-//  TruWord Music
-//
-//  Created by Dillon Davis on 9/7/25.
-//
-
 import SwiftUI
 import MusicKit
+import FirebaseAnalytics
 
 struct AlbumDetailView: View {
     @State var album: Album
     let playSong: (Song) -> Void
     @State private var tracks: [Song] = []
     @State private var isLoadingTracks: Bool = true
-    @Binding var isPlayingFromAlbum: Bool // Added binding
+    @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
     private let bottomPlayerHeight: CGFloat = 70
 
-    
     var body: some View {
-        VStack(spacing: 4) { // Controls vertical spacing
+        VStack(spacing: 4) {
             if let artworkURL = album.artwork?.url(width: 350, height: 350) {
                 let screenWidth = UIScreen.main.bounds.width
                 let albumSize = min(max(screenWidth * 0.5, 150), 300)
@@ -35,11 +28,11 @@ struct AlbumDetailView: View {
             
             Text(album.title)
                 .font(.headline)
-                .padding(.top, 2) // Slightly smaller than default padding
+                .padding(.top, 2)
             
             Text(album.artistName)
                 .font(.subheadline)
-                .foregroundColor(Color(white: 0.48)) // white: 0.0 = black, 1.0 = white
+                .foregroundColor(Color(white: 0.48))
             
             if let releaseDate = album.releaseDate {
                 Text(releaseDate.formatted(date: .abbreviated, time: .omitted))
@@ -51,27 +44,31 @@ struct AlbumDetailView: View {
             if isLoadingTracks {
                 ProgressView("Loading tracks...")
                     .padding()
+                    
             } else if tracks.isEmpty {
                 Text("No tracks available")
                     .padding()
+                    
             } else {
                 List {
                     ForEach(tracks, id: \.id) { song in
-                        let isPlayable = (song.releaseDate == nil || song.releaseDate! <= Date()) && song.playParameters != nil
+                        let isPlayable =
+                        (song.releaseDate == nil || song.releaseDate! <= Date()) &&
+                        song.playParameters != nil
                         
                         Button {
                             guard isPlayable && networkMonitor.isConnected else { return }
 
-                            // Build AlbumWithTracks for this album
+                            // 🔥 Track song selection
+                            Analytics.logEvent("album_song_selected", parameters: [
+                                "song_id": song.id.rawValue,
+                                "album_id": album.id.rawValue
+                            ])
+
                             let currentAlbumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
-                            
-                            // Update binding so playerManager knows the current album
                             albumWithTracks = currentAlbumWithTracks
                             
-                            // Play the tapped song
                             playSong(song)
-                            
-                            // Update UI state
                             isPlayingFromAlbum = true
                             
                         } label: {
@@ -80,6 +77,7 @@ struct AlbumDetailView: View {
                                     .font(.subheadline)
                                     .lineLimit(1)
                                     .foregroundColor(isPlayable && networkMonitor.isConnected ? .primary : Color(UIColor.lightGray))
+                                
                                 Text(song.artistName)
                                     .font(.caption)
                                     .lineLimit(1)
@@ -92,13 +90,23 @@ struct AlbumDetailView: View {
                 }
                 .safeAreaInset(edge: .bottom) {
                     if playerManager.currentlyPlayingSong != nil {
-                        Color.clear.frame(height: bottomPlayerHeight) // match BottomPlayerView height
+                        Color.clear.frame(height: bottomPlayerHeight)
                     }
                 }
             }
         }
         .navigationTitle("Album")
         .navigationBarTitleDisplayMode(.inline)
+        
+        // 🔥 Track album viewed
+        .onAppear {
+            Analytics.logEvent("album_viewed", parameters: [
+                "album_id": album.id.rawValue,
+                "album_title": album.title,
+                "artist_name": album.artistName
+            ])
+        }
+        
         .task {
             await fetchAlbumTracks(album: album)
             await setSelectedAlbum(album: album)
@@ -111,41 +119,40 @@ struct AlbumDetailView: View {
     
     func fetchAlbumTracks(album: Album) async {
         do {
-            // Ensure tracks are explicitly requested
             var albumRequest = MusicCatalogResourceRequest<Album>(matching: \.id, equalTo: album.id)
-            albumRequest.properties = [.tracks] // Request track details
+            albumRequest.properties = [.tracks]
             
             let albumResponse = try await albumRequest.response()
             
-            // Debug: Check if we received an album
             guard let fetchedAlbum = albumResponse.items.first else {
                 print("Error: Album not found.")
                 tracks = []
                 return
             }
             
-            // Debug: Check if the album contains tracks
             guard let albumTracks = fetchedAlbum.tracks, !albumTracks.isEmpty else {
                 print("Error: Album has no tracks.")
                 tracks = []
                 return
             }
             
-            // Extract track IDs
             let trackIDs = albumTracks.compactMap { $0.id }
             
-            // Debug: Check if track IDs are available
             guard !trackIDs.isEmpty else {
                 print("Error: No valid track IDs available.")
                 return
             }
             
-            // Fetch the actual song objects using track IDs
             let songsRequest = MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: trackIDs)
             let songResponse = try await songsRequest.response()
             
-            // Assign fetched songs to the tracks array
             tracks = Array(songResponse.items)
+            
+            // 🔥 Track tracks loaded
+            Analytics.logEvent("album_tracks_loaded", parameters: [
+                "album_id": album.id.rawValue,
+                "track_count": tracks.count
+            ])
             
         } catch {
             print("Error fetching album tracks: \(error)")

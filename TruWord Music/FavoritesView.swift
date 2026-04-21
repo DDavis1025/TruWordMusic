@@ -1,5 +1,6 @@
 import SwiftUI
 import MusicKit
+import FirebaseAnalytics
 
 struct FavoritesView: View {
     @EnvironmentObject var favoritesManager: FavoritesManager
@@ -10,7 +11,6 @@ struct FavoritesView: View {
     @Binding var navigationPath: NavigationPath
     @Binding var currentPlayingSong: Song?
     @Binding var isPlayingFromAlbum: Bool
-    
     @Binding var musicAuthorized: Bool
 
     @State private var searchQuery: String = ""
@@ -36,13 +36,15 @@ struct FavoritesView: View {
                 if !networkMonitor.isConnected {
                     noInternetView
 
-                // MARK: - Empty State
+                // MARK: - Authorization
                 } else if !musicAuthorized {
                     MusicAuthorizationView(
                         bottomPlayerHeight: bottomPlayerHeight,
                         hasPlayer: playerManager.currentlyPlayingSong != nil
                     )
                     .padding(.horizontal, 16)
+
+                // MARK: - Empty State
                 } else if favoritesManager.favoriteSongs.isEmpty {
                     emptyStateView
 
@@ -54,7 +56,23 @@ struct FavoritesView: View {
             .navigationTitle("Favorites")
             .navigationBarTitleDisplayMode(.inline)
 
-            // ONLY show search when online
+            // 🔥 Screen view tracking
+            .onAppear {
+                Analytics.logEvent("favorites_viewed", parameters: [
+                    "favorite_count": favoritesManager.favoriteSongs.count
+                ])
+            }
+
+            // 🔥 Search tracking
+            .onChange(of: searchQuery) { _, newValue in
+                if !newValue.isEmpty {
+                    Analytics.logEvent("favorites_searched", parameters: [
+                        "query": newValue
+                    ])
+                }
+            }
+
+
             .if(networkMonitor.isConnected && musicAuthorized) { view in
                 view.searchable(text: $searchQuery, prompt: "Search Favorites")
             }
@@ -103,6 +121,12 @@ struct FavoritesView: View {
                         Button {
                             withAnimation {
                                 favoritesManager.toggleFavorite(song)
+
+                                // 🔥 Favorite toggle tracking
+                                Analytics.logEvent("favorite_toggled_from_list", parameters: [
+                                    "song_id": song.id.rawValue,
+                                    "is_favorite": favoritesManager.isFavorite(song)
+                                ])
                             }
                         } label: {
                             Image(systemName: "star.fill")
@@ -114,6 +138,14 @@ struct FavoritesView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         UIApplication.shared.dismissKeyboard()
+
+                        // 🔥 Playback tracking
+                        Analytics.logEvent("favorite_song_played", parameters: [
+                            "song_id": song.id.rawValue,
+                            "title": song.title,
+                            "artist": song.artistName
+                        ])
+
                         playerManager.playSong(song, from: favoritesManager.favoriteSongs)
                         isPlayingFromAlbum = false
                     }

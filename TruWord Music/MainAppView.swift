@@ -20,7 +20,7 @@ struct MainAppView: View {
     @ObservedObject var playerManager: PlayerManager
     @ObservedObject var networkMonitor: NetworkMonitor
     @StateObject private var keyboardObserver = KeyboardObserver()
-
+    
     @State private var selectedSongForDetail: Song? = nil
     @State private var selectedTab: AppTab = .home
     @State private var homeNavigationPath = NavigationPath()
@@ -28,65 +28,57 @@ struct MainAppView: View {
     @State private var favoritesNavigationPath = NavigationPath()
     
     @State private var musicAuthorized = false
-
+    
     private let tabBarHeight: CGFloat = 49
-
+    
     var hasBottomTabBar: Bool {
         !(UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular)
     }
-
+    
     var body: some View {
         ZStack(alignment: .bottom) {
             // MARK: - Main TabView
             TabView(selection: $selectedTab) {
                 
-                NavigationStack {
-                    ContentView(
-                        playerManager: playerManager,
-                        networkMonitor: networkMonitor,
-                        musicAuthorized: $musicAuthorized,
-                        navigationPath: $homeNavigationPath
-                    )
-                }
+                ContentView(
+                    playerManager: playerManager,
+                    networkMonitor: networkMonitor,
+                    musicAuthorized: $musicAuthorized,
+                    navigationPath: $homeNavigationPath
+                )
                 .tabItem {
                     Label("Home", systemImage: "house.fill")
                 }
                 .tag(AppTab.home)
-
                 
-                NavigationStack {
-                    FavoritesView(
-                        networkMonitor: networkMonitor,
-                        playerManager: playerManager,
-                        navigationPath: $favoritesNavigationPath,
-                        currentPlayingSong: $playerManager.currentlyPlayingSong,
-                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                        musicAuthorized: $musicAuthorized
-                    )
-                }
+                FavoritesView(
+                    networkMonitor: networkMonitor,
+                    playerManager: playerManager,
+                    navigationPath: $favoritesNavigationPath,
+                    currentPlayingSong: $playerManager.currentlyPlayingSong,
+                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                    musicAuthorized: $musicAuthorized
+                )
                 .tabItem {
                     Label("Favorites", systemImage: "star.fill")
                 }
                 .tag(AppTab.favorites)
-
                 
-                NavigationStack {
-                    SearchView(
-                        playerManager: playerManager,
-                        networkMonitor: networkMonitor,
-                        keyboardObserver: keyboardObserver,
-                        navigationPath: $searchNavigationPath,
-                        musicAuthorized: $musicAuthorized
-                    )
-                }
+                SearchView(
+                    playerManager: playerManager,
+                    networkMonitor: networkMonitor,
+                    keyboardObserver: keyboardObserver,
+                    navigationPath: $searchNavigationPath,
+                    musicAuthorized: $musicAuthorized
+                )
                 .tabItem {
                     Label("Search", systemImage: "magnifyingglass")
                 }
                 .tag(AppTab.search)
             }
-
-
-
+            
+            
+            
             // MARK: - Bottom Player
             if let song = playerManager.currentlyPlayingSong,
                !keyboardObserver.isKeyboardVisible {
@@ -128,7 +120,7 @@ struct MainAppView: View {
                 )
             }
         }
-
+        
         .animation(.spring(), value: playerManager.currentlyPlayingSong)
         .animation(.spring(), value: keyboardObserver.isKeyboardVisible)
     }

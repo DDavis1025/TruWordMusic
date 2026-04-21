@@ -1,12 +1,6 @@
-//
-//  BottomPlayerView.swift
-//  TruWord Music
-//
-//  Created by Dillon Davis on 9/7/25.
-//
-
 import SwiftUI
 import MusicKit
+import FirebaseAnalytics
 
 struct BottomPlayerView: View {
     let song: Song
@@ -16,11 +10,12 @@ struct BottomPlayerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+
             HStack {
                 let screenWidth = UIScreen.main.bounds.width
-                let songArtworkSize = min(max(screenWidth * 0.10, 30), 60) // 10% of screen, min 30, max 60
+                let songArtworkSize = min(max(screenWidth * 0.10, 30), 60)
 
-                // Song Artwork
+                // Artwork
                 if let artworkURL = song.artwork?.url(width: 120, height: 120) {
                     CustomAsyncImage(url: artworkURL)
                         .frame(width: songArtworkSize, height: songArtworkSize)
@@ -28,7 +23,7 @@ struct BottomPlayerView: View {
                         .cornerRadius(8)
                 }
 
-                // Song Title & Artist
+                // Info
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title)
                         .font(.subheadline)
@@ -43,9 +38,15 @@ struct BottomPlayerView: View {
 
                 Spacer()
 
-                // Play/Pause Button or Loading Indicator
+                // MARK: - Play / Pause
                 if playerIsReady {
-                    Button(action: togglePlayPause) {
+                    Button(action: {
+                        togglePlayPause()
+                        Analytics.logEvent("bottom_player_toggle", parameters: [
+                            "song_id": song.id.rawValue,
+                            "action": isPlaying ? "pause" : "play"
+                        ])
+                    }) {
                         Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
                             .font(.system(size: 32))
                             .foregroundColor(.blue)
@@ -57,13 +58,20 @@ struct BottomPlayerView: View {
                         .frame(width: 32, height: 32)
                 }
             }
-            .padding(.horizontal, 8) // 👈 reduced padding for wider content
+            .padding(.horizontal, 8)
             .padding(.vertical, 8)
         }
         .frame(maxWidth: .infinity)
         .background(Color(UIColor.systemGray6))
         .cornerRadius(12)
         .shadow(radius: 2)
-        .padding(.horizontal, 7) // 👈 smaller outer inset to give more width
+        .padding(.horizontal, 7)
+
+        // 🔥 Track visibility
+        .onAppear {
+            Analytics.logEvent("bottom_player_shown", parameters: [
+                "song_id": song.id.rawValue
+            ])
+        }
     }
 }

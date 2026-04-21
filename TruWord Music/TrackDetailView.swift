@@ -1,12 +1,6 @@
-//
-//  TrackDetailView.swift
-//  TruWord Music
-//
-//  Created by Dillon Davis on 9/7/25.
-//
-
 import SwiftUI
 import MusicKit
+import FirebaseAnalytics
 
 struct TrackDetailView: View {
     @Binding var song: Song
@@ -104,7 +98,14 @@ struct TrackDetailView: View {
                         
                         ZStack {
                             if playerIsReady {
-                                Button(action: togglePlayPause) {
+                                Button(action: {
+                                    togglePlayPause()
+                                    
+                                    Analytics.logEvent("track_play_pause_tapped", parameters: [
+                                        "song_id": song.id.rawValue,
+                                        "is_playing": isPlaying
+                                    ])
+                                }) {
                                     Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
                                         .resizable()
                                         .scaledToFit()
@@ -128,6 +129,12 @@ struct TrackDetailView: View {
                     // View Album
                     if isPlayingFromAlbum {
                         Button(action: {
+                            
+                            Analytics.logEvent("view_album_tapped", parameters: [
+                                "song_id": song.id.rawValue,
+                                "album_id": albumWithTracks?.album.id.rawValue ?? ""
+                            ])
+                            
                             if let albumWithTracks,
                                albumWithTracks.tracks.contains(where: { $0.id == song.id }) {
                                 
@@ -139,16 +146,14 @@ struct TrackDetailView: View {
                                     
                                 case .favorites:
                                     if favoritesNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
-                                            favoritesNavigationPath.append(albumWithTracks.album)
-                                        }
-
+                                        favoritesNavigationPath.append(albumWithTracks.album)
+                                    }
+                                    
                                 case .search:
                                     if searchNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
                                         searchNavigationPath.append(albumWithTracks.album)
                                     }
-
                                 }
-
                             }
                             dismiss()
                         }) {
@@ -177,19 +182,30 @@ struct TrackDetailView: View {
                                 .padding(.top, 10)
                         }
                         .padding()
+                        .simultaneousGesture(TapGesture().onEnded {
+                            Analytics.logEvent("apple_music_link_tapped", parameters: [
+                                "song_id": song.id.rawValue
+                            ])
+                        })
                     }
                 }
+                
                 VStack {
                     HStack {
-                        
                         Spacer()
                         
                         HStack(spacing: 18) {
                             
-                            // ⭐️ Favorite Button
-                            if (networkMonitor.isConnected) {
+                            // Favorite Button
+                            if networkMonitor.isConnected {
                                 Button(action: {
                                     favoritesManager.toggleFavorite(song)
+                                    
+                                    Analytics.logEvent("favorite_toggled", parameters: [
+                                        "song_id": song.id.rawValue,
+                                        "is_favorite": favoritesManager.isFavorite(song)
+                                    ])
+                                    
                                 }) {
                                     Image(systemName: favoritesManager.isFavorite(song) ? "star.fill" : "star")
                                         .font(.system(size: 24))
@@ -199,7 +215,7 @@ struct TrackDetailView: View {
                                 }
                             }
                             
-                            // ❌ Close Button
+                            // Close Button
                             Button(action: {
                                 dismiss()
                             }) {
@@ -215,10 +231,19 @@ struct TrackDetailView: View {
                     
                     Spacer()
                 }
-
             }
             .padding(.horizontal)
             .frame(width: geometry.size.width, height: geometry.size.height)
+            
+            // 🔥 Track screen view
+            .onAppear {
+                Analytics.logEvent("track_detail_viewed", parameters: [
+                    "song_id": song.id.rawValue,
+                    "song_title": song.title,
+                    "artist_name": song.artistName
+                ])
+            }
+            
             .onChange(of: playerManager.currentlyPlayingSong) {
                 if playerManager.currentlyPlayingSong == nil {
                     dismiss()
@@ -228,6 +253,10 @@ struct TrackDetailView: View {
     }
     
     private func playNextSong() {
+        Analytics.logEvent("track_skipped_next", parameters: [
+            "song_id": song.id.rawValue
+        ])
+        
         guard networkMonitor.isConnected else { return }
         
         if appleMusicSubscription {
@@ -260,6 +289,10 @@ struct TrackDetailView: View {
     }
     
     private func playPreviousSong() {
+        Analytics.logEvent("track_skipped_previous", parameters: [
+            "song_id": song.id.rawValue
+        ])
+        
         guard networkMonitor.isConnected else { return }
         
         if appleMusicSubscription {

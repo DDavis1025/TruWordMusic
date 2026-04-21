@@ -8,6 +8,7 @@
 import SwiftUI
 import MusicKit
 import AVFoundation
+import FirebaseAnalytics
 
 @MainActor
 class PlayerManager: ObservableObject {
@@ -35,7 +36,7 @@ class PlayerManager: ObservableObject {
     
     // ✅ Track playback state across background/foreground
     private var wasPlayingBeforeBackground: Bool = false
-   
+    
     init(networkMonitor: NetworkMonitor) {
         self.networkMonitor = networkMonitor
     }
@@ -115,13 +116,30 @@ class PlayerManager: ObservableObject {
                 if state == .playing {
                     player.pause()
                     await MainActor.run { self.isPlaying = false }
+                    Analytics.logEvent("playback_paused", parameters: [
+                        
+                        "song_id": self.currentlyPlayingSong?.id.rawValue ?? ""
+                        
+                    ])
                 } else {
                     do {
                         try await player.play()
                         await MainActor.run { self.isPlaying = true }
+                        Analytics.logEvent("playback_started", parameters: [
+                            
+                            "song_id": self.currentlyPlayingSong?.id.rawValue ?? "",
+                            
+                            "source": self.isPlayingFromAlbum ? "album" : "list"
+                            
+                        ])
                     } catch {
                         print("Failed to play: \(error)")
                         await MainActor.run { self.isPlaying = false }
+                        Analytics.logEvent("playback_failed", parameters: [
+                            
+                            "song_id": self.currentlyPlayingSong?.id.rawValue ?? ""
+                            
+                        ])
                     }
                 }
             }
@@ -134,6 +152,13 @@ class PlayerManager: ObservableObject {
             } else {
                 audioPlayer.play()
                 isPlaying = true
+                Analytics.logEvent("playback_started", parameters: [
+                    
+                    "song_id": self.currentlyPlayingSong?.id.rawValue ?? "",
+                    
+                    "source": "preview"
+                    
+                ])
             }
         }
     }
@@ -142,7 +167,7 @@ class PlayerManager: ObservableObject {
         currentlyPlayingSong = nil
         clearApplicationMusicPlayer()
     }
-
+    
     
     func stopAndReplaceAVPlayer() {
         let player = ApplicationMusicPlayer.shared
@@ -152,7 +177,7 @@ class PlayerManager: ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         
         previewDidEnd = false
-       
+        
         if let currentSong = currentlyPlayingSong {
             if player.state.playbackStatus == .stopped || player.queue.entries.isEmpty {
                 // ✅ Use last known context instead of empty
@@ -236,7 +261,7 @@ class PlayerManager: ObservableObject {
             startPlayback()
             return
         }
-       
+        
         let queue = ApplicationMusicPlayer.Queue(for: queueSongs, startingAt: queueSongs[startIndex])
         player.queue = queue
         
@@ -427,7 +452,7 @@ class PlayerManager: ObservableObject {
             await MainActor.run { self.playerIsReady = true } // failsafe
         }
     }
-
+    
     
     private func clearApplicationMusicPlayer() {
         if !appleMusicSubscription {

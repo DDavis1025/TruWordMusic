@@ -117,9 +117,6 @@ struct ContentView: View {
                 ScrollView {
                     VStack {
                         DailyVerseView(manager: verseManager)
-                            .onAppear {
-                                Analytics.logEvent("verse_viewed", parameters: nil)
-                            }
                         albumsSection
                         songsSection
                     }
@@ -208,7 +205,7 @@ struct ContentView: View {
                                 .onTapGesture {
                                     navigationPath.append(album)
                                     
-                                    Analytics.logEvent("album_opened", parameters: [
+                                    Analytics.logEvent("album_opened_from_carousel", parameters: [
                                             "album_name": album.title
                                         ])
                                 }
@@ -259,7 +256,7 @@ struct ContentView: View {
                         playerManager.playSong(song, from: songs)
                         playerManager.isPlayingFromAlbum = false
                         
-                        Analytics.logEvent("song_played", parameters: [
+                        Analytics.logEvent("song_played_from_home", parameters: [
                                 "song_name": song.title,
                                 "artist": song.artistName
                             ])

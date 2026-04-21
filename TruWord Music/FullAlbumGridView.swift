@@ -1,12 +1,6 @@
-//
-//  FullAlbumGridView.swift
-//  TruWord Music
-//
-//  Created by Dillon Davis on 9/7/25.
-//
-
 import SwiftUI
 import MusicKit
+import FirebaseAnalytics
 
 struct FullAlbumGridView: View {
     let albums: [Album]
@@ -31,44 +25,54 @@ struct FullAlbumGridView: View {
     
     var body: some View {
         let screenWidth = UIScreen.main.bounds.width
-        let albumSize = max(min(screenWidth * 0.4, 255), 150) // Dynamic size: min 150px, max 255px
-        
+        let albumSize = max(min(screenWidth * 0.4, 255), 150)
+
         let columns = [
             GridItem(.adaptive(minimum: albumSize), spacing: 20)
         ]
         
         VStack(alignment: .leading, spacing: 10) {
+            
+            // MARK: - NO INTERNET
             if !networkMonitor.isConnected {
-                // No internet connection view
                 VStack(spacing: 8) {
                     Spacer()
+                    
                     Text("No Internet connection")
                         .font(.headline)
                         .foregroundColor(.black)
                         .multilineTextAlignment(.center)
+                    
                     Text("Your device is not connected to the internet")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
+                    
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
                 .safeAreaInset(edge: .bottom) {
-                        if playerManager.currentlyPlayingSong != nil {
-                            Color.clear.frame(height: bottomPlayerHeight) // leave space for BottomPlayerView
-                        }
+                    if playerManager.currentlyPlayingSong != nil {
+                        Color.clear.frame(height: bottomPlayerHeight)
                     }
-            } else if filteredAlbums.isEmpty {
+                }
+            }
+            
+            // MARK: - EMPTY STATE
+            else if filteredAlbums.isEmpty {
                 Spacer()
                 Text("No albums found")
                     .font(.subheadline)
                     .foregroundColor(.gray)
                     .frame(maxWidth: .infinity, alignment: .center)
                 Spacer()
-            } else {
+            }
+            
+            // MARK: - CONTENT
+            else {
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 30) { // Increased spacing
+                    LazyVGrid(columns: columns, spacing: 30) {
                         ForEach(filteredAlbums, id: \.id) { album in
                             VStack {
                                 if let artworkURL = album.artwork?.url(width: 280, height: 280) {
@@ -77,10 +81,12 @@ struct FullAlbumGridView: View {
                                         .clipped()
                                         .cornerRadius(12)
                                 }
+                                
                                 Text(album.title)
                                     .font(.caption)
                                     .lineLimit(1)
                                     .frame(width: albumSize - 20)
+                                
                                 Text(album.artistName)
                                     .font(.caption2)
                                     .foregroundColor(Color(white: 0.48))
@@ -88,6 +94,13 @@ struct FullAlbumGridView: View {
                                     .frame(width: albumSize - 20)
                             }
                             .onTapGesture {
+                                // 🔥 Track album selection
+                                Analytics.logEvent("album_selected_from_grid", parameters: [
+                                    "album_id": album.id.rawValue,
+                                    "album_title": album.title,
+                                    "artist_name": album.artistName
+                                ])
+                                
                                 onAlbumSelected(album)
                             }
                         }
@@ -103,9 +116,25 @@ struct FullAlbumGridView: View {
         }
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
+        
+        // 🔥 Track grid view
+        .onAppear {
+            Analytics.logEvent("album_grid_viewed", parameters: [
+                "album_count": filteredAlbums.count
+            ])
+        }
+        
+        // 🔥 Track search behavior
+        .onChange(of: searchQuery) { _, newValue in
+            guard !newValue.isEmpty else { return }
+
+            Analytics.logEvent("album_grid_searched", parameters: [
+                "query": newValue
+            ])
+        }
+        
         .if(networkMonitor.isConnected) { view in
             view.searchable(text: $searchQuery)
         }
     }
 }
-

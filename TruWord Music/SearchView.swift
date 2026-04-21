@@ -1,12 +1,6 @@
-//
-//  SearchView.swift
-//  TruWordMusic
-//
-//  Created by Dillon Davis on 2025-09-07.
-//
-
 import SwiftUI
 import MusicKit
+import FirebaseAnalytics
 
 // MARK: - Unified Result Model
 enum SearchResultItem: Identifiable {
@@ -62,7 +56,6 @@ struct SearchView: View {
     @State private var searchResults: [SearchResultItem] = []
     @State private var isSearching: Bool = false
     @State private var selectedTab: SearchTab = .all
-    @State private var scrollOffsets: [SearchTab: CGFloat] = [:]
     
     @Namespace private var tabNamespace
     private let bottomPlayerHeight: CGFloat = 70
@@ -89,6 +82,12 @@ struct SearchView: View {
                                     withAnimation(.spring()) {
                                         selectedTab = tab
                                     }
+                                    
+                                    // 🔥 Track tab change
+                                    Analytics.logEvent("search_tab_changed", parameters: [
+                                        "tab": tab.rawValue
+                                    ])
+                                    
                                 } label: {
                                     Text(tab.rawValue)
                                         .font(.subheadline)
@@ -155,7 +154,6 @@ struct SearchView: View {
                                             )
                                             .id(item.id)
                                             .onTapGesture {
-                                                // Dismiss keyboard
                                                 UIApplication.shared.sendAction(
                                                     #selector(UIResponder.resignFirstResponder),
                                                     to: nil,
@@ -165,6 +163,14 @@ struct SearchView: View {
                                                 
                                                 switch item {
                                                 case .song(let song):
+                                                    
+                                                    Analytics.logEvent("search_result_song_tapped", parameters: [
+                                                        "song_id": song.id.rawValue,
+                                                        "title": song.title,
+                                                        "artist": song.artistName,
+                                                        "query": searchQuery
+                                                    ])
+                                                    
                                                     let songsFromSearch = filteredResults.compactMap { r -> Song? in
                                                         if case .song(let s) = r { return s }
                                                         return nil
@@ -174,6 +180,14 @@ struct SearchView: View {
                                                     playerManager.isPlayingFromAlbum = false
                                                     
                                                 case .album(let album):
+                                                    
+                                                    Analytics.logEvent("search_result_album_tapped", parameters: [
+                                                        "album_id": album.id.rawValue,
+                                                        "title": album.title,
+                                                        "artist": album.artistName,
+                                                        "query": searchQuery
+                                                    ])
+                                                    
                                                     DispatchQueue.main.async {
                                                         navigationPath.append(album)
                                                     }
@@ -207,6 +221,12 @@ struct SearchView: View {
             }
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.inline)
+            
+            // 🔥 Track screen view
+            .onAppear {
+                Analytics.logEvent("search_viewed", parameters: nil)
+            }
+            
             .navigationDestination(for: Album.self) { album in
                 AlbumDetailView(
                     album: album,
@@ -261,22 +281,12 @@ struct SearchView: View {
             
             Text("No Internet connection")
                 .font(.headline)
-                .foregroundColor(.black)
-                .multilineTextAlignment(.center)
             
             Text("Your device is not connected to the internet")
                 .font(.subheadline)
                 .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
             
             Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
-        .safeAreaInset(edge: .bottom) {
-            if playerManager.currentlyPlayingSong != nil {
-                Color.clear.frame(height: bottomPlayerHeight)
-            }
         }
     }
     
@@ -317,13 +327,25 @@ struct SearchView: View {
             
             searchResults = results
             
+            // 🔥 Track search event
+            Analytics.logEvent("search_performed", parameters: [
+                "query": searchQuery,
+                "result_count": results.count
+            ])
+            
+            // 🔥 Track no results
+            if results.isEmpty {
+                Analytics.logEvent("search_no_results", parameters: [
+                    "query": searchQuery
+                ])
+            }
+            
         } catch {
             print("Error searching MusicKit: \(error)")
             searchResults = []
         }
     }
 }
-
 
 // MARK: - Row View (Shared by Songs & Albums)
 struct SongRowLikeView: View {
@@ -345,6 +367,7 @@ struct SongRowLikeView: View {
                     .font(.subheadline)
                     .lineLimit(1)
                     .truncationMode(.tail)
+
                 Text(artistName)
                     .font(.caption)
                     .foregroundColor(.gray)
@@ -356,21 +379,8 @@ struct SongRowLikeView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading) // Key: prevents row from expanding beyond screen
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.systemBackground))
     }
 }
 
-
-// MARK: - PreferenceKey for Scroll Offset
-    struct ScrollOffsetKey: PreferenceKey {
-        static var defaultValue: CGFloat = 0
-        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-    }
-
-extension View {
-    func hideKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
-                                        to: nil, from: nil, for: nil)
-    }
-}

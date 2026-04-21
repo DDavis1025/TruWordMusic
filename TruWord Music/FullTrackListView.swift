@@ -1,12 +1,6 @@
-//
-//  FullTrackListView.swift
-//  TruWord Music
-//
-//  Created by Dillon Davis on 9/7/25.
-//
-
 import SwiftUI
 import MusicKit
+import FirebaseAnalytics
 
 struct FullTrackListView: View {
     let songs: [Song]
@@ -17,11 +11,10 @@ struct FullTrackListView: View {
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
-    @State private var searchQuery: String = "" // State for search query
-    
+    @State private var searchQuery: String = ""
+
     private let bottomPlayerHeight: CGFloat = 70
-    
-    // Filtered songs based on search query (title or artist name)
+
     var filteredSongs: [Song] {
         if searchQuery.isEmpty {
             return songs
@@ -32,38 +25,50 @@ struct FullTrackListView: View {
             }
         }
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+
+            // MARK: - NO INTERNET
             if !networkMonitor.isConnected {
-                // No internet connection view
                 VStack(spacing: 8) {
                     Spacer()
+
                     Text("No Internet connection")
                         .font(.headline)
                         .foregroundColor(.black)
                         .multilineTextAlignment(.center)
+
                     Text("Your device is not connected to the internet")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
+
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
                 .safeAreaInset(edge: .bottom) {
-                        if playerManager.currentlyPlayingSong != nil {
-                            Color.clear.frame(height: bottomPlayerHeight) // leave space for BottomPlayerView
-                        }
+                    if playerManager.currentlyPlayingSong != nil {
+                        Color.clear.frame(height: bottomPlayerHeight)
                     }
-            } else if filteredSongs.isEmpty {
+                }
+            }
+
+            // MARK: - EMPTY STATE
+            else if filteredSongs.isEmpty {
                 Spacer()
+
                 Text("No tracks found")
                     .font(.subheadline)
                     .foregroundColor(.gray)
                     .frame(maxWidth: .infinity, alignment: .center)
+
                 Spacer()
-            } else {
+            }
+
+            // MARK: - CONTENT
+            else {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(filteredSongs, id: \.id) { song in
@@ -75,6 +80,14 @@ struct FullTrackListView: View {
                             )
                             .onTapGesture {
                                 UIApplication.shared.dismissKeyboard()
+
+                                // 🔥 Track song selection
+                                Analytics.logEvent("track_selected_from_list", parameters: [
+                                    "song_id": song.id.rawValue,
+                                    "song_title": song.title,
+                                    "artist_name": song.artistName
+                                ])
+
                                 playSong(song)
                                 isPlayingFromAlbum = false
                             }
@@ -90,9 +103,26 @@ struct FullTrackListView: View {
                 }
             }
         }
-        .frame(maxHeight: .infinity, alignment: .top) // Ensures the content stays at the top
+        .frame(maxHeight: .infinity, alignment: .top)
         .navigationTitle("Top Songs")
         .navigationBarTitleDisplayMode(.inline)
+
+        // 🔥 Track view appearance
+        .onAppear {
+            Analytics.logEvent("track_list_viewed", parameters: [
+                "track_count": filteredSongs.count
+            ])
+        }
+
+        // 🔥 Track search behavior
+        .onChange(of: searchQuery) { _, newValue in
+            guard !newValue.isEmpty else { return }
+
+            Analytics.logEvent("track_list_searched", parameters: [
+                "query": newValue
+            ])
+        }
+
         .if(networkMonitor.isConnected) { view in
             view.searchable(text: $searchQuery)
         }
