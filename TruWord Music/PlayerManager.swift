@@ -102,7 +102,7 @@ class PlayerManager: ObservableObject {
                     playFromAlbum: playFromAlbum
                 )
             } else {
-                playWithPreview(song, networkMonitor: networkMonitor)
+                playWithPreview(song, songs: validSongs, networkMonitor: networkMonitor)
             }
         }
     }
@@ -289,7 +289,11 @@ class PlayerManager: ObservableObject {
         }
     }
     
-    func playWithPreview(_ song: Song, networkMonitor: NetworkMonitor?) {
+    func playWithPreview(
+        _ song: Song,
+        songs: [Song],
+        networkMonitor: NetworkMonitor?
+    ) {
         guard let previewURL = song.previewAssets?.first?.url else {
             print("No preview available for song: \(song.title)")
             clearApplicationMusicPlayer()
@@ -298,6 +302,10 @@ class PlayerManager: ObservableObject {
         
         previewDidEnd = false
         audioPlayer?.pause()
+        
+        self.lastPlayedSongs = songs
+        self.lastPlayFromAlbum = false
+        self.lastAlbumWithTracks = nil
         
         if let currentItem = audioPlayer?.currentItem {
             NotificationCenter.default.removeObserver(
@@ -351,24 +359,50 @@ class PlayerManager: ObservableObject {
             player.seek(to: .zero)
             return
         }
+        
         guard let currentSong = currentlyPlayingSong else { return }
+        
         previewDidEnd = true
         
-        var nextSong: Song?
-        if isPlayingFromAlbum, let albumWithTracks, albumWithTracks.tracks.contains(currentSong) {
-            if let currentIndex = albumWithTracks.tracks.firstIndex(of: currentSong) {
-                let remainingTracks = albumWithTracks.tracks[(currentIndex + 1)...]
-                nextSong = remainingTracks.first(where: { $0.releaseDate.map { $0 <= Date() } ?? false })
+        // ✅ Determine correct list (album OR last played list like favorites)
+        let currentList: [Song] = {
+            if isPlayingFromAlbum,
+               let albumWithTracks,
+               albumWithTracks.tracks.contains(currentSong) {
+                return albumWithTracks.tracks
+            } else {
+                return lastPlayedSongs
+            }
+        }()
+        
+        // ✅ Find next playable song
+        var nextSong: Song? = nil
+        
+        if let currentIndex = currentList.firstIndex(of: currentSong),
+           currentIndex < currentList.count - 1 {
+            
+            let remainingSongs = currentList[(currentIndex + 1)...]
+            
+            nextSong = remainingSongs.first {
+                ($0.releaseDate == nil || $0.releaseDate! <= Date())
+                && $0.playParameters != nil
             }
         }
         
+        // ✅ Play next or stop
         if let nextSongToPlay = nextSong {
-            playSong(nextSongToPlay, from: albumWithTracks?.tracks ?? [])
+            playSong(
+                nextSongToPlay,
+                from: currentList,
+                albumWithTracks: isPlayingFromAlbum ? albumWithTracks : nil,
+                playFromAlbum: isPlayingFromAlbum
+            )
         } else {
             isPlaying = false
             player.seek(to: .zero)
         }
     }
+
     
     @MainActor
     private func ensurePlayerIsReadyAndPlays(

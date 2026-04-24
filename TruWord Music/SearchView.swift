@@ -189,7 +189,7 @@ struct SearchView: View {
                                                     ])
                                                     
                                                     DispatchQueue.main.async {
-                                                        navigationPath.append(album)
+                                                        navigationPath.append(Route.album(album))
                                                     }
                                                 }
                                             }
@@ -227,29 +227,36 @@ struct SearchView: View {
                 Analytics.logEvent("search_viewed", parameters: nil)
             }
             
-            .navigationDestination(for: Album.self) { album in
-                AlbumDetailView(
-                    album: album,
-                    playSong: { song in
-                        let songsFromResults = searchResults.compactMap { item -> Song? in
-                            if case .song(let s) = item { return s }
-                            return nil
-                        }
-                        
-                        playerManager.playSong(
-                            song,
-                            from: songsFromResults,
-                            albumWithTracks: playerManager.albumWithTracks,
-                            playFromAlbum: true,
-                            networkMonitor: networkMonitor
-                        )
-                    },
-                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                    albumWithTracks: $playerManager.albumWithTracks,
-                    networkMonitor: networkMonitor,
-                    playerManager: playerManager
-                )
-                .id(album.id)
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+
+                case .album(let album):
+                    AlbumDetailView(
+                        album: album,
+                        playSong: { song in
+                            let songsFromResults = searchResults.compactMap { item -> Song? in
+                                if case .song(let s) = item { return s }
+                                return nil
+                            }
+
+                            playerManager.playSong(
+                                song,
+                                from: songsFromResults,
+                                albumWithTracks: playerManager.albumWithTracks,
+                                playFromAlbum: true,
+                                networkMonitor: networkMonitor
+                            )
+                        },
+                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                        albumWithTracks: $playerManager.albumWithTracks,
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
+                    )
+                    .id(album.id)
+
+                case .fullAlbumGrid:
+                    EmptyView() // not used here
+                }
             }
         }
     }

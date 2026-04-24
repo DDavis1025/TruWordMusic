@@ -41,9 +41,12 @@ struct TrackDetailView: View {
                     
                     // Album Artwork
                     ZStack(alignment: .topLeading) {
+                        let displaySize = geometry.size.width * 0.85
+                        let scale = UIScreen.main.scale
+
                         if let artworkURL = song.artwork?.url(
-                            width: Int(geometry.size.width * 1.3),
-                            height: Int(geometry.size.width * 1.3)
+                            width: Int(displaySize * scale * 2),
+                            height: Int(displaySize * scale * 2)
                         ) {
                             CustomAsyncImage(url: artworkURL)
                                 .frame(width: geometry.size.width * 0.85,
@@ -140,22 +143,16 @@ struct TrackDetailView: View {
                                 
                                 switch activeTab {
                                 case .home:
-                                    if homeNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
-                                        homeNavigationPath.append(albumWithTracks.album)
-                                    }
-                                    
+                                    homeNavigationPath.append(Route.album(albumWithTracks.album))
+
                                 case .favorites:
-                                    if favoritesNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
-                                        favoritesNavigationPath.append(albumWithTracks.album)
-                                    }
-                                    
+                                    favoritesNavigationPath.append(Route.album(albumWithTracks.album))
+
                                 case .search:
-                                    if searchNavigationPath.isEmpty || selectedAlbum?.id != albumWithTracks.album.id {
-                                        searchNavigationPath.append(albumWithTracks.album)
-                                    }
+                                    searchNavigationPath.append(Route.album(albumWithTracks.album))
                                 }
+                                dismiss()
                             }
-                            dismiss()
                         }) {
                             if networkMonitor.isConnected {
                                 Text("View Album")
@@ -271,8 +268,8 @@ struct TrackDetailView: View {
         animateArtist = false
         
         let currentList = (isPlayingFromAlbum && albumWithTracks != nil)
-        ? albumWithTracks!.tracks
-        : songs
+            ? albumWithTracks!.tracks
+            : playerManager.lastPlayedSongs
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
         
@@ -308,7 +305,7 @@ struct TrackDetailView: View {
         
         let currentList = (isPlayingFromAlbum && albumWithTracks != nil)
         ? albumWithTracks!.tracks
-        : songs
+        : playerManager.lastPlayedSongs
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
         

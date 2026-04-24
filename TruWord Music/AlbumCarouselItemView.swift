@@ -13,9 +13,9 @@ struct AlbumCarouselItemView: View {
     
     var body: some View {
         let screenWidth = UIScreen.main.bounds.width
-        let albumSize = max(min(screenWidth * 0.4, 255), 150) // Dynamic size: min 150px, max 255px
+        let albumSize = max(min(screenWidth * 0.4, 255), 150)
         
-        VStack {
+        VStack(spacing: 4) {
             if let artworkURL = album.artwork?.url(width: 280, height: 280) {
                 
                 CustomAsyncImage(url: artworkURL)
@@ -24,13 +24,19 @@ struct AlbumCarouselItemView: View {
                     .cornerRadius(12)
             }
             
+            // Album Title
             Text(album.title)
                 .font(.caption)
                 .lineLimit(1)
-                .frame(maxWidth: 150) // Prevent text from stretching too wide
+                .frame(maxWidth: 150)
+            
+            // ✅ Artist Name
+            Text(album.artistName)
+                .font(.caption2)
+                .foregroundColor(Color(white: 0.48))
+                .lineLimit(1)
+                .frame(maxWidth: 150)
         }
-        .frame(maxWidth: albumSize) // Ensure VStack wraps around the image properly
+        .frame(maxWidth: albumSize)
     }
 }
-
-

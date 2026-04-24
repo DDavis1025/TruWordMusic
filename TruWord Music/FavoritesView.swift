@@ -77,29 +77,43 @@ struct FavoritesView: View {
                 view.searchable(text: $searchQuery, prompt: "Search Favorites")
             }
 
-            .navigationDestination(for: Album.self) { album in
-                AlbumDetailView(
-                    album: album,
-                    playSong: { song in
-                        let songsFromFavorites = favoritesManager.favoriteSongs
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .album(let album):
+                    AlbumDetailView(
+                        album: album,
+                        playSong: { song in
+                            let songsFromFavorites = favoritesManager.favoriteSongs
 
-                        playerManager.playSong(
-                            song,
-                            from: songsFromFavorites,
-                            albumWithTracks: playerManager.albumWithTracks,
-                            playFromAlbum: true,
-                            networkMonitor: networkMonitor
-                        )
-                    },
-                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                    albumWithTracks: $playerManager.albumWithTracks,
-                    networkMonitor: networkMonitor,
-                    playerManager: playerManager
-                )
+                            playerManager.playSong(
+                                song,
+                                from: songsFromFavorites,
+                                albumWithTracks: playerManager.albumWithTracks,
+                                playFromAlbum: true,
+                                networkMonitor: networkMonitor
+                            )
+                        },
+                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                        albumWithTracks: $playerManager.albumWithTracks,
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
+                    )
+                    .id(album.id)
+
+                case .fullAlbumGrid:
+                    EmptyView() // Not used in Favorites, but required
+                }
             }
+
         }
         .task {
             await favoritesManager.fetchFavoriteSongs()
+        }
+        .onChange(of: favoritesManager.favoriteSongs) { _, newFavorites in
+            // Only update if we're NOT playing from album
+            if !playerManager.isPlayingFromAlbum {
+                playerManager.lastPlayedSongs = newFavorites
+            }
         }
     }
 

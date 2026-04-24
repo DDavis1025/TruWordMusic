@@ -15,32 +15,7 @@ struct AlbumDetailView: View {
     private let bottomPlayerHeight: CGFloat = 70
 
     var body: some View {
-        VStack(spacing: 4) {
-            if let artworkURL = album.artwork?.url(width: 350, height: 350) {
-                let screenWidth = UIScreen.main.bounds.width
-                let albumSize = min(max(screenWidth * 0.5, 150), 300)
-                
-                CustomAsyncImage(url: artworkURL)
-                    .frame(width: albumSize, height: albumSize)
-                    .clipped()
-                    .cornerRadius(12)
-            }
-            
-            Text(album.title)
-                .font(.headline)
-                .padding(.top, 2)
-            
-            Text(album.artistName)
-                .font(.subheadline)
-                .foregroundColor(Color(white: 0.48))
-            
-            if let releaseDate = album.releaseDate {
-                Text(releaseDate.formatted(date: .abbreviated, time: .omitted))
-                    .font(.footnote)
-                    .foregroundColor(Color(white: 0.48))
-                    .padding(.bottom, 2)
-            }
-            
+        Group {
             if isLoadingTracks {
                 ProgressView("Loading tracks...")
                     .padding()
@@ -51,43 +26,114 @@ struct AlbumDetailView: View {
                     
             } else {
                 List {
-                    ForEach(tracks, id: \.id) { song in
-                        let isPlayable =
-                        (song.releaseDate == nil || song.releaseDate! <= Date()) &&
-                        song.playParameters != nil
-                        
-                        Button {
-                            guard isPlayable && networkMonitor.isConnected else { return }
-
-                            // 🔥 Track song selection
-                            Analytics.logEvent("album_song_selected", parameters: [
-                                "song_id": song.id.rawValue,
-                                "album_id": album.id.rawValue
-                            ])
-
-                            let currentAlbumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
-                            albumWithTracks = currentAlbumWithTracks
+                    
+                    // MARK: - HEADER
+                    Section {
+                        VStack(spacing: 6) {
                             
-                            playSong(song)
-                            isPlayingFromAlbum = true
-                            
-                        } label: {
-                            VStack(alignment: .leading) {
-                                Text(song.title)
-                                    .font(.subheadline)
-                                    .lineLimit(1)
-                                    .foregroundColor(isPlayable && networkMonitor.isConnected ? .primary : Color(UIColor.lightGray))
+                            if let artworkURL = album.artwork?.url(width: 1400, height: 1400) {
+                                let screenWidth = UIScreen.main.bounds.width
+                                let albumSize = min(max(screenWidth * 0.5, 150), 300)
                                 
-                                Text(song.artistName)
-                                    .font(.caption)
-                                    .lineLimit(1)
-                                    .foregroundColor(isPlayable && networkMonitor.isConnected ? Color(white: 0.48) : Color(UIColor.lightGray))
+                                CustomAsyncImage(url: artworkURL)
+                                    .frame(width: albumSize, height: albumSize)
+                                    .clipped()
+                                    .cornerRadius(12)
                             }
-                            .padding(.vertical, 4)
+                            
+                            Text(album.title)
+                                .font(.headline)
+                                .multilineTextAlignment(.center)
+                                .padding(.top, 4)
+                            
+                            Text(album.artistName)
+                                .font(.subheadline)
+                                .foregroundColor(Color(white: 0.48))
+                            
                         }
-                        .disabled(!isPlayable || !networkMonitor.isConnected)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 8)
+                        .padding(.bottom, 15)
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                    }
+                    
+                    // MARK: - TRACK LIST
+                    Section {
+                        ForEach(tracks, id: \.id) { song in
+                            
+                            let isPlayable =
+                            (song.releaseDate == nil || song.releaseDate! <= Date()) &&
+                            song.playParameters != nil
+                            
+                            Button {
+                                guard isPlayable && networkMonitor.isConnected else { return }
+
+                                Analytics.logEvent("album_song_selected", parameters: [
+                                    "song_id": song.id.rawValue,
+                                    "album_id": album.id.rawValue
+                                ])
+
+                                let currentAlbumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
+                                albumWithTracks = currentAlbumWithTracks
+                                
+                                playSong(song)
+                                isPlayingFromAlbum = true
+                                
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    
+                                    Text(song.title)
+                                        .font(.subheadline)
+                                        .lineLimit(1)
+                                        .foregroundColor(
+                                            isPlayable && networkMonitor.isConnected
+                                            ? .primary
+                                            : Color(UIColor.lightGray)
+                                        )
+                                    
+                                    Text(song.artistName)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                        .foregroundColor(
+                                            isPlayable && networkMonitor.isConnected
+                                            ? Color(white: 0.48)
+                                            : Color(UIColor.lightGray)
+                                        )
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            .disabled(!isPlayable || !networkMonitor.isConnected)
+                        }
+                    }
+                    .listSectionSeparator(.visible, edges: .top)
+                    
+                    // MARK: - FOOTER (BOTTOM INFO)
+                    Section {
+                        VStack(alignment: .leading, spacing: 6) {
+                            
+                            if let releaseDate = album.releaseDate {
+                                Text("\(releaseDate.formatted(date: .abbreviated, time: .omitted))")
+                                    .font(.footnote)
+                                    .foregroundColor(Color(white: 0.48))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            
+                            if let album_copyright = album.copyright {
+                                Text(album_copyright)
+                                    .font(.footnote)
+                                    .foregroundColor(Color(white: 0.48))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.top, album.releaseDate == nil ? 2 : 0)
+                            }
+                        }
+                        .padding(.vertical, 10)
+                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 30, trailing: 16))
+                        .listRowSeparator(.hidden)
                     }
                 }
+                .listStyle(.plain)
                 .safeAreaInset(edge: .bottom) {
                     if playerManager.currentlyPlayingSong != nil {
                         Color.clear.frame(height: bottomPlayerHeight)
@@ -98,7 +144,7 @@ struct AlbumDetailView: View {
         .navigationTitle("Album")
         .navigationBarTitleDisplayMode(.inline)
         
-        // 🔥 Track album viewed
+        // MARK: - Analytics
         .onAppear {
             Analytics.logEvent("album_viewed", parameters: [
                 "album_id": album.id.rawValue,
@@ -113,6 +159,8 @@ struct AlbumDetailView: View {
         }
     }
     
+    // MARK: - Helpers
+    
     func setSelectedAlbum(album: Album) async {
         playerManager.selectedAlbum = album
     }
@@ -125,30 +173,22 @@ struct AlbumDetailView: View {
             let albumResponse = try await albumRequest.response()
             
             guard let fetchedAlbum = albumResponse.items.first else {
-                print("Error: Album not found.")
                 tracks = []
                 return
             }
             
             guard let albumTracks = fetchedAlbum.tracks, !albumTracks.isEmpty else {
-                print("Error: Album has no tracks.")
                 tracks = []
                 return
             }
             
             let trackIDs = albumTracks.compactMap { $0.id }
             
-            guard !trackIDs.isEmpty else {
-                print("Error: No valid track IDs available.")
-                return
-            }
-            
             let songsRequest = MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: trackIDs)
             let songResponse = try await songsRequest.response()
             
             tracks = Array(songResponse.items)
             
-            // 🔥 Track tracks loaded
             Analytics.logEvent("album_tracks_loaded", parameters: [
                 "album_id": album.id.rawValue,
                 "track_count": tracks.count

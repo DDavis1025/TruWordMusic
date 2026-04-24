@@ -33,6 +33,9 @@ class FavoritesManager: ObservableObject {
         if let index = favoriteOrder.firstIndex(of: id) {
             favoriteOrder.remove(at: index)
             favoriteIDs.remove(id)
+            
+            // ✅ Remove instantly from UI list
+            favoriteSongs.removeAll { $0.id.rawValue == id }
         } else {
             favoriteOrder.append(id)
             favoriteIDs.insert(id)

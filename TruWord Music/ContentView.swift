@@ -1,10 +1,3 @@
-//
-//  ContentView.swift
-//  TruWord Music
-//
-//  Created by Dillon Davis on 1/31/25.
-//
-
 import SwiftUI
 import MusicKit
 import AVFoundation
@@ -15,6 +8,13 @@ import FirebaseAnalytics
 struct AlbumWithTracks {
     var album: Album
     var tracks: [Song]
+}
+
+// MARK: - Route
+
+enum Route: Hashable {
+    case fullAlbumGrid
+    case album(Album)
 }
 
 // MARK: - ContentView
@@ -33,6 +33,7 @@ struct ContentView: View {
     @State private var songs: [Song] = []
     @State private var albums: [Album] = []
 
+    // 🔥 Navigation Path (typed)
     @Binding var navigationPath: NavigationPath
 
     @Environment(\.scenePhase) private var scenePhase
@@ -55,38 +56,46 @@ struct ContentView: View {
             }
             .navigationTitle("Home")
             .navigationBarTitleDisplayMode(.inline)
-            .onAppear {
-                Analytics.logEvent("home_viewed", parameters: nil)
-            }
-            .navigationDestination(for: String.self) { value in
-                if value == "fullAlbumGrid" {
+
+            // 🔥 Typed navigation
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+
+                case .fullAlbumGrid:
                     FullAlbumGridView(
                         albums: albums,
-                        onAlbumSelected: { album in navigationPath.append(album) },
+                        onAlbumSelected: { album in
+                            navigationPath.append(Route.album(album))
+                        },
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
                     )
+
+                case .album(let album):
+                    AlbumDetailView(
+                        album: album,
+                        playSong: { song in
+                            playerManager.playSong(
+                                song,
+                                from: songs,
+                                albumWithTracks: playerManager.albumWithTracks,
+                                playFromAlbum: true,
+                                networkMonitor: networkMonitor
+                            )
+                        },
+                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                        albumWithTracks: $playerManager.albumWithTracks,
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
+                    )
+                    .id(album.id)
                 }
             }
-            .navigationDestination(for: Album.self) { album in
-                AlbumDetailView(
-                    album: album,
-                    playSong: { song in
-                        playerManager.playSong(
-                            song,
-                            from: songs,
-                            albumWithTracks: playerManager.albumWithTracks,
-                            playFromAlbum: true,
-                            networkMonitor: networkMonitor
-                        )
-                    },
-                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                    albumWithTracks: $playerManager.albumWithTracks,
-                    networkMonitor: networkMonitor,
-                    playerManager: playerManager
-                )
-                .id(album.id)
+
+            .onAppear {
+                Analytics.logEvent("home_viewed", parameters: nil)
             }
+
             .task {
                 isLoading = true
                 await requestMusicAuthorization()
@@ -101,6 +110,7 @@ struct ContentView: View {
 
                 isLoading = false
             }
+
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
                     Task { await checkAppleMusicStatus() }
@@ -140,14 +150,12 @@ struct ContentView: View {
                 }
             }
         }
-        // 👇 THIS FIXES YOUR ISSUE
         .safeAreaInset(edge: .bottom) {
             if playerManager.currentlyPlayingSong != nil {
                 Color.clear.frame(height: bottomPlayerHeight)
             }
         }
     }
-
 
     // MARK: - No Internet View
 
@@ -188,12 +196,14 @@ struct ContentView: View {
                     Spacer()
 
                     if albums.count > 5 {
-                        NavigationLink("View More", value: "fullAlbumGrid")
-                            .simultaneousGesture(TapGesture().onEnded {
-                                Analytics.logEvent("view_more_albums", parameters: nil)
-                            })
-                            .foregroundColor(.blue)
-                            .font(.system(size: 15))
+                        NavigationLink(value: Route.fullAlbumGrid) {
+                            Text("View More")
+                        }
+                        .simultaneousGesture(TapGesture().onEnded {
+                            Analytics.logEvent("view_more_albums", parameters: nil)
+                        })
+                        .foregroundColor(.blue)
+                        .font(.system(size: 15))
                     }
                 }
                 .padding(.vertical, 4)
@@ -203,11 +213,11 @@ struct ContentView: View {
                         ForEach(albums.prefix(5), id: \.id) { album in
                             AlbumCarouselItemView(album: album)
                                 .onTapGesture {
-                                    navigationPath.append(album)
-                                    
+                                    navigationPath.append(Route.album(album))
+
                                     Analytics.logEvent("album_opened_from_carousel", parameters: [
-                                            "album_name": album.title
-                                        ])
+                                        "album_name": album.title
+                                    ])
                                 }
                         }
                     }
@@ -229,7 +239,7 @@ struct ContentView: View {
                 Spacer()
 
                 if songs.count > 5 {
-                    NavigationLink("View More") {
+                    NavigationLink {
                         FullTrackListView(
                             songs: songs,
                             playSong: { song in
@@ -240,10 +250,12 @@ struct ContentView: View {
                             networkMonitor: networkMonitor,
                             playerManager: playerManager
                         )
+                    } label: {
+                        Text("View More")
                     }
                     .simultaneousGesture(TapGesture().onEnded {
-                            Analytics.logEvent("view_more_songs", parameters: nil)
-                        })
+                        Analytics.logEvent("view_more_songs", parameters: nil)
+                    })
                     .foregroundColor(.blue)
                     .font(.system(size: 15))
                 }
@@ -255,11 +267,11 @@ struct ContentView: View {
                     .onTapGesture {
                         playerManager.playSong(song, from: songs)
                         playerManager.isPlayingFromAlbum = false
-                        
+
                         Analytics.logEvent("song_played_from_home", parameters: [
-                                "song_name": song.title,
-                                "artist": song.artistName
-                            ])
+                            "song_name": song.title,
+                            "artist": song.artistName
+                        ])
                     }
             }
         }
