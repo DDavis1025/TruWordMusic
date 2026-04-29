@@ -23,6 +23,7 @@ struct ContentView: View {
     @ObservedObject var playerManager: PlayerManager
     @ObservedObject var networkMonitor: NetworkMonitor
     @StateObject private var verseManager = DailyVerseManager()
+    @StateObject private var songOfDayManager = SongOfTheDayManager()
 
     // Authorization & Data
     @Binding var musicAuthorized: Bool
@@ -126,7 +127,13 @@ struct ContentView: View {
             if musicAuthorized {
                 ScrollView {
                     VStack {
-                        DailyVerseView(manager: verseManager)
+                        TodaySectionView(
+                            verseManager: verseManager,
+                            songOfDayManager: songOfDayManager,
+                            playerManager: playerManager,
+                            songs: songs
+                        )
+                        Spacer().frame(height: 15)
                         albumsSection
                         songsSection
                     }
@@ -141,7 +148,12 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
 
                     VStack {
-                        DailyVerseView(manager: verseManager)
+                        TodaySectionView(
+                            verseManager: verseManager,
+                            songOfDayManager: songOfDayManager,
+                            playerManager: playerManager,
+                            songs: songs
+                        )
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
 
@@ -325,6 +337,8 @@ struct ContentView: View {
             await MainActor.run {
                 self.songs = fetchedSongs
                 self.playerManager.songs = fetchedSongs
+                
+                songOfDayManager.loadSongs(fetchedSongs)
             }
 
         } catch {

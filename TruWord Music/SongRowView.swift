@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MusicKit
+import FirebaseAnalytics
 
 // MARK: - Song Row View
 
