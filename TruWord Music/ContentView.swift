@@ -76,6 +76,8 @@ struct ContentView: View {
                     AlbumDetailView(
                         album: album,
                         playSong: { song in
+                            playerManager.playbackSource = .album
+
                             playerManager.playSong(
                                 song,
                                 from: songs,
@@ -255,7 +257,15 @@ struct ContentView: View {
                         FullTrackListView(
                             songs: songs,
                             playSong: { song in
-                                playerManager.playSong(song, from: songs, networkMonitor: networkMonitor)
+                                playerManager.playbackSource = .home
+
+                                playerManager.playSong(
+                                    song,
+                                    from: songs,
+                                    albumWithTracks: nil,
+                                    playFromAlbum: false,
+                                    networkMonitor: networkMonitor
+                                )
                             },
                             currentPlayingSong: $playerManager.currentlyPlayingSong,
                             isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
@@ -277,8 +287,15 @@ struct ContentView: View {
             ForEach(songs.prefix(5), id: \.id) { song in
                 SongRowView(song: song, currentPlayingSong: $playerManager.currentlyPlayingSong)
                     .onTapGesture {
-                        playerManager.playSong(song, from: songs)
-                        playerManager.isPlayingFromAlbum = false
+                        playerManager.playbackSource = .home
+
+                        playerManager.playSong(
+                            song,
+                            from: songs,
+                            albumWithTracks: nil,
+                            playFromAlbum: false,
+                            networkMonitor: networkMonitor
+                        )
 
                         Analytics.logEvent("song_played_from_home", parameters: [
                             "song_name": song.title,

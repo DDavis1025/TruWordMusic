@@ -267,9 +267,16 @@ struct TrackDetailView: View {
         animateTitle = false
         animateArtist = false
         
-        let currentList = (isPlayingFromAlbum && albumWithTracks != nil)
-            ? albumWithTracks!.tracks
-            : playerManager.lastPlayedSongs
+        let currentList: [Song] = {
+            switch playerManager.playbackSource {
+            case .album:
+                return albumWithTracks?.tracks ?? playerManager.lastPlayedSongs
+            case .favorites:
+                return favoritesManager.favoriteSongs
+            case .home, .search, .none:
+                return playerManager.lastPlayedSongs
+            }
+        }()
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
         
@@ -303,9 +310,16 @@ struct TrackDetailView: View {
         animateTitle = false
         animateArtist = false
         
-        let currentList = (isPlayingFromAlbum && albumWithTracks != nil)
-        ? albumWithTracks!.tracks
-        : playerManager.lastPlayedSongs
+        let currentList: [Song] = {
+            switch playerManager.playbackSource {
+            case .album:
+                return albumWithTracks?.tracks ?? playerManager.lastPlayedSongs
+            case .favorites:
+                return favoritesManager.favoriteSongs
+            case .home, .search, .none:
+                return playerManager.lastPlayedSongs
+            }
+        }()
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
         

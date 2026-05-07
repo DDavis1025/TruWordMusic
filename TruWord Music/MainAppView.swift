@@ -77,8 +77,6 @@ struct MainAppView: View {
                 .tag(AppTab.search)
             }
             
-            
-            
             // MARK: - Bottom Player
             if let song = playerManager.currentlyPlayingSong,
                !keyboardObserver.isKeyboardVisible {

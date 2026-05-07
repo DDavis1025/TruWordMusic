@@ -176,6 +176,7 @@ struct SearchView: View {
                                                         return nil
                                                     }
                                                     
+                                                    playerManager.playbackSource = .search
                                                     playerManager.playSong(song, from: songsFromSearch)
                                                     playerManager.isPlayingFromAlbum = false
                                                     
@@ -238,6 +239,8 @@ struct SearchView: View {
                                 if case .song(let s) = item { return s }
                                 return nil
                             }
+                            
+                            playerManager.playbackSource = .album
 
                             playerManager.playSong(
                                 song,

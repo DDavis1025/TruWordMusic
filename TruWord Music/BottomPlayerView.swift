@@ -32,7 +32,7 @@ struct BottomPlayerView: View {
 
                     Text(song.artistName)
                         .font(.caption)
-                        .foregroundColor(Color(white: 0.48))
+                        .fontWeight(.regular)
                         .lineLimit(1)
                 }
 
@@ -62,10 +62,15 @@ struct BottomPlayerView: View {
             .padding(.vertical, 8)
         }
         .frame(maxWidth: .infinity)
-        .background(Color(UIColor.systemGray6))
-        .cornerRadius(12)
-        .shadow(radius: 2)
-        .padding(.horizontal, 7)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(Color.black.opacity(0.10), lineWidth: 0.955)
+        )
+        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+        .padding(.horizontal, 10)
+        .padding(.bottom, 5)
 
         // 🔥 Track visibility
         .onAppear {

@@ -10,6 +10,15 @@ import MusicKit
 import AVFoundation
 import FirebaseAnalytics
 
+enum PlaybackSource {
+    case none
+    case home
+    case album
+    case favorites
+    case search
+}
+
+
 @MainActor
 class PlayerManager: ObservableObject {
     // MARK: - Published Properties
@@ -26,6 +35,7 @@ class PlayerManager: ObservableObject {
     @Published var lastPlayedSongs: [Song] = []
     @Published var lastAlbumWithTracks: AlbumWithTracks? = nil
     @Published var lastPlayFromAlbum: Bool = false
+    @Published var playbackSource: PlaybackSource = .none
     
     // MARK: - Private
     private var audioPlayer: AVPlayer?

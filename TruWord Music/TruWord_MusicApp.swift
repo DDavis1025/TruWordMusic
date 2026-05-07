@@ -22,14 +22,6 @@ struct TruWord_MusicApp: App {
         // ✅ Initialize Firebase FIRST
         FirebaseApp.configure()
         
-        // Tab bar styling
-        let appearance = UITabBarAppearance()
-        appearance.configureWithDefaultBackground()
-        appearance.backgroundEffect = UIBlurEffect(style: .systemChromeMaterial)
-        appearance.backgroundColor = UIColor.systemGray6.withAlphaComponent(0.35)
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
-
         // Initialize PlayerManager once, using the same NetworkMonitor
         let manager = PlayerManager(networkMonitor: NetworkMonitor())
         _playerManager = StateObject(wrappedValue: manager)

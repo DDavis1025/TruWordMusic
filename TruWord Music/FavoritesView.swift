@@ -109,12 +109,6 @@ struct FavoritesView: View {
         .task {
             await favoritesManager.fetchFavoriteSongs()
         }
-        .onChange(of: favoritesManager.favoriteSongs) { _, newFavorites in
-            // Only update if we're NOT playing from album
-            if !playerManager.isPlayingFromAlbum {
-                playerManager.lastPlayedSongs = newFavorites
-            }
-        }
     }
 
     // MARK: - CONTENT VIEW
@@ -160,7 +154,15 @@ struct FavoritesView: View {
                             "artist": song.artistName
                         ])
 
-                        playerManager.playSong(song, from: favoritesManager.favoriteSongs)
+                        playerManager.playbackSource = .favorites
+
+                        playerManager.playSong(
+                            song,
+                            from: favoritesManager.favoriteSongs,
+                            albumWithTracks: nil,
+                            playFromAlbum: false,
+                            networkMonitor: networkMonitor
+                        )
                         isPlayingFromAlbum = false
                     }
                     .padding(.vertical, 4)
