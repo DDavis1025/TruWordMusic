@@ -31,9 +31,24 @@ class SongOfTheDayManager: ObservableObject {
         var order = UserDefaults.standard.array(forKey: orderKey) as? [String] ?? []
         var index = UserDefaults.standard.integer(forKey: indexKey)
 
-        // First time OR finished cycle → reshuffle
-        if order.isEmpty || order.count != songs.count {
-            order = songs.map { $0.id.rawValue }.shuffled()
+        // Current valid song IDs
+        let validIDs = songs.map { $0.id.rawValue }
+
+        // Remove deleted/unavailable songs from saved order
+        order.removeAll { !validIDs.contains($0) }
+
+        // Add any new songs that weren't previously saved
+        let missingIDs = validIDs.filter { !order.contains($0) }
+        order.append(contentsOf: missingIDs.shuffled())
+
+        // First setup
+        if order.isEmpty {
+            order = validIDs.shuffled()
+            index = 0
+        }
+
+        // Prevent index overflow
+        if index >= order.count {
             index = 0
         }
 
@@ -41,22 +56,27 @@ class SongOfTheDayManager: ObservableObject {
         if today != lastDay {
             index += 1
 
-            // Reset after full cycle
+            // Finished cycle → reshuffle
             if index >= order.count {
-                order = songs.map { $0.id.rawValue }.shuffled()
+                order.shuffle()
                 index = 0
             }
 
             UserDefaults.standard.set(today, forKey: lastDayKey)
-            UserDefaults.standard.set(index, forKey: indexKey)
-            UserDefaults.standard.set(order, forKey: orderKey)
         }
 
-        // Find today's song
+        // Save updated values
+        UserDefaults.standard.set(index, forKey: indexKey)
+        UserDefaults.standard.set(order, forKey: orderKey)
+
+        // Pick today's song safely
         let currentID = order[index]
 
         if let match = songs.first(where: { $0.id.rawValue == currentID }) {
             self.song = match
+        } else {
+            // Fallback if somehow still invalid
+            self.song = songs.randomElement()
         }
     }
 }

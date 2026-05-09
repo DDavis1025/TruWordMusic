@@ -22,6 +22,10 @@ struct TruWord_MusicApp: App {
         // ✅ Initialize Firebase FIRST
         FirebaseApp.configure()
         
+        #if DEBUG
+        Analytics.setAnalyticsCollectionEnabled(false)
+        #endif
+        
         // Initialize PlayerManager once, using the same NetworkMonitor
         let manager = PlayerManager(networkMonitor: NetworkMonitor())
         _playerManager = StateObject(wrappedValue: manager)

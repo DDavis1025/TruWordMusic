@@ -66,9 +66,9 @@ struct BottomPlayerView: View {
         .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(Color.black.opacity(0.10), lineWidth: 0.955)
+                .stroke(Color.black.opacity(0.057), lineWidth: 0.955)
         )
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+        .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
         .padding(.horizontal, 10)
         .padding(.bottom, 5)
 
