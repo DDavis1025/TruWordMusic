@@ -23,9 +23,11 @@ struct MainAppView: View {
     
     @State private var selectedSongForDetail: Song? = nil
     @State private var selectedTab: AppTab = .home
-    @State private var homeNavigationPath = NavigationPath()
-    @State private var searchNavigationPath = NavigationPath()
-    @State private var favoritesNavigationPath = NavigationPath()
+    @State private var homeNavigationPath: [Route] = []
+    @State private var searchNavigationPath: [Route] = []
+    @State private var favoritesNavigationPath: [Route] = []
+    @State private var albums: [Album] = []
+    @State private var albumCache: [MusicItemID: Album] = [:]
     
     @State private var musicAuthorized = false
     
@@ -44,6 +46,8 @@ struct MainAppView: View {
                     playerManager: playerManager,
                     networkMonitor: networkMonitor,
                     musicAuthorized: $musicAuthorized,
+                    albums: $albums,
+                    albumCache: $albumCache,
                     navigationPath: $homeNavigationPath
                 )
                 .tabItem {
@@ -57,7 +61,9 @@ struct MainAppView: View {
                     navigationPath: $favoritesNavigationPath,
                     currentPlayingSong: $playerManager.currentlyPlayingSong,
                     isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                    musicAuthorized: $musicAuthorized
+                    musicAuthorized: $musicAuthorized,
+                    albums: albums,
+                    albumCache:  $albumCache
                 )
                 .tabItem {
                     Label("Favorites", systemImage: "star.fill")
@@ -69,7 +75,9 @@ struct MainAppView: View {
                     networkMonitor: networkMonitor,
                     keyboardObserver: keyboardObserver,
                     navigationPath: $searchNavigationPath,
-                    musicAuthorized: $musicAuthorized
+                    musicAuthorized: $musicAuthorized,
+                    albumCache:  $albumCache,
+                    albums: albums
                 )
                 .tabItem {
                     Label("Search", systemImage: "magnifyingglass")

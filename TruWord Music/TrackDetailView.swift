@@ -17,9 +17,9 @@ struct TrackDetailView: View {
     @Binding var selectedAlbum: Album?
     
     @Binding var activeTab: AppTab
-    @Binding var homeNavigationPath: NavigationPath
-    @Binding var searchNavigationPath: NavigationPath
-    @Binding var favoritesNavigationPath: NavigationPath
+    @Binding var homeNavigationPath: [Route]
+    @Binding var searchNavigationPath: [Route]
+    @Binding var favoritesNavigationPath: [Route]
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var favoritesManager: FavoritesManager
@@ -43,7 +43,7 @@ struct TrackDetailView: View {
                     ZStack(alignment: .topLeading) {
                         let displaySize = geometry.size.width * 0.85
                         let scale = UIScreen.main.scale
-
+                        
                         if let artworkURL = song.artwork?.url(
                             width: Int(displaySize * scale * 2),
                             height: Int(displaySize * scale * 2)
@@ -130,30 +130,65 @@ struct TrackDetailView: View {
                     .padding(.bottom, 10)
                     
                     // View Album
+                    // MARK: - View Album
                     if isPlayingFromAlbum {
+                        
                         Button(action: {
                             
-                            Analytics.logEvent("view_album_tapped", parameters: [
-                                "song_id": song.id.rawValue,
-                                "album_id": albumWithTracks?.album.id.rawValue ?? ""
-                            ])
+                            Analytics.logEvent(
+                                "view_album_tapped",
+                                parameters: [
+                                    "song_id": song.id.rawValue,
+                                    "album_id": albumWithTracks?.album.id.rawValue ?? ""
+                                ]
+                            )
                             
-                            if let albumWithTracks,
-                               albumWithTracks.tracks.contains(where: { $0.id == song.id }) {
-                                
+                            guard let albumWithTracks,
+                                  albumWithTracks.tracks.contains(where: {
+                                      $0.id == song.id
+                                  }) else {
+                                return
+                            }
+
+                            let albumID = albumWithTracks.album.id
+
+                            let alreadyOpen: Bool = {
                                 switch activeTab {
                                 case .home:
-                                    homeNavigationPath.append(Route.album(albumWithTracks.album))
-
-                                case .favorites:
-                                    favoritesNavigationPath.append(Route.album(albumWithTracks.album))
-
+                                    return isAlbumInHomeStack(albumID)
                                 case .search:
-                                    searchNavigationPath.append(Route.album(albumWithTracks.album))
+                                    return isAlbumInSearchStack(albumID)
+                                case .favorites:
+                                    return isAlbumInFavoritesStack(albumID)
                                 }
+                            }()
+
+                            if alreadyOpen {
                                 dismiss()
+                                return
                             }
-                        }) {
+                            
+                            switch activeTab {
+                                
+                            case .home:
+                                homeNavigationPath.append(
+                                    Route.album(albumWithTracks.album.id)
+                                )
+                                
+                            case .favorites:
+                                favoritesNavigationPath.append(
+                                    Route.album(albumWithTracks.album.id)
+                                )
+                                
+                            case .search:
+                                searchNavigationPath.append(
+                                    Route.album(albumWithTracks.album.id)
+                                )
+                            }
+                            
+                            dismiss()
+                            
+                        })  {
                             if networkMonitor.isConnected {
                                 Text("View Album")
                                     .font(.subheadline)
@@ -246,6 +281,33 @@ struct TrackDetailView: View {
                     dismiss()
                 }
             }
+        }
+    }
+    
+    private func isAlbumInHomeStack(_ id: MusicItemID) -> Bool {
+        homeNavigationPath.contains { route in
+            if case .album(let routeID) = route {
+                return routeID == id
+            }
+            return false
+        }
+    }
+
+    private func isAlbumInSearchStack(_ id: MusicItemID) -> Bool {
+        searchNavigationPath.contains { route in
+            if case .album(let routeID) = route {
+                return routeID == id
+            }
+            return false
+        }
+    }
+
+    private func isAlbumInFavoritesStack(_ id: MusicItemID) -> Bool {
+        favoritesNavigationPath.contains { route in
+            if case .album(let routeID) = route {
+                return routeID == id
+            }
+            return false
         }
     }
     

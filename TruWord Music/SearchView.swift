@@ -49,13 +49,17 @@ struct SearchView: View {
     @ObservedObject var playerManager: PlayerManager
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var keyboardObserver: KeyboardObserver
-    @Binding var navigationPath: NavigationPath
+    @Binding var navigationPath: [Route]
     @Binding var musicAuthorized: Bool
     
     @State private var searchQuery: String = ""
     @State private var searchResults: [SearchResultItem] = []
     @State private var isSearching: Bool = false
     @State private var selectedTab: SearchTab = .all
+    
+    @Binding var albumCache: [MusicItemID: Album]
+    
+    let albums: [Album]
     
     @Namespace private var tabNamespace
     private let bottomPlayerHeight: CGFloat = 70
@@ -117,6 +121,11 @@ struct SearchView: View {
                         if isSearching {
                             ProgressView("Searching…")
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .padding(.bottom,
+                                    playerManager.currentlyPlayingSong != nil && !keyboardObserver.isKeyboardVisible
+                                    ? bottomPlayerHeight
+                                    : 0
+                                )
                                 
                         } else if filteredResults.isEmpty && !searchQuery.isEmpty {
                             VStack {
@@ -189,9 +198,8 @@ struct SearchView: View {
                                                         "query": searchQuery
                                                     ])
                                                     
-                                                    DispatchQueue.main.async {
-                                                        navigationPath.append(Route.album(album))
-                                                    }
+                                                    navigationPath.append(.album(album.id))
+                                                    
                                                 }
                                             }
                                             .padding(.vertical, 4)
@@ -231,31 +239,36 @@ struct SearchView: View {
             .navigationDestination(for: Route.self) { route in
                 switch route {
 
-                case .album(let album):
-                    AlbumDetailView(
-                        album: album,
-                        playSong: { song in
-                            let songsFromResults = searchResults.compactMap { item -> Song? in
-                                if case .song(let s) = item { return s }
-                                return nil
-                            }
-                            
-                            playerManager.playbackSource = .album
+                case .album(let albumID):
 
-                            playerManager.playSong(
-                                song,
-                                from: songsFromResults,
-                                albumWithTracks: playerManager.albumWithTracks,
-                                playFromAlbum: true,
-                                networkMonitor: networkMonitor
-                            )
-                        },
-                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                        albumWithTracks: $playerManager.albumWithTracks,
-                        networkMonitor: networkMonitor,
-                        playerManager: playerManager
-                    )
-                    .id(album.id)
+                    if let album = albumCache[albumID] {
+                        AlbumDetailView(
+                            album: album,
+                            playSong: { song in
+                                let songsFromResults = searchResults.compactMap { item -> Song? in
+                                    if case .song(let s) = item { return s }
+                                    return nil
+                                }
+
+                                playerManager.playbackSource = .album
+
+                                playerManager.playSong(
+                                    song,
+                                    from: songsFromResults,
+                                    albumWithTracks: playerManager.albumWithTracks,
+                                    playFromAlbum: true,
+                                    networkMonitor: networkMonitor
+                                )
+                            },
+                            isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                            albumWithTracks: $playerManager.albumWithTracks,
+                            networkMonitor: networkMonitor,
+                            playerManager: playerManager
+                        )
+                        .id(album.id)
+                    } else {
+                        EmptyView()
+                    }
 
                 case .fullAlbumGrid:
                     EmptyView() // not used here
@@ -263,6 +276,7 @@ struct SearchView: View {
             }
         }
     }
+    
     
     // MARK: - Filtered Results
     private var filteredResults: [SearchResultItem] {
@@ -336,6 +350,10 @@ struct SearchView: View {
             results.append(contentsOf: christianAlbums.map { .album($0) })
             
             searchResults = results
+            
+            for album in christianAlbums {
+                albumCache[album.id] = album
+            }
             
             // 🔥 Track search event
             Analytics.logEvent("search_performed", parameters: [

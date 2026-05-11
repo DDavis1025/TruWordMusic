@@ -8,12 +8,15 @@ struct FavoritesView: View {
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
 
-    @Binding var navigationPath: NavigationPath
+    @Binding var navigationPath: [Route]
     @Binding var currentPlayingSong: Song?
     @Binding var isPlayingFromAlbum: Bool
     @Binding var musicAuthorized: Bool
 
     @State private var searchQuery: String = ""
+    
+    let albums: [Album]
+    @Binding var albumCache: [MusicItemID: Album]
 
     private let bottomPlayerHeight: CGFloat = 70
 
@@ -79,26 +82,31 @@ struct FavoritesView: View {
 
             .navigationDestination(for: Route.self) { route in
                 switch route {
-                case .album(let album):
-                    AlbumDetailView(
-                        album: album,
-                        playSong: { song in
-                            let songsFromFavorites = favoritesManager.favoriteSongs
+                case .album(let albumID):
 
-                            playerManager.playSong(
-                                song,
-                                from: songsFromFavorites,
-                                albumWithTracks: playerManager.albumWithTracks,
-                                playFromAlbum: true,
-                                networkMonitor: networkMonitor
-                            )
-                        },
-                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                        albumWithTracks: $playerManager.albumWithTracks,
-                        networkMonitor: networkMonitor,
-                        playerManager: playerManager
-                    )
-                    .id(album.id)
+                    if let album = albumCache[albumID] {
+                        AlbumDetailView(
+                            album: album,
+                            playSong: { song in
+                                let songsFromFavorites = favoritesManager.favoriteSongs
+
+                                playerManager.playSong(
+                                    song,
+                                    from: songsFromFavorites,
+                                    albumWithTracks: playerManager.albumWithTracks,
+                                    playFromAlbum: true,
+                                    networkMonitor: networkMonitor
+                                )
+                            },
+                            isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                            albumWithTracks: $playerManager.albumWithTracks,
+                            networkMonitor: networkMonitor,
+                            playerManager: playerManager
+                        )
+                        .id(album.id)
+                    } else {
+                        Text("Album not found")
+                    }
 
                 case .fullAlbumGrid:
                     EmptyView() // Not used in Favorites, but required

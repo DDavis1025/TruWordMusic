@@ -52,10 +52,15 @@ struct CustomAsyncImage: View {
                     .scaledToFill() // Fill the frame while maintaining aspect ratio
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity) // Expand to fill the parent frame
-        .clipped() // Clip content to the frame
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(white: 0.85), lineWidth: 1.0)
+        )
         .onAppear {
             loadImage()
+
         }
     }
     

@@ -13,17 +13,26 @@ struct AlbumDetailView: View {
     @ObservedObject var playerManager: PlayerManager
     
     private let bottomPlayerHeight: CGFloat = 70
-
+    
     var body: some View {
         Group {
             if isLoadingTracks {
-                ProgressView("Loading tracks...")
-                    .padding()
-                    
+                VStack {
+                    Spacer()
+                    ProgressView("Loading...")
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .safeAreaInset(edge: .bottom) {
+                    if playerManager.currentlyPlayingSong != nil {
+                        Color.clear.frame(height: bottomPlayerHeight)
+                    }
+                }
+                
             } else if tracks.isEmpty {
                 Text("No tracks available")
                     .padding()
-                    
+                
             } else {
                 List {
                     
@@ -69,12 +78,12 @@ struct AlbumDetailView: View {
                             
                             Button {
                                 guard isPlayable && networkMonitor.isConnected else { return }
-
+                                
                                 Analytics.logEvent("album_song_selected", parameters: [
                                     "song_id": song.id.rawValue,
                                     "album_id": album.id.rawValue
                                 ])
-
+                                
                                 let currentAlbumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
                                 albumWithTracks = currentAlbumWithTracks
                                 
