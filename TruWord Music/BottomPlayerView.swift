@@ -9,74 +9,93 @@ struct BottomPlayerView: View {
     let playerIsReady: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
+        
+        let songArtworkSize: CGFloat = 38
+        let contentPadding: CGFloat = 10
 
-            HStack {
-                let screenWidth = UIScreen.main.bounds.width
-                let songArtworkSize = min(max(screenWidth * 0.10, 30), 60)
+        HStack(spacing: 12) {
 
-                // Artwork
-                if let artworkURL = song.artwork?.url(width: 120, height: 120) {
-                    CustomAsyncImage(url: artworkURL)
-                        .frame(width: songArtworkSize, height: songArtworkSize)
-                        .clipped()
-                        .cornerRadius(8)
-                }
+            // MARK: - Artwork
+            if let artworkURL = song.artwork?.url(width: 120, height: 120) {
 
-                // Info
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(song.title)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
+                CustomAsyncImage(url: artworkURL)
+                    .frame(width: songArtworkSize, height: songArtworkSize)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 8,
+                            style: .continuous
+                        )
+                    )
+            }
 
-                    Text(song.artistName)
-                        .font(.caption)
-                        .fontWeight(.regular)
-                        .lineLimit(1)
-                }
+            // MARK: - Info
+            VStack(alignment: .leading, spacing: 2) {
 
-                Spacer()
+                Text(song.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
 
-                // MARK: - Play / Pause
-                if playerIsReady {
-                    Button(action: {
-                        togglePlayPause()
-                        Analytics.logEvent("bottom_player_toggle", parameters: [
+                Text(song.artistName)
+                    .font(.caption)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            // MARK: - Play / Pause
+            if playerIsReady {
+
+                Button(action: {
+
+                    togglePlayPause()
+
+                    Analytics.logEvent(
+                        "bottom_player_toggle",
+                        parameters: [
                             "song_id": song.id.rawValue,
                             "action": isPlaying ? "pause" : "play"
-                        ])
-                    }) {
-                        Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                            .font(.system(size: 32))
-                            .foregroundColor(.blue)
-                    }
-                    .disabled(!playerIsReady)
-                } else {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .frame(width: 32, height: 32)
+                        ]
+                    )
+
+                }) {
+
+                    Image(
+                        systemName:
+                            isPlaying
+                            ? "pause.circle.fill"
+                            : "play.circle.fill"
+                    )
+                    .font(.system(size: 32))
+                    .foregroundStyle(.blue)
                 }
+
+            } else {
+
+                ProgressView()
+                    .frame(width: 32, height: 32)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
         }
+
+        // Equal padding on ALL sides
+        .padding(contentPadding)
+
         .frame(maxWidth: .infinity)
         .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(Color.black.opacity(0.057), lineWidth: 0.955)
-        )
-        .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.24), radius: 8, x: 0, y: 0)
+
         .padding(.horizontal, 10)
         .padding(.bottom, 5)
 
-        // 🔥 Track visibility
         .onAppear {
-            Analytics.logEvent("bottom_player_shown", parameters: [
-                "song_id": song.id.rawValue
-            ])
+
+            Analytics.logEvent(
+                "bottom_player_shown",
+                parameters: [
+                    "song_id": song.id.rawValue
+                ]
+            )
         }
     }
 }

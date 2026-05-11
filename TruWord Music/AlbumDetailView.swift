@@ -13,47 +13,53 @@ struct AlbumDetailView: View {
     @ObservedObject var playerManager: PlayerManager
     
     private let bottomPlayerHeight: CGFloat = 70
-
+    
     var body: some View {
         Group {
             if isLoadingTracks {
-                ProgressView("Loading tracks...")
-                    .padding()
-                    
+                VStack {
+                    Spacer()
+                    ProgressView("Loading tracks...")
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .safeAreaInset(edge: .bottom) {
+                    if playerManager.currentlyPlayingSong != nil {
+                        Color.clear.frame(height: bottomPlayerHeight)
+                    }
+                }
+                
             } else if tracks.isEmpty {
                 Text("No tracks available")
                     .padding()
-                    
+                
             } else {
+                
                 List {
-                    
                     // MARK: - HEADER
                     Section {
-                        VStack(spacing: 6) {
+                        VStack(spacing: 12) {
                             
                             if let artworkURL = album.artwork?.url(width: 1400, height: 1400) {
-                                let screenWidth = UIScreen.main.bounds.width
-                                let albumSize = min(max(screenWidth * 0.5, 150), 300)
                                 
                                 CustomAsyncImage(url: artworkURL)
-                                    .frame(width: albumSize, height: albumSize)
-                                    .clipped()
-                                    .cornerRadius(12)
+                                    .frame(width: 240, height: 240)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             }
                             
-                            Text(album.title)
-                                .font(.headline)
-                                .multilineTextAlignment(.center)
-                                .padding(.top, 4)
-                            
-                            Text(album.artistName)
-                                .font(.subheadline)
-                                .foregroundColor(Color(white: 0.48))
-                            
+                            VStack(spacing: 4) {
+                                Text(album.title)
+                                    .font(.headline)
+                                    .multilineTextAlignment(.center)
+                                
+                                Text(album.artistName)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.top, 8)
-                        .padding(.bottom, 15)
+                        .padding(.vertical, 10)
                         .listRowInsets(EdgeInsets())
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
@@ -69,14 +75,13 @@ struct AlbumDetailView: View {
                             
                             Button {
                                 guard isPlayable && networkMonitor.isConnected else { return }
-
+                                
                                 Analytics.logEvent("album_song_selected", parameters: [
                                     "song_id": song.id.rawValue,
                                     "album_id": album.id.rawValue
                                 ])
-
-                                let currentAlbumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
-                                albumWithTracks = currentAlbumWithTracks
+                                
+                                albumWithTracks = AlbumWithTracks(album: album, tracks: tracks)
                                 
                                 playSong(song)
                                 isPlayingFromAlbum = true
@@ -87,45 +92,37 @@ struct AlbumDetailView: View {
                                     Text(song.title)
                                         .font(.subheadline)
                                         .lineLimit(1)
-                                        .foregroundColor(
+                                        .foregroundStyle(
                                             isPlayable && networkMonitor.isConnected
                                             ? .primary
-                                            : Color(UIColor.lightGray)
+                                            : .secondary
                                         )
                                     
                                     Text(song.artistName)
                                         .font(.caption)
                                         .lineLimit(1)
-                                        .foregroundColor(
-                                            isPlayable && networkMonitor.isConnected
-                                            ? Color(white: 0.48)
-                                            : Color(UIColor.lightGray)
-                                        )
+                                        .foregroundStyle(.secondary)
                                 }
                                 .padding(.vertical, 4)
                             }
                             .disabled(!isPlayable || !networkMonitor.isConnected)
                         }
                     }
-                    .listSectionSeparator(.visible, edges: .top)
                     
-                    // MARK: - FOOTER (BOTTOM INFO)
+                    // MARK: - FOOTER
                     Section {
                         VStack(alignment: .leading, spacing: 6) {
                             
                             if let releaseDate = album.releaseDate {
-                                Text("\(releaseDate.formatted(date: .abbreviated, time: .omitted))")
+                                Text(releaseDate.formatted(date: .abbreviated, time: .omitted))
                                     .font(.footnote)
-                                    .foregroundColor(Color(white: 0.48))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .foregroundStyle(.secondary)
                             }
                             
                             if let album_copyright = album.copyright {
                                 Text(album_copyright)
                                     .font(.footnote)
-                                    .foregroundColor(Color(white: 0.48))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.top, album.releaseDate == nil ? 2 : 0)
+                                    .foregroundStyle(.secondary)
                             }
                         }
                         .padding(.vertical, 10)
@@ -172,13 +169,11 @@ struct AlbumDetailView: View {
             
             let albumResponse = try await albumRequest.response()
             
-            guard let fetchedAlbum = albumResponse.items.first else {
+            guard let fetchedAlbum = albumResponse.items.first,
+                  let albumTracks = fetchedAlbum.tracks,
+                  !albumTracks.isEmpty else {
                 tracks = []
-                return
-            }
-            
-            guard let albumTracks = fetchedAlbum.tracks, !albumTracks.isEmpty else {
-                tracks = []
+                isLoadingTracks = false
                 return
             }
             

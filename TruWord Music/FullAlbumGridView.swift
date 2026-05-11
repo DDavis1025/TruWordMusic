@@ -7,11 +7,11 @@ struct FullAlbumGridView: View {
     let onAlbumSelected: (Album) -> Void
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
-    
+
     @State private var searchQuery: String = ""
-    
+
     private let bottomPlayerHeight: CGFloat = 70
-    
+
     var filteredAlbums: [Album] {
         if searchQuery.isEmpty {
             return albums
@@ -22,90 +22,94 @@ struct FullAlbumGridView: View {
             }
         }
     }
-    
-    var body: some View {
-        let screenWidth = UIScreen.main.bounds.width
-        let albumSize = max(min(screenWidth * 0.4, 255), 150)
 
-        let columns = [
-            GridItem(.adaptive(minimum: albumSize), spacing: 20)
-        ]
-        
-        VStack(alignment: .leading, spacing: 10) {
-            
-            // MARK: - NO INTERNET
+    var body: some View {
+        VStack(spacing: 0) {
+
+            // MARK: - OFFLINE STATE
             if !networkMonitor.isConnected {
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     Spacer()
-                    
+
                     Text("No Internet connection")
                         .font(.headline)
-                        .foregroundColor(.black)
                         .multilineTextAlignment(.center)
-                    
+
                     Text("Your device is not connected to the internet")
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    
+
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(.systemBackground))
                 .safeAreaInset(edge: .bottom) {
                     if playerManager.currentlyPlayingSong != nil {
                         Color.clear.frame(height: bottomPlayerHeight)
                     }
                 }
             }
-            
+
             // MARK: - EMPTY STATE
             else if filteredAlbums.isEmpty {
                 Spacer()
                 Text("No albums found")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                    .foregroundStyle(.secondary)
                 Spacer()
             }
-            
-            // MARK: - CONTENT
+
+            // MARK: - GRID CONTENT
             else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 30) {
-                        ForEach(filteredAlbums, id: \.id) { album in
-                            VStack {
-                                if let artworkURL = album.artwork?.url(width: 280, height: 280) {
-                                    CustomAsyncImage(url: artworkURL)
-                                        .frame(width: albumSize, height: albumSize)
-                                        .clipped()
-                                        .cornerRadius(12)
+                GeometryReader { proxy in
+
+                    let spacing: CGFloat = 20
+    
+                    // Adaptive columns based on available width
+                    let columnsCount = max(Int(proxy.size.width / 180), 2)
+
+                    let columns = Array(
+                        repeating: GridItem(.flexible(), spacing: spacing),
+                        count: columnsCount
+                    )
+
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: spacing) {
+
+                            ForEach(filteredAlbums, id: \.id) { album in
+
+                                VStack(spacing: 6) {
+
+                                    if let artworkURL = album.artwork?.url(width: 280, height: 280) {
+                                        CustomAsyncImage(url: artworkURL)
+                                            .frame(height: 170)
+                                            .frame(maxWidth: .infinity)
+                                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    }
+
+                                    Text(album.title)
+                                        .font(.caption)
+                                        .lineLimit(1)
+
+                                    Text(album.artistName)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
                                 }
-                                
-                                Text(album.title)
-                                    .font(.caption)
-                                    .lineLimit(1)
-                                    .frame(width: albumSize - 20)
-                                
-                                Text(album.artistName)
-                                    .font(.caption2)
-                                    .foregroundColor(Color(white: 0.48))
-                                    .lineLimit(1)
-                                    .frame(width: albumSize - 20)
-                            }
-                            .onTapGesture {
-                                // 🔥 Track album selection
-                                Analytics.logEvent("album_selected_from_grid", parameters: [
-                                    "album_id": album.id.rawValue,
-                                    "album_title": album.title,
-                                    "artist_name": album.artistName
-                                ])
-                                
-                                onAlbumSelected(album)
+                                .onTapGesture {
+
+                                    Analytics.logEvent("album_selected_from_grid", parameters: [
+                                        "album_id": album.id.rawValue,
+                                        "album_title": album.title,
+                                        "artist_name": album.artistName
+                                    ])
+
+                                    onAlbumSelected(album)
+                                }
                             }
                         }
+                        .padding()
                     }
-                    .padding()
                 }
                 .safeAreaInset(edge: .bottom) {
                     if playerManager.currentlyPlayingSong != nil {
@@ -114,17 +118,18 @@ struct FullAlbumGridView: View {
                 }
             }
         }
+
+        // MARK: - NAVIGATION
         .navigationTitle("Top Albums")
         .navigationBarTitleDisplayMode(.inline)
-        
-        // 🔥 Track grid view
+
+        // MARK: - ANALYTICS
         .onAppear {
             Analytics.logEvent("album_grid_viewed", parameters: [
                 "album_count": filteredAlbums.count
             ])
         }
-        
-        // 🔥 Track search behavior
+
         .onChange(of: searchQuery) { _, newValue in
             guard !newValue.isEmpty else { return }
 
@@ -132,7 +137,8 @@ struct FullAlbumGridView: View {
                 "query": newValue
             ])
         }
-        
+
+        // MARK: - SEARCH
         .if(networkMonitor.isConnected) { view in
             view.searchable(text: $searchQuery)
         }

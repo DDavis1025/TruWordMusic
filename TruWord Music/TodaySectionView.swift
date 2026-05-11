@@ -62,6 +62,7 @@ struct TodaySectionView: View {
                 songs: songs,
                 playerManager: playerManager
             )
+            .id(songOfDayManager.song?.id)
         }
         .padding()
         .background(Color(.systemGray6))

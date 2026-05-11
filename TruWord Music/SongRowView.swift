@@ -14,41 +14,46 @@ import FirebaseAnalytics
 struct SongRowView: View {
     let song: Song
     @Binding var currentPlayingSong: Song?
-    var leftPadding: CGFloat = 0 // Default left padding
-    var rightPadding: CGFloat = 0 // Default right padding
-    
+
+    var leftPadding: CGFloat = 0
+    var rightPadding: CGFloat = 0
+
     var body: some View {
-        HStack {
-            // Album Artwork with configurable left padding
-            let screenWidth = UIScreen.main.bounds.width
-            let songArtworkSize = min(max(screenWidth * 0.15, 50), 100) // Scales dynamically between 50-100pt
-            
+
+        HStack(spacing: 12) {
+
+            // MARK: - Artwork
             if let artworkURL = song.artwork?.url(width: 150, height: 150) {
+
                 CustomAsyncImage(url: artworkURL)
-                    .frame(width: songArtworkSize, height: songArtworkSize)
-                    .clipped()
-                    .cornerRadius(8)
-                    .padding(.leading, leftPadding) // Use configurable left padding
+                    .frame(width: 58, height: 58)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 10,
+                            style: .continuous
+                        )
+                    )
+                    .padding(.leading, leftPadding)
             }
-            // Song Title and Artist Name with configurable right padding
+
+            // MARK: - Song Info
             VStack(alignment: .leading, spacing: 4) {
+
                 Text(song.title)
                     .font(.subheadline)
                     .lineLimit(1)
                     .multilineTextAlignment(.leading)
-                
+
                 Text(song.artistName)
                     .font(.caption)
-                    .foregroundColor(Color(white: 0.48))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .multilineTextAlignment(.leading)
             }
-            .padding(.trailing, rightPadding) // Use configurable right padding
-            
+            .padding(.trailing, rightPadding)
+
             Spacer()
-            
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }
-

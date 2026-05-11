@@ -47,10 +47,13 @@ struct ContentView: View {
                     noInternetView
 
                 } else if isLoading || !hasRequestedMusicAuthorization {
-                    ProgressView("Loading...")
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .scaleEffect(1.5)
-
+                    ZStack {
+                        ProgressView("Loading...")
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(1.5)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
                 } else {
                     mainContent
                 }
