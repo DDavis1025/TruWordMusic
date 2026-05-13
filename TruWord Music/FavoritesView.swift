@@ -18,7 +18,7 @@ struct FavoritesView: View {
     let albums: [Album]
     @Binding var albumCache: [MusicItemID: Album]
 
-    private let bottomPlayerHeight: CGFloat = 70
+    private let bottomPlayerHeight: CGFloat = 77
 
     var filteredSongs: [Song] {
         if searchQuery.isEmpty {

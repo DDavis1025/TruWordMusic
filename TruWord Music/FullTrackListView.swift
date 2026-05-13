@@ -13,7 +13,7 @@ struct FullTrackListView: View {
     
     @State private var searchQuery: String = ""
 
-    private let bottomPlayerHeight: CGFloat = 70
+    private let bottomPlayerHeight: CGFloat = 77
 
     var filteredSongs: [Song] {
         if searchQuery.isEmpty {

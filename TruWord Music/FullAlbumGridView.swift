@@ -10,7 +10,7 @@ struct FullAlbumGridView: View {
     
     @State private var searchQuery: String = ""
     
-    private let bottomPlayerHeight: CGFloat = 70
+    private let bottomPlayerHeight: CGFloat = 77
     
     var filteredAlbums: [Album] {
         if searchQuery.isEmpty {

@@ -12,7 +12,7 @@ struct AlbumDetailView: View {
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
-    private let bottomPlayerHeight: CGFloat = 70
+    private let bottomPlayerHeight: CGFloat = 77
     
     var body: some View {
         Group {

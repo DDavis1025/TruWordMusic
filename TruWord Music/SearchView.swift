@@ -62,7 +62,7 @@ struct SearchView: View {
     let albums: [Album]
     
     @Namespace private var tabNamespace
-    private let bottomPlayerHeight: CGFloat = 70
+    private let bottomPlayerHeight: CGFloat = 77
     
     var body: some View {
         NavigationStack(path: $navigationPath) {

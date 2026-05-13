@@ -56,7 +56,7 @@ struct CustomAsyncImage: View {
         .clipped()
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(white: 0.85), lineWidth: 1.0)
+                .stroke(Color(white: 0.84), lineWidth: 0.9)
         )
         .onAppear {
             loadImage()
