@@ -30,6 +30,8 @@ struct CustomAsyncImage: View {
     @State private var image: UIImage? = nil
     @State private var isLoading: Bool = false
     
+    @Environment(\.colorScheme) var colorScheme
+    
     var body: some View {
         Group {
             if let image = image {
@@ -38,29 +40,26 @@ struct CustomAsyncImage: View {
                     .scaledToFill() // Fill the frame while maintaining aspect ratio
             } else if isLoading {
                 ZStack {
-                    // Light grey background that matches the parent frame size
-                    Color(white: 0.95)
-                        .cornerRadius(8) // Match the corner radius of the parent
-                    
-                    // ProgressView centered in the frame
+                    Color(.secondarySystemBackground)
+                        .cornerRadius(8)
                     ProgressView()
                 }
             } else {
                 // Directly use the "placeholder" image from assets
-                Image("placeholder")
+                Image(colorScheme == .dark ? "placeholder_dark" : "placeholder")
                     .resizable()
-                    .scaledToFill() // Fill the frame while maintaining aspect ratio
+                    .scaledToFill()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(white: 0.84), lineWidth: 0.9)
+                .stroke(Color.gray.opacity(0.6), lineWidth: 0.289)
         )
         .onAppear {
             loadImage()
-
+            
         }
     }
     

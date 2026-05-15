@@ -89,7 +89,7 @@ struct FullAlbumGridView: View {
                                 
                                 Text(album.artistName)
                                     .font(.caption2)
-                                    .foregroundColor(Color(white: 0.48))
+                                    .foregroundColor(Color(white: 0.52))
                                     .lineLimit(1)
                                     .frame(width: albumSize - 20)
                             }

@@ -12,7 +12,10 @@ import FirebaseAnalytics
 struct SongOfTheDayView: View {
     let song: Song?
     let songs: [Song]
+    
     @ObservedObject var playerManager: PlayerManager
+    
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         if let song {
@@ -63,13 +66,15 @@ struct SongOfTheDayView: View {
                     Image(systemName: "play.fill")
                         .foregroundColor(.white)
                         .padding()
-                        .background(Color.black)
+                        .background(
+                            colorScheme == .dark ? Color(.systemGray6) : Color.black
+                        )
                         .clipShape(Circle())
                 }
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading) // ✅ Add this line
-            .background(Color.white)
+            .background(Color(.systemBackground))
             .cornerRadius(16)
         }
     }

@@ -41,7 +41,7 @@ struct VerseCardView: View {
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white)
+                .background(Color(.systemBackground))
                 .cornerRadius(16)
             }
             .buttonStyle(.plain)

@@ -62,7 +62,7 @@ struct FullVerseView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .foregroundColor(.black)
+                        .foregroundColor(.primary)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)

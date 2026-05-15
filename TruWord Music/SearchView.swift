@@ -103,7 +103,7 @@ struct SearchView: View {
                                             ZStack {
                                                 if selectedTab == tab {
                                                     RoundedRectangle(cornerRadius: 8)
-                                                        .fill(Color.accentColor.opacity(0.2))
+                                                        .fill(Color(.systemGray6))
                                                         .matchedGeometryEffect(id: "tabHighlight", in: tabNamespace)
                                                 }
                                             }

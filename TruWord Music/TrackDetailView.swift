@@ -85,7 +85,7 @@ struct TrackDetailView: View {
                         scrollSpeed: 47.0
                     )
                     .font(.subheadline)
-                    .foregroundColor(Color(white: 0.48))
+                    .foregroundColor(Color(white: 0.52))
                     .id("artist-\(song.id)")
                     
                     Spacer().frame(height: 30)
@@ -195,7 +195,7 @@ struct TrackDetailView: View {
                                     .foregroundColor(.blue)
                                     .padding(.vertical, 10)
                                     .padding(.horizontal, 16)
-                                    .background(Color.blue.opacity(0.1))
+                                    .background(Color(.systemGray6))
                                     .cornerRadius(10)
                             }
                         }

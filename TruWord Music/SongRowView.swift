@@ -39,7 +39,7 @@ struct SongRowView: View {
                 
                 Text(song.artistName)
                     .font(.caption)
-                    .foregroundColor(Color(white: 0.48))
+                    .foregroundColor(Color(white: 0.52))
                     .lineLimit(1)
                     .multilineTextAlignment(.leading)
             }
