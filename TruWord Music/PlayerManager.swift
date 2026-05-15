@@ -1,5 +1,5 @@
 //
-//  PlayerManager.swift
+//PlayerManager.swift
 //  TruWord Music
 //
 //  Created by Dillon Davis on 9/7/25.
@@ -18,6 +18,13 @@ enum PlaybackSource {
     case search
 }
 
+enum PlayerLoadingState {
+    case idle
+    case loading
+    case ready
+    case failed
+}
+
 
 @MainActor
 class PlayerManager: ObservableObject {
@@ -25,7 +32,8 @@ class PlayerManager: ObservableObject {
     let networkMonitor: NetworkMonitor
     @Published var currentlyPlayingSong: Song? = nil
     @Published var isPlaying: Bool = false
-    @Published var playerIsReady: Bool = true
+    @Published var playerIsReady: Bool = true   // Apple Music (MusicKit)
+    @Published var previewState: PlayerLoadingState = .idle
     @Published var isPlayingFromAlbum: Bool = false
     @Published var albumWithTracks: AlbumWithTracks?
     @Published var appleMusicSubscription: Bool = false
@@ -43,6 +51,8 @@ class PlayerManager: ObservableObject {
     private var playbackObservationTask: Task<Void, Never>?
     private var playerStateTask: Task<Void, Never>?
     private var playerPreparationTask: Task<Void, Never>?
+    private var previewStatusObservation: NSKeyValueObservation?
+    private var previewReadyTimeoutTask: Task<Void, Never>?
     
     // ✅ Track playback state across background/foreground
     private var wasPlayingBeforeBackground: Bool = false
@@ -105,6 +115,9 @@ class PlayerManager: ObservableObject {
             }
             
             if appleMusicSubscription {
+                audioPlayer?.pause()
+                audioPlayer = nil
+                previewStatusObservation = nil
                 playWithApplicationMusicPlayer(
                     song,
                     songs: validSongs,
@@ -160,7 +173,12 @@ class PlayerManager: ObservableObject {
                 audioPlayer.pause()
                 isPlaying = false
             } else {
-                audioPlayer.play()
+                Task {
+                    try? await Task.sleep(nanoseconds: 150_000_000)
+                    await MainActor.run {
+                        self.audioPlayer?.play()
+                    }
+                }
                 isPlaying = true
                 Analytics.logEvent("playback_started", parameters: [
                     
@@ -307,16 +325,27 @@ class PlayerManager: ObservableObject {
         guard let previewURL = song.previewAssets?.first?.url else {
             print("No preview available for song: \(song.title)")
             clearApplicationMusicPlayer()
+            previewState = .failed
             return
         }
-        
+
         previewDidEnd = false
         audioPlayer?.pause()
-        
+
+        // cleanup old preview state
+        previewStatusObservation = nil
+        previewReadyTimeoutTask?.cancel()
+
         self.lastPlayedSongs = songs
         self.lastPlayFromAlbum = false
         self.lastAlbumWithTracks = nil
-        
+
+        // UI state
+        Task { @MainActor in
+            self.previewState = .loading
+        }
+        self.isPlaying = false
+
         if let currentItem = audioPlayer?.currentItem {
             NotificationCenter.default.removeObserver(
                 self,
@@ -324,20 +353,59 @@ class PlayerManager: ObservableObject {
                 object: currentItem
             )
         }
-        
+
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
             print("Failed to activate audio session:", error)
         }
-        
+
         audioPlayer = AVPlayer(url: previewURL)
-        guard let audioPlayer = audioPlayer else {
-            print("Error: AVPlayer failed to initialize.")
+
+        guard let audioPlayer else {
+            previewState = .failed
             return
         }
-        
+
+        let item = audioPlayer.currentItem
+
+        // MARK: - STATUS OBSERVER
+        if let item {
+            previewStatusObservation = item.observe(\.status, options: [.new]) { [weak self] item, _ in
+                guard let self else { return }
+
+                Task { @MainActor in
+                    switch item.status {
+                    case .readyToPlay:
+                        self.previewState = .ready
+                        self.isPlaying = true
+
+                    case .failed:
+                        self.previewState = .failed
+                        self.isPlaying = false
+
+                    default:
+                        break
+                    }
+                }
+            }
+        }
+
+        // MARK: - SAFETY TIMEOUT (prevents stuck loader)
+        previewReadyTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+            guard let self else { return }
+
+            await MainActor.run {
+                if self.previewState == .loading {
+                    self.previewState = .ready
+                }
+            }
+        }
+
+        // MARK: - END OBSERVER
         if let playerItem = audioPlayer.currentItem {
             NotificationCenter.default.addObserver(
                 forName: .AVPlayerItemDidPlayToEndTime,
@@ -350,16 +418,16 @@ class PlayerManager: ObservableObject {
                 }
             }
         }
-        
-        DispatchQueue.main.async {
-            audioPlayer.play()
+
+        Task {
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            await MainActor.run {
+                self.audioPlayer?.play()
+            }
         }
-        
-        Task { @MainActor in
-            self.currentlyPlayingSong = song
-            self.isPlaying = true
-        }
-        
+
+        self.currentlyPlayingSong = song
+
         clearApplicationMusicPlayer()
     }
     
@@ -410,6 +478,11 @@ class PlayerManager: ObservableObject {
         } else {
             isPlaying = false
             player.seek(to: .zero)
+            previewState = .idle
+            audioPlayer?.pause()
+            audioPlayer = nil
+            previewStatusObservation = nil
+            previewReadyTimeoutTask?.cancel()
         }
     }
 
@@ -504,10 +577,16 @@ class PlayerManager: ObservableObject {
             player.stop()
             player.queue = .init()
             player.queue.entries.removeAll()
-            
+
             playbackObservationTask?.cancel()
             playerStateTask?.cancel()
         }
+
+        previewStatusObservation = nil
+        previewReadyTimeoutTask?.cancel()
+        previewReadyTimeoutTask = nil
+
+        previewState = .idle
     }
     
     private func observePlaybackState(
