@@ -59,7 +59,7 @@ struct TrackDetailView: View {
                         if !appleMusicSubscription {
                             Text("Preview")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondary)
                                 .offset(y: -25)
                         }
                     }

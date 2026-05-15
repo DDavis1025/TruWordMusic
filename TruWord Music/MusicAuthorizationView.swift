@@ -16,7 +16,6 @@ struct MusicAuthorizationView: View {
             Spacer()
 
             Text("Please allow Apple Music to show Christian music")
-                .foregroundColor(.black)
                 .multilineTextAlignment(.center)
 
             Button("Enable in Settings") {

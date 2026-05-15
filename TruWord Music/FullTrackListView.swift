@@ -36,12 +36,11 @@ struct FullTrackListView: View {
 
                     Text("No Internet connection")
                         .font(.headline)
-                        .foregroundColor(.black)
                         .multilineTextAlignment(.center)
 
                     Text("Your device is not connected to the internet")
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
 
                     Spacer()
@@ -61,7 +60,7 @@ struct FullTrackListView: View {
 
                 Text("No tracks found")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
 
                 Spacer()

@@ -31,11 +31,11 @@ struct FullVerseView: View {
                         // Header
                         HStack(spacing: 6) {
                             Image(systemName: "book")
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondary)
 
                             Text("Verse of the Day")
                                 .font(.subheadline)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondary)
                         }
 
                         // Verse Text (LEFT ALIGNED ✅)
@@ -46,7 +46,7 @@ struct FullVerseView: View {
                         // Reference
                         Text(verse.reference)
                             .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
 
                         Spacer(minLength: 20)
                     }

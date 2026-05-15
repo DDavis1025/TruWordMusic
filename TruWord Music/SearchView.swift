@@ -96,7 +96,7 @@ struct SearchView: View {
                                     Text(tab.rawValue)
                                         .font(.subheadline)
                                         .fontWeight(selectedTab == tab ? .semibold : .regular)
-                                        .foregroundColor(selectedTab == tab ? .accentColor : .gray)
+                                        .foregroundColor(selectedTab == tab ? .accentColor : .secondary)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 8)
                                         .background(
@@ -133,7 +133,7 @@ struct SearchView: View {
                                 
                                 Text("No results found")
                                     .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.secondary)
                                 
                                 Spacer()
                             }
@@ -308,7 +308,7 @@ struct SearchView: View {
             
             Text("Your device is not connected to the internet")
                 .font(.subheadline)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
             
             Spacer()
         }
@@ -398,7 +398,7 @@ struct SongRowLikeView: View {
 
                 Text(artistName)
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

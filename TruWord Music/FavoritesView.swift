@@ -191,14 +191,14 @@ struct FavoritesView: View {
 
             Image(systemName: "star")
                 .font(.system(size: 40))
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
 
             Text("No Favorites Yet")
                 .font(.headline)
 
             Text("Tap the star on any song to save it here")
                 .font(.subheadline)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
@@ -222,7 +222,7 @@ struct FavoritesView: View {
 
             Text("Your device is not connected to the internet")
                 .font(.subheadline)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
 
             Spacer()
         }

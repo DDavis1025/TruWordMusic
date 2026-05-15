@@ -186,11 +186,10 @@ struct ContentView: View {
             
             Text("No Internet connection")
                 .font(.headline)
-                .foregroundColor(.black)
-            
+                
             Text("Your device is not connected to the internet")
                 .font(.subheadline)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
             
             Spacer()
         }

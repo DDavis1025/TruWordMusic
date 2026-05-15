@@ -22,7 +22,7 @@ struct TodaySectionView: View {
             // Header
             HStack {
                 Image(systemName: "sun.max.fill")
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
 
                 Text("Today")
                     .font(.title2)
