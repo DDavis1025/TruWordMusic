@@ -57,7 +57,7 @@ struct AlbumDetailView: View {
                             
                             Text(album.artistName)
                                 .font(.subheadline)
-                                .foregroundColor(Color(white: 0.52))
+                                .foregroundColor(.secondary)
                             
                         }
                         .frame(maxWidth: .infinity)
@@ -125,14 +125,14 @@ struct AlbumDetailView: View {
                             if let releaseDate = album.releaseDate {
                                 Text("\(releaseDate.formatted(date: .abbreviated, time: .omitted))")
                                     .font(.footnote)
-                                    .foregroundColor(Color(white: 0.52))
+                                    .foregroundColor(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             
                             if let album_copyright = album.copyright {
                                 Text(album_copyright)
                                     .font(.footnote)
-                                    .foregroundColor(Color(white: 0.52))
+                                    .foregroundColor(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.top, album.releaseDate == nil ? 2 : 0)
                             }

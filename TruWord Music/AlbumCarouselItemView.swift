@@ -33,7 +33,7 @@ struct AlbumCarouselItemView: View {
             // ✅ Artist Name
             Text(album.artistName)
                 .font(.caption2)
-                .foregroundColor(Color(white: 0.52))
+                .foregroundColor(.secondary)
                 .lineLimit(1)
                 .frame(maxWidth: 150)
         }

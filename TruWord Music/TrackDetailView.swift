@@ -85,7 +85,7 @@ struct TrackDetailView: View {
                         scrollSpeed: 47.0
                     )
                     .font(.subheadline)
-                    .foregroundColor(Color(white: 0.52))
+                    .foregroundColor(.secondary)
                     .id("artist-\(song.id)")
                     
                     Spacer().frame(height: 30)

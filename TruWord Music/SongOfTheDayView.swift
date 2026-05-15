@@ -33,7 +33,7 @@ struct SongOfTheDayView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "music.note")
                         Text("Song of the Day")
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
                     }
                     .font(.footnote)  // Between caption and subheadline
 
@@ -44,7 +44,7 @@ struct SongOfTheDayView: View {
 
                     Text(song.artistName)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }

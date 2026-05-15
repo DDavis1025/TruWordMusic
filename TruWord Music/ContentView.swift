@@ -237,6 +237,7 @@ struct ContentView: View {
                                     navigationPath.append(.album(album.id))
                                     
                                     Analytics.logEvent("album_opened_from_carousel", parameters: [
+                                        "album_id:" : album.id,
                                         "album_name": album.title
                                     ])
                                 }
@@ -305,6 +306,7 @@ struct ContentView: View {
                         )
                         
                         Analytics.logEvent("song_played_from_home", parameters: [
+                            "song_id": song.id,
                             "song_name": song.title,
                             "artist": song.artistName
                         ])

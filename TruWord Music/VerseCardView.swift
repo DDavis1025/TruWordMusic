@@ -26,7 +26,7 @@ struct VerseCardView: View {
                     HStack(spacing: 4) {  // Default is around 8
                         Image(systemName: "book")
                         Text("Verse of the Day")
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
                     }
                     .font(.footnote)  // Between caption and subheadline
                     
@@ -37,7 +37,7 @@ struct VerseCardView: View {
                     
                     Text(verse.reference)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
