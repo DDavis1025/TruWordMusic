@@ -14,6 +14,10 @@ struct AlbumDetailView: View {
     
     private let bottomPlayerHeight: CGFloat = 77
     
+    private var appleMusicURL: URL? {
+        URL(string: "https://music.apple.com/us/album/\(album.id)")
+    }
+    
     var body: some View {
         Group {
             if isLoadingTracks {
@@ -59,6 +63,27 @@ struct AlbumDetailView: View {
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             
+                            if let appleMusicURL, !playerManager.appleMusicSubscription {
+                                
+                                HStack {
+                                    Spacer()
+                                    
+                                    Image("AppleMusicBadge")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(height: min(UIScreen.main.bounds.width * 0.1, 65))
+                                        .padding(.top, 12)
+                                        .onTapGesture {
+                                            Analytics.logEvent("apple_music_album_link_tapped", parameters: [
+                                                "album_id": album.id.rawValue
+                                            ])
+                                            UIApplication.shared.open(appleMusicURL)
+                                        }
+                                    
+                                    Spacer()
+                                }
+                            }
+                            
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 8)
@@ -70,6 +95,7 @@ struct AlbumDetailView: View {
                     
                     // MARK: - TRACK LIST
                     Section {
+                        
                         ForEach(tracks, id: \.id) { song in
                             
                             let isPlayable =
