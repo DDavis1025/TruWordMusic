@@ -336,15 +336,17 @@ struct SearchView: View {
             var results: [SearchResultItem] = []
             
             let christianSongs = response.songs.filter {
-                $0.genreNames.contains("Christian") ||
-                $0.genreNames.contains("Christian & Gospel")
+                ($0.genreNames.contains("Christian") ||
+                 $0.genreNames.contains("Christian & Gospel")) &&
+                 $0.contentRating != .explicit
             }
             
             results.append(contentsOf: christianSongs.map { .song($0) })
             
-            let christianAlbums = response.albums.filter {
-                $0.genreNames.contains("Christian") ||
-                $0.genreNames.contains("Christian & Gospel")
+            let christianAlbums = response.albums.filter { album in
+                (album.genreNames.contains("Christian") ||
+                 album.genreNames.contains("Christian & Gospel")) &&
+                 album.contentRating != .explicit
             }
             
             results.append(contentsOf: christianAlbums.map { .album($0) })
