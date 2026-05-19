@@ -15,6 +15,7 @@ struct AlbumWithTracks {
 enum Route: Hashable {
     case fullAlbumGrid
     case album(MusicItemID)
+    case artist(MusicItemID)
 }
 
 // MARK: - ContentView
@@ -71,6 +72,9 @@ struct ContentView: View {
                         onAlbumSelected: { album in
                             navigationPath.append(.album(album.id))
                         },
+                        cacheAlbum: { album in
+                            albumCache[album.id] = album
+                        },
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
                     )
@@ -99,6 +103,15 @@ struct ContentView: View {
                     } else {
                         EmptyView()
                     }
+                    
+                case .artist(let artistID):
+                    ArtistDetailView(
+                        artistID: artistID,
+                        playerManager: playerManager,
+                        networkMonitor: networkMonitor,
+                        navigationPath: $navigationPath,
+                        albumCache: $albumCache
+                    )
                 }
             }
             

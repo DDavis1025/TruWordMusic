@@ -16,6 +16,7 @@ enum PlaybackSource {
     case album
     case favorites
     case search
+    case artist
 }
 
 

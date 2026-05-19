@@ -110,6 +110,15 @@ struct FavoritesView: View {
 
                 case .fullAlbumGrid:
                     EmptyView() // Not used in Favorites, but required
+                    
+                case .artist(let artistID):
+                    ArtistDetailView(
+                        artistID: artistID,
+                        playerManager: playerManager,
+                        networkMonitor: networkMonitor,
+                        navigationPath: $navigationPath,
+                        albumCache: $albumCache
+                    )
                 }
             }
 

@@ -335,7 +335,7 @@ struct TrackDetailView: View {
                 return albumWithTracks?.tracks ?? playerManager.lastPlayedSongs
             case .favorites:
                 return favoritesManager.favoriteSongs
-            case .home, .search, .none:
+            case .home, .search, .artist, .none:
                 return playerManager.lastPlayedSongs
             }
         }()
@@ -378,7 +378,7 @@ struct TrackDetailView: View {
                 return albumWithTracks?.tracks ?? playerManager.lastPlayedSongs
             case .favorites:
                 return favoritesManager.favoriteSongs
-            case .home, .search, .none:
+            case .home, .search, .artist, .none:
                 return playerManager.lastPlayedSongs
             }
         }()

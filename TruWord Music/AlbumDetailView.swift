@@ -3,10 +3,10 @@ import MusicKit
 import FirebaseAnalytics
 
 struct AlbumDetailView: View {
-    @State var album: Album
+    let album: Album
     let playSong: (Song) -> Void
     @State private var tracks: [Song] = []
-    @State private var isLoadingTracks: Bool = true
+    @State private var isLoading = true
     @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
     @ObservedObject var networkMonitor: NetworkMonitor
@@ -20,23 +20,16 @@ struct AlbumDetailView: View {
     
     var body: some View {
         Group {
-            if isLoadingTracks {
+            if isLoading {
                 VStack {
                     Spacer()
                     ProgressView("Loading...")
                     Spacer()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .safeAreaInset(edge: .bottom) {
-                    if playerManager.currentlyPlayingSong != nil {
-                        Color.clear.frame(height: bottomPlayerHeight)
-                    }
-                }
-                
+
             } else if tracks.isEmpty {
                 Text("No tracks available")
                     .padding()
-                
             } else {
                 List {
                     
@@ -179,18 +172,24 @@ struct AlbumDetailView: View {
         .navigationTitle("Album")
         .navigationBarTitleDisplayMode(.inline)
         
-        // MARK: - Analytics
+        .task(id: album.id) {
+            isLoading = true
+            tracks = []
+
+            let fetchedTracks = await fetchAlbumTracks(album: album)
+
+            await MainActor.run {
+                self.tracks = fetchedTracks
+                self.isLoading = false
+            }
+        }
+        
         .onAppear {
             Analytics.logEvent("album_viewed", parameters: [
                 "album_id": album.id.rawValue,
                 "album_title": album.title,
                 "artist_name": album.artistName
             ])
-        }
-        
-        .task {
-            await fetchAlbumTracks(album: album)
-            await setSelectedAlbum(album: album)
         }
     }
     
@@ -200,40 +199,36 @@ struct AlbumDetailView: View {
         playerManager.selectedAlbum = album
     }
     
-    func fetchAlbumTracks(album: Album) async {
+    func fetchAlbumTracks(album: Album) async -> [Song] {
         do {
-            var albumRequest = MusicCatalogResourceRequest<Album>(matching: \.id, equalTo: album.id)
+            var albumRequest = MusicCatalogResourceRequest<Album>(
+                matching: \.id,
+                equalTo: album.id
+            )
+
             albumRequest.properties = [.tracks]
-            
+
             let albumResponse = try await albumRequest.response()
-            
-            guard let fetchedAlbum = albumResponse.items.first else {
-                tracks = []
-                return
+
+            guard let fetchedAlbum = albumResponse.items.first,
+                  let albumTracks = fetchedAlbum.tracks else {
+                return []
             }
-            
-            guard let albumTracks = fetchedAlbum.tracks, !albumTracks.isEmpty else {
-                tracks = []
-                return
-            }
-            
+
             let trackIDs = albumTracks.compactMap { $0.id }
-            
-            let songsRequest = MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: trackIDs)
+
+            let songsRequest = MusicCatalogResourceRequest<Song>(
+                matching: \.id,
+                memberOf: trackIDs
+            )
+
             let songResponse = try await songsRequest.response()
-            
-            tracks = Array(songResponse.items)
-            
-            Analytics.logEvent("album_tracks_loaded", parameters: [
-                "album_id": album.id.rawValue,
-                "track_count": tracks.count
-            ])
-            
+
+            return Array(songResponse.items)
+
         } catch {
             print("Error fetching album tracks: \(error)")
-            tracks = []
+            return []
         }
-        
-        isLoadingTracks = false
     }
 }

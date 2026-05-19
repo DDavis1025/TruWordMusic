@@ -5,6 +5,7 @@ import FirebaseAnalytics
 struct FullAlbumGridView: View {
     let albums: [Album]
     let onAlbumSelected: (Album) -> Void
+    let cacheAlbum: (Album) -> Void
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
@@ -100,7 +101,10 @@ struct FullAlbumGridView: View {
                                     "artist_name": album.artistName
                                 ])
                                 
-                                onAlbumSelected(album)
+                                cacheAlbum(album)
+                                    DispatchQueue.main.async {
+                                        onAlbumSelected(album)
+                                    }
                             }
                         }
                     }
