@@ -102,9 +102,7 @@ struct FullAlbumGridView: View {
                                 ])
                                 
                                 cacheAlbum(album)
-                                    DispatchQueue.main.async {
-                                        onAlbumSelected(album)
-                                    }
+                                onAlbumSelected(album)
                             }
                         }
                     }
@@ -122,6 +120,8 @@ struct FullAlbumGridView: View {
         
         // 🔥 Track grid view
         .onAppear {
+            albums.forEach { cacheAlbum($0) }
+            
             Analytics.logEvent("album_grid_viewed", parameters: [
                 "album_count": filteredAlbums.count
             ])

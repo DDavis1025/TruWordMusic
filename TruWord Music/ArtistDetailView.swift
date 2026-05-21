@@ -85,10 +85,10 @@ struct ArtistDetailView: View {
                                     if topAlbums.count > 7 {
                                         
                                         NavigationLink {
-                                            
                                             FullAlbumGridView(
                                                 albums: topAlbums,
                                                 onAlbumSelected: { album in
+                                                    albumCache[album.id] = album
                                                     navigationPath.append(.album(album.id))
                                                 },
                                                 cacheAlbum: { album in
@@ -114,9 +114,8 @@ struct ArtistDetailView: View {
                                             
                                             AlbumCarouselItemView(album: album)
                                                 .onTapGesture {
-                                                    
+                                                    albumCache[album.id] = album
                                                     navigationPath.append(.album(album.id))
-                                                    
                                                     Analytics.logEvent("artist_album_opened", parameters: [
                                                         "album_name": album.title,
                                                         "artist_name": artist?.name ?? ""
