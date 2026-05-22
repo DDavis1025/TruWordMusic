@@ -87,6 +87,7 @@ struct SearchView: View {
     
     let albums: [Album]
     
+    
     @Namespace private var tabNamespace
     private let bottomPlayerHeight: CGFloat = 77
     
@@ -180,16 +181,22 @@ struct SearchView: View {
                                                     switch item {
                                                         
                                                     case .song:
-                                                        return "Song | \(item.artistName)"
+                                                        return "\(item.artistName)"
                                                         
                                                     case .album:
-                                                        return "Album | \(item.artistName)"
+                                                        return "\(item.artistName)"
                                                         
                                                     case .artist:
                                                         return "Artist"
                                                     }
                                                 }(),
                                                 artworkURL: item.artworkURL,
+                                                isArtist: {
+                                                    if case .artist = item {
+                                                        return true
+                                                    }
+                                                    return false
+                                                }(),
                                                 currentlyPlayingSong: $playerManager.currentlyPlayingSong
                                             )
                                             .id(item.id)
@@ -524,14 +531,16 @@ struct SongRowLikeView: View {
     let title: String
     let artistName: String
     let artworkURL: URL?
+    
+    let isArtist: Bool
+    
     @Binding var currentlyPlayingSong: Song?
     
     var body: some View {
         HStack(spacing: 8) {
             if let url = artworkURL {
-                CustomAsyncImage(url: url)
+                CustomAsyncImage(url: url, isCircle: isArtist)
                     .frame(width: 60, height: 60)
-                    .cornerRadius(8)
             }
             
             VStack(alignment: .leading, spacing: 4) {

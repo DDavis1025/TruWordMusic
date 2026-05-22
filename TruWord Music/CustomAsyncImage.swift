@@ -26,40 +26,49 @@ class ImageCache {
 
 struct CustomAsyncImage: View {
     let url: URL?
-    
+    let isCircle: Bool   // 👈 add this
+
     @State private var image: UIImage? = nil
     @State private var isLoading: Bool = false
-    
+
     @Environment(\.colorScheme) var colorScheme
-    
+
     var body: some View {
         Group {
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFill() // Fill the frame while maintaining aspect ratio
+                    .scaledToFill()
+
             } else if isLoading {
                 ZStack {
                     Color(.secondarySystemBackground)
-                        .cornerRadius(8)
+                        .clipShape(isCircle ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 8)))
                     ProgressView()
                 }
             } else {
-                // Directly use the "placeholder" image from assets
                 Image(colorScheme == .dark ? "placeholder_dark" : "placeholder")
                     .resizable()
                     .scaledToFill()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.gray.opacity(0.6), lineWidth: 0.289)
+        .clipShape(
+            isCircle
+                ? AnyShape(Circle())
+                : AnyShape(RoundedRectangle(cornerRadius: 8))
         )
+        .overlay {
+            if isCircle {
+                Circle()
+                    .stroke(Color.gray.opacity(0.6), lineWidth: 0.17)
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.gray.opacity(0.6), lineWidth: 0.17)
+            }
+        }
         .onAppear {
             loadImage()
-            
         }
     }
     

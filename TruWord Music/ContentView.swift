@@ -69,9 +69,7 @@ struct ContentView: View {
                 case .fullAlbumGrid:
                     FullAlbumGridView(
                         albums: albums,
-                        onAlbumSelected: { album in
-                            navigationPath.append(.album(album.id))
-                        },
+                        title: "Top Albums",
                         cacheAlbum: { album in
                             albumCache[album.id] = album
                         },

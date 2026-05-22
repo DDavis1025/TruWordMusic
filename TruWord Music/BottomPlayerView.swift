@@ -17,10 +17,8 @@ struct BottomPlayerView: View {
 
                 // Artwork
                 if let artworkURL = song.artwork?.url(width: 120, height: 120) {
-                    CustomAsyncImage(url: artworkURL)
+                    CustomAsyncImage(url: artworkURL, isCircle: false)
                         .frame(width: songArtworkSize, height: songArtworkSize)
-                        .clipped()
-                        .cornerRadius(8)
                 }
 
                 // Info

@@ -41,10 +41,8 @@ struct AlbumDetailView: View {
                                 let screenWidth = UIScreen.main.bounds.width
                                 let albumSize = min(max(screenWidth * 0.5, 150), 300)
                                 
-                                CustomAsyncImage(url: artworkURL)
+                                CustomAsyncImage(url: artworkURL, isCircle: false)
                                     .frame(width: albumSize, height: albumSize)
-                                    .clipped()
-                                    .cornerRadius(12)
                             }
                             
                             Text(album.title)
@@ -169,7 +167,6 @@ struct AlbumDetailView: View {
                 }
             }
         }
-        .navigationTitle("Album")
         .navigationBarTitleDisplayMode(.inline)
         
         .task(id: album.id) {

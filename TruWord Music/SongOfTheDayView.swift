@@ -23,9 +23,8 @@ struct SongOfTheDayView: View {
 
                 // Artwork
                 if let artworkURL = song.artwork?.url(width: 120, height: 120) {
-                    CustomAsyncImage(url: artworkURL)
+                    CustomAsyncImage(url: artworkURL, isCircle: false)
                         .frame(width: 50, height: 50)
-                        .cornerRadius(10)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {

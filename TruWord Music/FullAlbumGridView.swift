@@ -4,7 +4,7 @@ import FirebaseAnalytics
 
 struct FullAlbumGridView: View {
     let albums: [Album]
-    let onAlbumSelected: (Album) -> Void
+    let title: String
     let cacheAlbum: (Album) -> Void
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
@@ -74,27 +74,50 @@ struct FullAlbumGridView: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 30) {
                         ForEach(filteredAlbums, id: \.id) { album in
-                            VStack {
-                                if let artworkURL = album.artwork?.url(width: 280, height: 280) {
-                                    CustomAsyncImage(url: artworkURL)
-                                        .frame(width: albumSize, height: albumSize)
-                                        .clipped()
-                                        .cornerRadius(12)
+                            NavigationLink {
+                                
+                                AlbumDetailView(
+                                    album: album,
+                                    playSong: { song in
+                                        playerManager.playbackSource = .album
+                                        
+                                        playerManager.playSong(
+                                            song,
+                                            from: [],
+                                            albumWithTracks: playerManager.albumWithTracks,
+                                            playFromAlbum: true,
+                                            networkMonitor: networkMonitor
+                                        )
+                                    },
+                                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                                    albumWithTracks: $playerManager.albumWithTracks,
+                                    networkMonitor: networkMonitor,
+                                    playerManager: playerManager
+                                )
+                                
+                            } label: {
+                                
+                                VStack {
+                                    if let artworkURL = album.artwork?.url(width: 280, height: 280) {
+                                        CustomAsyncImage(url: artworkURL, isCircle: false)
+                                            .frame(width: albumSize, height: albumSize)
+                                    }
+                                    
+                                    Text(album.title)
+                                        .font(.caption)
+                                        .foregroundColor(.primary)
+                                        .lineLimit(1)
+                                        .frame(width: albumSize - 20)
+                                    
+                                    Text(album.artistName)
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                        .frame(width: albumSize - 20)
                                 }
-                                
-                                Text(album.title)
-                                    .font(.caption)
-                                    .lineLimit(1)
-                                    .frame(width: albumSize - 20)
-                                
-                                Text(album.artistName)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                                    .frame(width: albumSize - 20)
                             }
-                            .onTapGesture {
-                                // 🔥 Track album selection
+                            .simultaneousGesture(TapGesture().onEnded {
+                                
                                 Analytics.logEvent("album_selected_from_grid", parameters: [
                                     "album_id": album.id.rawValue,
                                     "album_title": album.title,
@@ -102,8 +125,7 @@ struct FullAlbumGridView: View {
                                 ])
                                 
                                 cacheAlbum(album)
-                                onAlbumSelected(album)
-                            }
+                            })
                         }
                     }
                     .padding()
@@ -115,7 +137,7 @@ struct FullAlbumGridView: View {
                 }
             }
         }
-        .navigationTitle("Top Albums")
+        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         
         // 🔥 Track grid view

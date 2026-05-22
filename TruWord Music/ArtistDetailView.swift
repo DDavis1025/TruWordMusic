@@ -50,11 +50,11 @@ struct ArtistDetailView: View {
                         
                         // MARK: - Artist Header
                         
-                        VStack(spacing: 12) {
+                        VStack(spacing: 7) {
                             
-                            if let artwork = artist?.artwork {
-                                ArtworkImage(artwork, width: 160)
-                                    .clipShape(Circle())
+                            if let artworkURL = artist?.artwork?.url(width: 320, height: 320) {
+                                CustomAsyncImage(url: artworkURL, isCircle: true)
+                                    .frame(width: 160, height: 160)
                             }
                             
                             VStack(spacing: 2) {
@@ -77,7 +77,7 @@ struct ArtistDetailView: View {
                                 
                                 HStack {
                                     
-                                    Text("Top Albums")
+                                    Text("Top Releases")
                                         .font(.system(size: 20, weight: .bold))
                                     
                                     Spacer()
@@ -87,10 +87,7 @@ struct ArtistDetailView: View {
                                         NavigationLink {
                                             FullAlbumGridView(
                                                 albums: topAlbums,
-                                                onAlbumSelected: { album in
-                                                    albumCache[album.id] = album
-                                                    navigationPath.append(.album(album.id))
-                                                },
+                                                title: "Top Releases",
                                                 cacheAlbum: { album in
                                                     albumCache[album.id] = album
                                                 },
@@ -99,7 +96,7 @@ struct ArtistDetailView: View {
                                             )
                                             
                                         } label: {
-                                            Text("View More")
+                                            Text("View All")
                                         }
                                         .font(.system(size: 15))
                                         .foregroundColor(.blue)
@@ -166,7 +163,7 @@ struct ArtistDetailView: View {
                                             )
                                             
                                         } label: {
-                                            Text("View More")
+                                            Text("View All")
                                         }
                                         .font(.system(size: 15))
                                         .foregroundColor(.blue)

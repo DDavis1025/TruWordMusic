@@ -18,10 +18,8 @@ struct AlbumCarouselItemView: View {
         VStack(spacing: 4) {
             if let artworkURL = album.artwork?.url(width: 280, height: 280) {
                 
-                CustomAsyncImage(url: artworkURL)
+                CustomAsyncImage(url: artworkURL, isCircle: false)
                     .frame(width: albumSize, height: albumSize)
-                    .clipped()
-                    .cornerRadius(12)
             }
             
             // Album Title

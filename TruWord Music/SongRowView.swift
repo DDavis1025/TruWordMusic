@@ -24,10 +24,8 @@ struct SongRowView: View {
             let songArtworkSize = min(max(screenWidth * 0.15, 50), 100) // Scales dynamically between 50-100pt
             
             if let artworkURL = song.artwork?.url(width: 150, height: 150) {
-                CustomAsyncImage(url: artworkURL)
+                CustomAsyncImage(url: artworkURL, isCircle: false)
                     .frame(width: songArtworkSize, height: songArtworkSize)
-                    .clipped()
-                    .cornerRadius(8)
                     .padding(.leading, leftPadding) // Use configurable left padding
             }
             // Song Title and Artist Name with configurable right padding

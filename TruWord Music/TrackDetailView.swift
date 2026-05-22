@@ -48,11 +48,9 @@ struct TrackDetailView: View {
                             width: Int(displaySize * scale * 2),
                             height: Int(displaySize * scale * 2)
                         ) {
-                            CustomAsyncImage(url: artworkURL)
+                            CustomAsyncImage(url: artworkURL, isCircle: false)
                                 .frame(width: geometry.size.width * 0.85,
                                        height: geometry.size.width * 0.85)
-                                .clipped()
-                                .cornerRadius(8)
                                 .id(song.id)
                         }
                         
