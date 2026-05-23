@@ -127,68 +127,52 @@ struct TrackDetailView: View {
                     }
                     .padding(.bottom, 10)
                     
-                    // View Album
-                    // MARK: - View Album
-                    if isPlayingFromAlbum {
+                    
+                    if networkMonitor.isConnected {
                         
-                        Button(action: {
+                        if isPlayingFromAlbum {
                             
-                            Analytics.logEvent(
-                                "view_album_tapped",
-                                parameters: [
-                                    "song_id": song.id.rawValue,
-                                    "album_id": albumWithTracks?.album.id.rawValue ?? ""
-                                ]
-                            )
-                            
-                            guard let albumWithTracks,
-                                  albumWithTracks.tracks.contains(where: {
-                                      $0.id == song.id
-                                  }) else {
-                                return
-                            }
-
-                            let albumID = albumWithTracks.album.id
-
-                            let alreadyOpen: Bool = {
-                                switch activeTab {
-                                case .home:
-                                    return isAlbumInHomeStack(albumID)
-                                case .search:
-                                    return isAlbumInSearchStack(albumID)
-                                case .favorites:
-                                    return isAlbumInFavoritesStack(albumID)
+                            Menu {
+                                
+                                Button {
+                                    
+                                    Analytics.logEvent("view_artist_tapped", parameters: [
+                                        "song_id": song.id.rawValue,
+                                        "artist_name": song.artistName
+                                    ])
+                                    
+                                    openArtist()
+                                    
+                                } label: {
+                                    Label("View Artist", systemImage: "music.mic")
                                 }
-                            }()
-
-                            if alreadyOpen {
-                                dismiss()
-                                return
+                                
+                                Button {
+                                    openAlbum()
+                                } label: {
+                                    Label("View Album", systemImage: "square.stack")
+                                }
+                                
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.primary)
                             }
+                            .padding(.top, 5)
                             
-                            switch activeTab {
-                                
-                            case .home:
-                                homeNavigationPath.append(
-                                    Route.album(albumWithTracks.album.id)
-                                )
-                                
-                            case .favorites:
-                                favoritesNavigationPath.append(
-                                    Route.album(albumWithTracks.album.id)
-                                )
-                                
-                            case .search:
-                                searchNavigationPath.append(
-                                    Route.album(albumWithTracks.album.id)
-                                )
-                            }
+                        } else {
                             
-                            dismiss()
-                            
-                        })  {
-                            if networkMonitor.isConnected {
-                                Text("View Album")
+                            Button {
+                                
+                                Analytics.logEvent("view_artist_tapped", parameters: [
+                                    "song_id": song.id.rawValue,
+                                    "artist_name": song.artistName
+                                ])
+                                
+                                openArtist()
+                                
+                            } label: {
+                                Text("View Artist")
                                     .font(.subheadline)
                                     .foregroundColor(.blue)
                                     .padding(.vertical, 10)
@@ -196,8 +180,8 @@ struct TrackDetailView: View {
                                     .background(Color(.systemGray6))
                                     .cornerRadius(10)
                             }
+                            .padding(.top, 5)
                         }
-                        .padding(.top, 5)
                     }
                     
                     Spacer()
@@ -282,6 +266,33 @@ struct TrackDetailView: View {
         }
     }
     
+    private func isArtistInHomeStack(_ id: MusicItemID) -> Bool {
+        homeNavigationPath.contains { route in
+            if case .artist(let routeID) = route {
+                return routeID == id
+            }
+            return false
+        }
+    }
+
+    private func isArtistInSearchStack(_ id: MusicItemID) -> Bool {
+        searchNavigationPath.contains { route in
+            if case .artist(let routeID) = route {
+                return routeID == id
+            }
+            return false
+        }
+    }
+
+    private func isArtistInFavoritesStack(_ id: MusicItemID) -> Bool {
+        favoritesNavigationPath.contains { route in
+            if case .artist(let routeID) = route {
+                return routeID == id
+            }
+            return false
+        }
+    }
+    
     private func isAlbumInHomeStack(_ id: MusicItemID) -> Bool {
         homeNavigationPath.contains { route in
             if case .album(let routeID) = route {
@@ -290,7 +301,7 @@ struct TrackDetailView: View {
             return false
         }
     }
-
+    
     private func isAlbumInSearchStack(_ id: MusicItemID) -> Bool {
         searchNavigationPath.contains { route in
             if case .album(let routeID) = route {
@@ -299,7 +310,7 @@ struct TrackDetailView: View {
             return false
         }
     }
-
+    
     private func isAlbumInFavoritesStack(_ id: MusicItemID) -> Bool {
         favoritesNavigationPath.contains { route in
             if case .album(let routeID) = route {
@@ -307,6 +318,126 @@ struct TrackDetailView: View {
             }
             return false
         }
+    }
+    
+    private func fetchSongWithArtists() async throws -> Song {
+        var request = MusicCatalogResourceRequest<Song>(
+            matching: \.id,
+            equalTo: song.id
+        )
+
+        request.properties = [.artists]
+        request.limit = 1
+
+        let response = try await request.response()
+
+        guard let fullSong = response.items.first else {
+            throw URLError(.badServerResponse)
+        }
+
+        return fullSong
+    }
+    
+    private func openArtist() {
+        Task {
+            do {
+                let fullSong = try await fetchSongWithArtists()
+
+                guard let artist = fullSong.artists?.first else {
+                    print("No artist found even after full fetch")
+                    return
+                }
+
+                let artistID = artist.id
+
+                let alreadyOpen: Bool = {
+                    switch activeTab {
+                    case .home:
+                        return isArtistInHomeStack(artistID)
+                    case .search:
+                        return isArtistInSearchStack(artistID)
+                    case .favorites:
+                        return isArtistInFavoritesStack(artistID)
+                    }
+                }()
+
+                await MainActor.run {
+                    if alreadyOpen {
+                        dismiss()
+                        return
+                    }
+
+                    switch activeTab {
+                    case .home:
+                        homeNavigationPath.append(.artist(artistID))
+                    case .search:
+                        searchNavigationPath.append(.artist(artistID))
+                    case .favorites:
+                        favoritesNavigationPath.append(.artist(artistID))
+                    }
+
+                    dismiss()
+                }
+
+            } catch {
+                print("Error fetching song with artists: \(error)")
+            }
+        }
+    }
+    
+    private func openAlbum() {
+        Analytics.logEvent(
+            "view_album_tapped",
+            parameters: [
+                "song_id": song.id.rawValue,
+                "album_id": albumWithTracks?.album.id.rawValue ?? ""
+            ]
+        )
+        
+        guard let albumWithTracks,
+              albumWithTracks.tracks.contains(where: {
+                  $0.id == song.id
+              }) else {
+            return
+        }
+        
+        let albumID = albumWithTracks.album.id
+        
+        let alreadyOpen: Bool = {
+            switch activeTab {
+            case .home:
+                return isAlbumInHomeStack(albumID)
+            case .search:
+                return isAlbumInSearchStack(albumID)
+            case .favorites:
+                return isAlbumInFavoritesStack(albumID)
+            }
+        }()
+        
+        if alreadyOpen {
+            dismiss()
+            return
+        }
+        
+        switch activeTab {
+            
+        case .home:
+            homeNavigationPath.append(
+                Route.album(albumWithTracks.album.id)
+            )
+            
+        case .favorites:
+            favoritesNavigationPath.append(
+                Route.album(albumWithTracks.album.id)
+            )
+            
+        case .search:
+            searchNavigationPath.append(
+                Route.album(albumWithTracks.album.id)
+            )
+        }
+        
+        dismiss()
     }
     
     private func playNextSong() {
