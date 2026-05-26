@@ -73,6 +73,7 @@ struct ContentView: View {
                         cacheAlbum: { album in
                             albumCache[album.id] = album
                         },
+                        navigationPath: $navigationPath,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
                     )
@@ -95,7 +96,8 @@ struct ContentView: View {
                             isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                             albumWithTracks: $playerManager.albumWithTracks,
                             networkMonitor: networkMonitor,
-                            playerManager: playerManager
+                            playerManager: playerManager,
+                            navigationPath: $navigationPath
                         )
                         .id(album.id)
                     } else {

@@ -101,7 +101,8 @@ struct FavoritesView: View {
                             isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                             albumWithTracks: $playerManager.albumWithTracks,
                             networkMonitor: networkMonitor,
-                            playerManager: playerManager
+                            playerManager: playerManager,
+                            navigationPath: $navigationPath
                         )
                         .id(album.id)
                     } else {

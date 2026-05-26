@@ -6,6 +6,9 @@ struct FullAlbumGridView: View {
     let albums: [Album]
     let title: String
     let cacheAlbum: (Album) -> Void
+    
+    @Binding var navigationPath: [Route]
+    
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
@@ -92,7 +95,8 @@ struct FullAlbumGridView: View {
                                     isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                                     albumWithTracks: $playerManager.albumWithTracks,
                                     networkMonitor: networkMonitor,
-                                    playerManager: playerManager
+                                    playerManager: playerManager,
+                                    navigationPath: $navigationPath
                                 )
                                 
                             } label: {

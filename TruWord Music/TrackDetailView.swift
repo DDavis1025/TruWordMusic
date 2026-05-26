@@ -125,63 +125,38 @@ struct TrackDetailView: View {
                         }
                         .disabled(!networkMonitor.isConnected)
                     }
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 22)
                     
                     
                     if networkMonitor.isConnected {
                         
-                        if isPlayingFromAlbum {
-                            
-                            Menu {
-                                
-                                Button {
-                                    
-                                    Analytics.logEvent("view_artist_tapped", parameters: [
-                                        "song_id": song.id.rawValue,
-                                        "artist_name": song.artistName
-                                    ])
-                                    
-                                    openArtist()
-                                    
-                                } label: {
-                                    Label("View Artist", systemImage: "music.mic")
-                                }
-                                
-                                Button {
-                                    openAlbum()
-                                } label: {
-                                    Label("View Album", systemImage: "square.stack")
-                                }
-                                
-                            } label: {
-                                Image(systemName: "ellipsis.circle")
-                                    .font(.system(size: 28))
-                                    .foregroundColor(.primary)
-                            }
-                            .padding(.top, 5)
-                            
-                        } else {
+                        Menu {
                             
                             Button {
-                                
                                 Analytics.logEvent("view_artist_tapped", parameters: [
                                     "song_id": song.id.rawValue,
                                     "artist_name": song.artistName
                                 ])
                                 
                                 openArtist()
-                                
                             } label: {
-                                Text("View Artist")
-                                    .font(.subheadline)
-                                    .foregroundColor(.blue)
-                                    .padding(.vertical, 10)
-                                    .padding(.horizontal, 16)
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(10)
+                                Label("View Artist", systemImage: "music.mic")
                             }
-                            .padding(.top, 5)
+                            
+                            if isPlayingFromAlbum {
+                                Button {
+                                    openAlbum()
+                                } label: {
+                                    Label("View Album", systemImage: "square.stack")
+                                }
+                            }
+                            
+                        } label: {
+                            Image(systemName: "ellipsis.circle.fill")
+                                .font(.system(size: 28))
+                                .foregroundColor(.primary)
                         }
+                        .padding(.top, 6)
                     }
                     
                     Spacer()
@@ -274,7 +249,7 @@ struct TrackDetailView: View {
             return false
         }
     }
-
+    
     private func isArtistInSearchStack(_ id: MusicItemID) -> Bool {
         searchNavigationPath.contains { route in
             if case .artist(let routeID) = route {
@@ -283,7 +258,7 @@ struct TrackDetailView: View {
             return false
         }
     }
-
+    
     private func isArtistInFavoritesStack(_ id: MusicItemID) -> Bool {
         favoritesNavigationPath.contains { route in
             if case .artist(let routeID) = route {
@@ -325,31 +300,32 @@ struct TrackDetailView: View {
             matching: \.id,
             equalTo: song.id
         )
-
+        
         request.properties = [.artists]
         request.limit = 1
-
+        
         let response = try await request.response()
-
+        
         guard let fullSong = response.items.first else {
             throw URLError(.badServerResponse)
         }
-
+        
         return fullSong
     }
     
     private func openArtist() {
         Task {
             do {
+                
                 let fullSong = try await fetchSongWithArtists()
-
+                
                 guard let artist = fullSong.artists?.first else {
                     print("No artist found even after full fetch")
                     return
                 }
-
+                
                 let artistID = artist.id
-
+                
                 let alreadyOpen: Bool = {
                     switch activeTab {
                     case .home:
@@ -360,13 +336,13 @@ struct TrackDetailView: View {
                         return isArtistInFavoritesStack(artistID)
                     }
                 }()
-
+                
                 await MainActor.run {
                     if alreadyOpen {
                         dismiss()
                         return
                     }
-
+                    
                     switch activeTab {
                     case .home:
                         homeNavigationPath.append(.artist(artistID))
@@ -375,10 +351,16 @@ struct TrackDetailView: View {
                     case .favorites:
                         favoritesNavigationPath.append(.artist(artistID))
                     }
-
+                    
+                    Analytics.logEvent("artist_opened", parameters: [
+                        "artist_id": artist.id.rawValue,
+                        "artist_name": artist.name,
+                        "song_id": song.id.rawValue
+                    ])
+                    
                     dismiss()
                 }
-
+                
             } catch {
                 print("Error fetching song with artists: \(error)")
             }

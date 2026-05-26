@@ -91,6 +91,7 @@ struct ArtistDetailView: View {
                                                 cacheAlbum: { album in
                                                     albumCache[album.id] = album
                                                 },
+                                                navigationPath: $navigationPath,
                                                 networkMonitor: networkMonitor,
                                                 playerManager: playerManager
                                             )

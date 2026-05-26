@@ -12,6 +12,8 @@ struct AlbumDetailView: View {
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
+    @Binding var navigationPath: [Route]
+    
     private let bottomPlayerHeight: CGFloat = 77
     
     private var appleMusicURL: URL? {
@@ -26,7 +28,7 @@ struct AlbumDetailView: View {
                     ProgressView("Loading...")
                     Spacer()
                 }
-
+                
             } else if tracks.isEmpty {
                 Text("No tracks available")
                     .padding()
@@ -46,13 +48,27 @@ struct AlbumDetailView: View {
                             }
                             
                             Text(album.title)
-                                .font(.headline)
+                                .font(.system(size: 20, weight: .bold))
                                 .multilineTextAlignment(.center)
                                 .padding(.top, 4)
                             
-                            Text(album.artistName)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                            Button {
+                                Analytics.logEvent("artist_from_album_tapped", parameters: [
+                                    "artist_name": album.artistName,
+                                    "album_id": album.id.rawValue
+                                ])
+                                
+                                Task {
+                                    await openArtistFromAlbum()
+                                }
+                                
+                            } label: {
+                                Text(album.artistName)
+                                    .font(.system(size: 18, weight: .regular))
+                                    .foregroundColor(.primary)
+                            }
+                            
+                            .buttonStyle(.plain)
                             
                             if let appleMusicURL, !playerManager.appleMusicSubscription {
                                 
@@ -172,9 +188,9 @@ struct AlbumDetailView: View {
         .task(id: album.id) {
             isLoading = true
             tracks = []
-
+            
             let fetchedTracks = await fetchAlbumTracks(album: album)
-
+            
             await MainActor.run {
                 self.tracks = fetchedTracks
                 self.isLoading = false
@@ -190,7 +206,42 @@ struct AlbumDetailView: View {
         }
     }
     
-    // MARK: - Helpers
+    private func fetchAlbumWithArtists() async throws -> Album {
+        var request = MusicCatalogResourceRequest<Album>(
+            matching: \.id,
+            equalTo: album.id
+        )
+        
+        request.properties = [.artists]
+        
+        let response = try await request.response()
+        
+        guard let fullAlbum = response.items.first else {
+            throw URLError(.badServerResponse)
+        }
+        
+        return fullAlbum
+    }
+    
+    private func openArtistFromAlbum() async {
+        do {
+            let fullAlbum = try await fetchAlbumWithArtists()
+            
+            guard let artist = fullAlbum.artists?.first else {
+                print("No artist found")
+                return
+            }
+            
+            let artistID = artist.id
+            
+            await MainActor.run {
+                navigationPath.append(.artist(artistID))
+            }
+            
+        } catch {
+            print("Failed to open artist: \(error)")
+        }
+    }
     
     func setSelectedAlbum(album: Album) async {
         playerManager.selectedAlbum = album
@@ -202,27 +253,27 @@ struct AlbumDetailView: View {
                 matching: \.id,
                 equalTo: album.id
             )
-
+            
             albumRequest.properties = [.tracks]
-
+            
             let albumResponse = try await albumRequest.response()
-
+            
             guard let fetchedAlbum = albumResponse.items.first,
                   let albumTracks = fetchedAlbum.tracks else {
                 return []
             }
-
+            
             let trackIDs = albumTracks.compactMap { $0.id }
-
+            
             let songsRequest = MusicCatalogResourceRequest<Song>(
                 matching: \.id,
                 memberOf: trackIDs
             )
-
+            
             let songResponse = try await songsRequest.response()
-
+            
             return Array(songResponse.items)
-
+            
         } catch {
             print("Error fetching album tracks: \(error)")
             return []
