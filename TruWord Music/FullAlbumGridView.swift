@@ -77,42 +77,20 @@ struct FullAlbumGridView: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 30) {
                         ForEach(filteredAlbums, id: \.id) { album in
-                            NavigationLink {
-                                
-                                AlbumDetailView(
-                                    album: album,
-                                    playSong: { song in
-                                        playerManager.playbackSource = .album
-                                        
-                                        playerManager.playSong(
-                                            song,
-                                            from: [],
-                                            albumWithTracks: playerManager.albumWithTracks,
-                                            playFromAlbum: true,
-                                            networkMonitor: networkMonitor
-                                        )
-                                    },
-                                    isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                                    albumWithTracks: $playerManager.albumWithTracks,
-                                    networkMonitor: networkMonitor,
-                                    playerManager: playerManager,
-                                    navigationPath: $navigationPath
-                                )
-                                
-                            } label: {
+                            NavigationLink(value: Route.album(album.id)) {
                                 
                                 VStack {
                                     if let artworkURL = album.artwork?.url(width: 280, height: 280) {
                                         CustomAsyncImage(url: artworkURL, isCircle: false)
                                             .frame(width: albumSize, height: albumSize)
                                     }
-                                    
+
                                     Text(album.title)
                                         .font(.caption)
                                         .foregroundColor(.primary)
                                         .lineLimit(1)
                                         .frame(width: albumSize - 20)
-                                    
+
                                     Text(album.artistName)
                                         .font(.caption2)
                                         .foregroundColor(.secondary)

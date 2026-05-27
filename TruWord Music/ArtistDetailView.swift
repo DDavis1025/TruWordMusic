@@ -29,6 +29,10 @@ struct ArtistDetailView: View {
     
     private let bottomPlayerHeight: CGFloat = 77
     
+    private var appleMusicArtistURL: URL? {
+        URL(string: "https://music.apple.com/us/artist/\(artistID)")
+    }
+    
     var body: some View {
         Group {
             
@@ -58,12 +62,36 @@ struct ArtistDetailView: View {
                             }
                             
                             VStack(spacing: 2) {
-                                Text(artist?.name ?? "Artist")
+                                Text(artist?.name ?? "")
                                     .font(.title2.bold())
 
                                 Text("Artist")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
+                            }
+                            
+                            if let appleMusicArtistURL, !playerManager.appleMusicSubscription {
+                                
+                                HStack {
+                                    Spacer()
+                                    
+                                    Image("AppleMusicBadge")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(height: min(UIScreen.main.bounds.width * 0.1, 65))
+                                        .padding(.top, 14)
+                                        .onTapGesture {
+                                            Analytics.logEvent("apple_music_link_tapped", parameters: [
+                                                "source": "artist_detail",
+                                                "artist_id": artistID.rawValue,
+                                                "artist_name": artist?.name ?? ""
+                                            ])
+                                            
+                                            UIApplication.shared.open(appleMusicArtistURL)
+                                        }
+                                    
+                                    Spacer()
+                                }
                             }
                         }
                         .frame(maxWidth: .infinity)

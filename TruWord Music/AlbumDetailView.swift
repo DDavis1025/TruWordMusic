@@ -23,11 +23,10 @@ struct AlbumDetailView: View {
     var body: some View {
         Group {
             if isLoading {
-                VStack {
-                    Spacer()
+                ZStack {
                     ProgressView("Loading...")
-                    Spacer()
                 }
+                .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
                 
             } else if tracks.isEmpty {
                 Text("No tracks available")
@@ -79,9 +78,10 @@ struct AlbumDetailView: View {
                                         .resizable()
                                         .scaledToFit()
                                         .frame(height: min(UIScreen.main.bounds.width * 0.1, 65))
-                                        .padding(.top, 12)
+                                        .padding(.top, 14)
                                         .onTapGesture {
-                                            Analytics.logEvent("apple_music_album_link_tapped", parameters: [
+                                            Analytics.logEvent("apple_music_link_tapped", parameters: [
+                                                "source": "album_detail",
                                                 "album_id": album.id.rawValue
                                             ])
                                             UIApplication.shared.open(appleMusicURL)
