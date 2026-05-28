@@ -115,7 +115,7 @@ struct ContentView: View {
                         navigationPath: $navigationPath,
                         albumCache: $albumCache
                     )
-                case .fullTrackList(let title, let songs, let isFromArtist):
+                case .fullTrackList(_, let songs, let isFromArtist):
                     FullTrackListView(
                         songs: songs,
                         playSong: { song in
