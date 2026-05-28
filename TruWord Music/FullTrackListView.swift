@@ -5,6 +5,7 @@ import FirebaseAnalytics
 struct FullTrackListView: View {
     let songs: [Song]
     let playSong: (Song) -> Void
+    let isFromArtist: Bool
     @Binding var currentPlayingSong: Song?
     @Binding var isPlayingFromAlbum: Bool
     
@@ -81,11 +82,14 @@ struct FullTrackListView: View {
                                 UIApplication.shared.dismissKeyboard()
 
                                 // 🔥 Track song selection
-                                Analytics.logEvent("track_selected_from_list", parameters: [
-                                    "song_id": song.id.rawValue,
-                                    "song_title": song.title,
-                                    "artist_name": song.artistName
-                                ])
+                                Analytics.logEvent(
+                                    isFromArtist ? "artist_track_selected_from_list" : "track_selected_from_list",
+                                    parameters: [
+                                        "song_id": song.id.rawValue,
+                                        "song_title": song.title,
+                                        "artist_name": song.artistName
+                                    ]
+                                )
 
                                 playSong(song)
                                 isPlayingFromAlbum = false
@@ -108,18 +112,24 @@ struct FullTrackListView: View {
 
         // 🔥 Track view appearance
         .onAppear {
-            Analytics.logEvent("track_list_viewed", parameters: [
-                "track_count": filteredSongs.count
-            ])
+            Analytics.logEvent(
+                isFromArtist ? "artist_track_list_viewed" : "track_list_viewed",
+                parameters: [
+                    "track_count": filteredSongs.count
+                ]
+            )
         }
 
         // 🔥 Track search behavior
         .onChange(of: searchQuery) { _, newValue in
             guard !newValue.isEmpty else { return }
-
-            Analytics.logEvent("track_list_searched", parameters: [
-                "query": newValue
-            ])
+            
+            Analytics.logEvent(
+                isFromArtist ? "artist_track_list_searched" : "track_list_searched",
+                parameters: [
+                    "query": newValue
+                ]
+            )
         }
 
         .if(networkMonitor.isConnected) { view in

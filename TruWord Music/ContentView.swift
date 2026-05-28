@@ -14,6 +14,8 @@ struct AlbumWithTracks {
 
 enum Route: Hashable {
     case fullAlbumGrid
+    case fullTrackList
+    case artistAlbumGrid(title: String, albums: [Album])
     case album(MusicItemID)
     case artist(MusicItemID)
 }
@@ -73,6 +75,7 @@ struct ContentView: View {
                         cacheAlbum: { album in
                             albumCache[album.id] = album
                         },
+                        isFromArtist: false,
                         navigationPath: $navigationPath,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
@@ -111,6 +114,38 @@ struct ContentView: View {
                         networkMonitor: networkMonitor,
                         navigationPath: $navigationPath,
                         albumCache: $albumCache
+                    )
+                case .fullTrackList:
+                    FullTrackListView(
+                        songs: songs,
+                        playSong: { song in
+                            playerManager.playbackSource = .home
+
+                            playerManager.playSong(
+                                song,
+                                from: songs,
+                                albumWithTracks: nil,
+                                playFromAlbum: false,
+                                networkMonitor: networkMonitor
+                            )
+                        },
+                        isFromArtist: false,
+                        currentPlayingSong: $playerManager.currentlyPlayingSong,
+                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
+                    )
+                case .artistAlbumGrid(let title, let albums):
+                    FullAlbumGridView(
+                        albums: albums,
+                        title: title,
+                        cacheAlbum: { album in
+                            albumCache[album.id] = album
+                        },
+                        isFromArtist: true,
+                        navigationPath: $navigationPath,
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
                     )
                 }
             }
@@ -273,26 +308,7 @@ struct ContentView: View {
                 Spacer()
                 
                 if songs.count > 5 {
-                    NavigationLink {
-                        FullTrackListView(
-                            songs: songs,
-                            playSong: { song in
-                                playerManager.playbackSource = .home
-                                
-                                playerManager.playSong(
-                                    song,
-                                    from: songs,
-                                    albumWithTracks: nil,
-                                    playFromAlbum: false,
-                                    networkMonitor: networkMonitor
-                                )
-                            },
-                            currentPlayingSong: $playerManager.currentlyPlayingSong,
-                            isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                            networkMonitor: networkMonitor,
-                            playerManager: playerManager
-                        )
-                    } label: {
+                    NavigationLink(value: Route.fullTrackList) {
                         Text("View More")
                     }
                     .simultaneousGesture(TapGesture().onEnded {
@@ -308,6 +324,7 @@ struct ContentView: View {
                 SongRowView(song: song, currentPlayingSong: $playerManager.currentlyPlayingSong)
                     .onTapGesture {
                         playerManager.playbackSource = .home
+                        playerManager.isPlayingFromAlbum = false
                         
                         playerManager.playSong(
                             song,

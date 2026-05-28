@@ -6,6 +6,7 @@ struct FullAlbumGridView: View {
     let albums: [Album]
     let title: String
     let cacheAlbum: (Album) -> Void
+    let isFromArtist: Bool
     
     @Binding var navigationPath: [Route]
     
@@ -100,11 +101,16 @@ struct FullAlbumGridView: View {
                             }
                             .simultaneousGesture(TapGesture().onEnded {
                                 
-                                Analytics.logEvent("album_selected_from_grid", parameters: [
-                                    "album_id": album.id.rawValue,
-                                    "album_title": album.title,
-                                    "artist_name": album.artistName
-                                ])
+                                print("isFromArtist \(isFromArtist)")
+                                
+                                Analytics.logEvent(
+                                    isFromArtist ? "artist_album_selected_from_grid" : "album_selected_from_grid",
+                                    parameters: [
+                                        "album_id": album.id.rawValue,
+                                        "album_title": album.title,
+                                        "artist_name": album.artistName
+                                    ]
+                                )
                                 
                                 cacheAlbum(album)
                             })
@@ -126,18 +132,24 @@ struct FullAlbumGridView: View {
         .onAppear {
             albums.forEach { cacheAlbum($0) }
             
-            Analytics.logEvent("album_grid_viewed", parameters: [
-                "album_count": filteredAlbums.count
-            ])
+            Analytics.logEvent(
+                isFromArtist ? "artist_album_grid_viewed" : "album_grid_viewed",
+                parameters: [
+                    "album_count": filteredAlbums.count
+                ]
+            )
         }
         
         // 🔥 Track search behavior
         .onChange(of: searchQuery) { _, newValue in
             guard !newValue.isEmpty else { return }
-
-            Analytics.logEvent("album_grid_searched", parameters: [
-                "query": newValue
-            ])
+            
+            Analytics.logEvent(
+                isFromArtist ? "artist_album_grid_searched" : "album_grid_searched",
+                parameters: [
+                    "query": newValue
+                ]
+            )
         }
         
         .if(networkMonitor.isConnected) { view in

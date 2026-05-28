@@ -64,7 +64,7 @@ struct ArtistDetailView: View {
                             VStack(spacing: 2) {
                                 Text(artist?.name ?? "")
                                     .font(.title2.bold())
-
+                                
                                 Text("Artist")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
@@ -112,20 +112,13 @@ struct ArtistDetailView: View {
                                     
                                     if topAlbums.count > 7 {
                                         
-                                        NavigationLink {
-                                            FullAlbumGridView(
-                                                albums: topAlbums,
-                                                title: "Top Releases",
-                                                cacheAlbum: { album in
-                                                    albumCache[album.id] = album
-                                                },
-                                                navigationPath: $navigationPath,
-                                                networkMonitor: networkMonitor,
-                                                playerManager: playerManager
+                                        NavigationLink(
+                                            value: Route.artistAlbumGrid(
+                                                title: artist?.name ?? "Top Releases",
+                                                albums: topAlbums
                                             )
-                                            
-                                        } label: {
-                                            Text("View All")
+                                        ) {
+                                            Text("View More")
                                         }
                                         .font(.system(size: 15))
                                         .foregroundColor(.blue)
@@ -140,10 +133,19 @@ struct ArtistDetailView: View {
                                             
                                             AlbumCarouselItemView(album: album)
                                                 .onTapGesture {
+                                                    // Cache the album immediately
                                                     albumCache[album.id] = album
+                                                    
+                                                    // 🔥 NEW: pre-warm album tracks in background
+                                                    Task {
+                                                        _ = await prefetchAlbumTracks(album: album)
+                                                    }
+                                                    
                                                     navigationPath.append(.album(album.id))
-                                                    Analytics.logEvent("artist_album_opened", parameters: [
+                                                    
+                                                    Analytics.logEvent("artist_album_opened_from_carousel", parameters: [
                                                         "album_name": album.title,
+                                                        "artist_id": artistID.rawValue,
                                                         "artist_name": artist?.name ?? ""
                                                     ])
                                                 }
@@ -167,7 +169,7 @@ struct ArtistDetailView: View {
                                     
                                     Spacer()
                                     
-                                    if topSongs.count > 7 {
+                                    if topSongs.count > 10 {
                                         
                                         NavigationLink {
                                             
@@ -185,6 +187,7 @@ struct ArtistDetailView: View {
                                                         networkMonitor: networkMonitor
                                                     )
                                                 },
+                                                isFromArtist: true,
                                                 currentPlayingSong: $playerManager.currentlyPlayingSong,
                                                 isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                                                 networkMonitor: networkMonitor,
@@ -192,7 +195,7 @@ struct ArtistDetailView: View {
                                             )
                                             
                                         } label: {
-                                            Text("View All")
+                                            Text("View More")
                                         }
                                         .font(.system(size: 15))
                                         .foregroundColor(.blue)
@@ -201,7 +204,7 @@ struct ArtistDetailView: View {
                                 
                                 VStack(spacing: 0) {
                                     
-                                    ForEach(topSongs.prefix(7), id: \.id) { song in
+                                    ForEach(topSongs.prefix(10), id: \.id) { song in
                                         
                                         SongRowView(
                                             song: song,
@@ -210,6 +213,7 @@ struct ArtistDetailView: View {
                                         .onTapGesture {
                                             
                                             playerManager.playbackSource = .artist
+                                            playerManager.isPlayingFromAlbum = false
                                             
                                             playerManager.playSong(
                                                 song,
@@ -219,8 +223,9 @@ struct ArtistDetailView: View {
                                                 networkMonitor: networkMonitor
                                             )
                                             
-                                            Analytics.logEvent("artist_song_played", parameters: [
+                                            Analytics.logEvent("song_played_from_artist_detail", parameters: [
                                                 "song_name": song.title,
+                                                "artist_id": artistID.rawValue,
                                                 "artist_name": song.artistName
                                             ])
                                         }
@@ -231,9 +236,9 @@ struct ArtistDetailView: View {
                     }
                     .padding()
                     .padding(.bottom,
-                        playerManager.currentlyPlayingSong != nil
-                        ? bottomPlayerHeight
-                        : 0
+                             playerManager.currentlyPlayingSong != nil
+                             ? bottomPlayerHeight
+                             : 0
                     )
                 }
             }
@@ -249,6 +254,39 @@ struct ArtistDetailView: View {
             Analytics.logEvent("artist_viewed", parameters: [
                 "artist_name": artist?.name ?? ""
             ])
+        }
+    }
+    
+    private func prefetchAlbumTracks(album: Album) async -> [Song] {
+        do {
+            var albumRequest = MusicCatalogResourceRequest<Album>(
+                matching: \.id,
+                equalTo: album.id
+            )
+            
+            albumRequest.properties = [.tracks]
+            
+            let albumResponse = try await albumRequest.response()
+            
+            guard let fetchedAlbum = albumResponse.items.first,
+                  let albumTracks = fetchedAlbum.tracks else {
+                return []
+            }
+            
+            let trackIDs = albumTracks.compactMap { $0.id }
+            
+            let songsRequest = MusicCatalogResourceRequest<Song>(
+                matching: \.id,
+                memberOf: trackIDs
+            )
+            
+            let songResponse = try await songsRequest.response()
+            
+            return Array(songResponse.items)
+            
+        } catch {
+            print("Error pre-fetching album tracks: \(error)")
+            return []
         }
     }
     
@@ -285,21 +323,25 @@ struct ArtistDetailView: View {
                 
                 self.artist = fetchedArtist
                 
-                self.topAlbums = Array(fetchedArtist.albums ?? []).filter {
-                    
-                    ($0.genreNames.contains("Christian") ||
-                     $0.genreNames.contains("Christian & Gospel")) &&
-                    
-                    $0.contentRating != .explicit
-                }
+                self.topAlbums = Array(fetchedArtist.albums ?? [])
+                    .filter {
+                        ($0.genreNames.contains("Christian") ||
+                         $0.genreNames.contains("Christian & Gospel")) &&
+                        $0.contentRating != .explicit
+                    }
+                    .sorted {
+                        ($0.releaseDate ?? .distantPast) > ($1.releaseDate ?? .distantPast)
+                    }
                 
-                self.topSongs = Array(fetchedArtist.topSongs ?? []).filter {
-                    
-                    ($0.genreNames.contains("Christian") ||
-                     $0.genreNames.contains("Christian & Gospel")) &&
-                    
-                    $0.contentRating != .explicit
-                }
+                self.topSongs = Array(fetchedArtist.topSongs ?? [])
+                    .filter {
+                        ($0.genreNames.contains("Christian") ||
+                         $0.genreNames.contains("Christian & Gospel")) &&
+                        $0.contentRating != .explicit
+                    }
+                    .sorted {
+                        ($0.releaseDate ?? .distantPast) > ($1.releaseDate ?? .distantPast)
+                    }
                 
                 self.isLoading = false
             }

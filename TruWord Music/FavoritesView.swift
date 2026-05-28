@@ -120,6 +120,20 @@ struct FavoritesView: View {
                         navigationPath: $navigationPath,
                         albumCache: $albumCache
                     )
+                case .fullTrackList:
+                    EmptyView() // Not used in Favorites, but required
+                case .artistAlbumGrid(let title, let albums):
+                    FullAlbumGridView(
+                        albums: albums,
+                        title: title,
+                        cacheAlbum: { album in
+                            albumCache[album.id] = album
+                        },
+                        isFromArtist: true,   // ✅ Favorites is NOT artist-origin
+                        navigationPath: $navigationPath,
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
+                    )
                 }
             }
 

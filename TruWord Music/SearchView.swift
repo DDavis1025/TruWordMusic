@@ -295,7 +295,6 @@ struct SearchView: View {
                 switch route {
                     
                 case .album(let albumID):
-                    
                     if let album = albumCache[albumID] {
                         AlbumDetailView(
                             album: album,
@@ -323,16 +322,18 @@ struct SearchView: View {
                         )
                         .id(album.id)
                     } else {
-                        VStack {
-                            Spacer()
-                            ProgressView()
-                            Spacer()
-                        }
+                        // Fetch album if not in cache
+                        AlbumDetailLoadingView(
+                            albumID: albumID,
+                            playerManager: playerManager,
+                            networkMonitor: networkMonitor,
+                            navigationPath: $navigationPath,
+                            albumCache: $albumCache
+                        )
                     }
                     
                 case .fullAlbumGrid:
                     EmptyView() // not used here
-                    
                 case .artist(let artistID):
                     ArtistDetailView(
                         artistID: artistID,
@@ -340,6 +341,20 @@ struct SearchView: View {
                         networkMonitor: networkMonitor,
                         navigationPath: $navigationPath,
                         albumCache: $albumCache
+                    )
+                case .fullTrackList:
+                    EmptyView() // not used here
+                case .artistAlbumGrid(let title, let albums):
+                    FullAlbumGridView(
+                        albums: albums,
+                        title: title,
+                        cacheAlbum: { album in
+                            albumCache[album.id] = album
+                        },
+                        isFromArtist: true,
+                        navigationPath: $navigationPath,
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
                     )
                 }
             }
