@@ -14,7 +14,7 @@ struct AlbumWithTracks {
 
 enum Route: Hashable {
     case fullAlbumGrid
-    case fullTrackList
+    case fullTrackList(title: String, songs: [Song], isFromArtist: Bool)
     case artistAlbumGrid(title: String, albums: [Album])
     case album(MusicItemID)
     case artist(MusicItemID)
@@ -115,11 +115,11 @@ struct ContentView: View {
                         navigationPath: $navigationPath,
                         albumCache: $albumCache
                     )
-                case .fullTrackList:
+                case .fullTrackList(let title, let songs, let isFromArtist):
                     FullTrackListView(
                         songs: songs,
                         playSong: { song in
-                            playerManager.playbackSource = .home
+                            playerManager.playbackSource = isFromArtist ? .artist : .home
 
                             playerManager.playSong(
                                 song,
@@ -129,7 +129,7 @@ struct ContentView: View {
                                 networkMonitor: networkMonitor
                             )
                         },
-                        isFromArtist: false,
+                        isFromArtist: isFromArtist,
                         currentPlayingSong: $playerManager.currentlyPlayingSong,
                         isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
                         networkMonitor: networkMonitor,
@@ -308,7 +308,13 @@ struct ContentView: View {
                 Spacer()
                 
                 if songs.count > 5 {
-                    NavigationLink(value: Route.fullTrackList) {
+                    NavigationLink(
+                        value: Route.fullTrackList(
+                            title: "Top Songs",
+                            songs: songs,
+                            isFromArtist: false
+                        )
+                    ) {
                         Text("View More")
                     }
                     .simultaneousGesture(TapGesture().onEnded {

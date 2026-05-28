@@ -170,33 +170,17 @@ struct ArtistDetailView: View {
                                     Spacer()
                                     
                                     if topSongs.count > 10 {
-                                        
-                                        NavigationLink {
-                                            
-                                            FullTrackListView(
+                                        NavigationLink(
+                                            value: Route.fullTrackList(
+                                                title: "Top Songs",
                                                 songs: topSongs,
-                                                playSong: { song in
-                                                    
-                                                    playerManager.playbackSource = .artist
-                                                    
-                                                    playerManager.playSong(
-                                                        song,
-                                                        from: topSongs,
-                                                        albumWithTracks: nil,
-                                                        playFromAlbum: false,
-                                                        networkMonitor: networkMonitor
-                                                    )
-                                                },
-                                                isFromArtist: true,
-                                                currentPlayingSong: $playerManager.currentlyPlayingSong,
-                                                isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
-                                                networkMonitor: networkMonitor,
-                                                playerManager: playerManager
+                                                isFromArtist: true
                                             )
-                                            
-                                        } label: {
+                                        ) {
                                             Text("View More")
                                         }
+                                        .font(.system(size: 15))
+                                        .foregroundColor(.blue)
                                         .font(.system(size: 15))
                                         .foregroundColor(.blue)
                                     }

@@ -79,15 +79,18 @@ struct FullTrackListView: View {
                                 rightPadding: 8
                             )
                             .onTapGesture {
+                                
+                                print("track selected \(isFromArtist)")
+                                
                                 UIApplication.shared.dismissKeyboard()
 
-                                // 🔥 Track song selection
                                 Analytics.logEvent(
-                                    isFromArtist ? "artist_track_selected_from_list" : "track_selected_from_list",
+                                    "track_selected_from_list",
                                     parameters: [
                                         "song_id": song.id.rawValue,
                                         "song_title": song.title,
-                                        "artist_name": song.artistName
+                                        "artist_name": song.artistName,
+                                        "source": isFromArtist ? "artist" : "home"
                                     ]
                                 )
 
@@ -113,9 +116,10 @@ struct FullTrackListView: View {
         // 🔥 Track view appearance
         .onAppear {
             Analytics.logEvent(
-                isFromArtist ? "artist_track_list_viewed" : "track_list_viewed",
+                "track_list_viewed",
                 parameters: [
-                    "track_count": filteredSongs.count
+                    "track_count": filteredSongs.count,
+                    "source": isFromArtist ? "artist" : "home"
                 ]
             )
         }
@@ -125,9 +129,10 @@ struct FullTrackListView: View {
             guard !newValue.isEmpty else { return }
             
             Analytics.logEvent(
-                isFromArtist ? "artist_track_list_searched" : "track_list_searched",
+                "track_list_searched",
                 parameters: [
-                    "query": newValue
+                    "query": newValue,
+                    "source": isFromArtist ? "artist" : "home"
                 ]
             )
         }

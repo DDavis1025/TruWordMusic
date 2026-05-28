@@ -342,8 +342,26 @@ struct SearchView: View {
                         navigationPath: $navigationPath,
                         albumCache: $albumCache
                     )
-                case .fullTrackList:
-                    EmptyView() // not used here
+                case .fullTrackList(_, let songs, let isFromArtist):
+                    FullTrackListView(
+                        songs: songs,
+                        playSong: { song in
+                            playerManager.playbackSource = isFromArtist ? .artist : .search
+
+                            playerManager.playSong(
+                                song,
+                                from: songs,
+                                albumWithTracks: nil,
+                                playFromAlbum: false,
+                                networkMonitor: networkMonitor
+                            )
+                        },
+                        isFromArtist: isFromArtist,
+                        currentPlayingSong: $playerManager.currentlyPlayingSong,
+                        isPlayingFromAlbum: $playerManager.isPlayingFromAlbum,
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
+                    )
                 case .artistAlbumGrid(let title, let albums):
                     FullAlbumGridView(
                         albums: albums,

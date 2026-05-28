@@ -101,17 +101,15 @@ struct FullAlbumGridView: View {
                             }
                             .simultaneousGesture(TapGesture().onEnded {
                                 
-                                print("isFromArtist \(isFromArtist)")
-                                
                                 Analytics.logEvent(
-                                    isFromArtist ? "artist_album_selected_from_grid" : "album_selected_from_grid",
+                                    "album_selected_from_grid",
                                     parameters: [
                                         "album_id": album.id.rawValue,
                                         "album_title": album.title,
-                                        "artist_name": album.artistName
+                                        "artist_name": album.artistName,
+                                        "source": isFromArtist ? "artist" : "home"
                                     ]
                                 )
-                                
                                 cacheAlbum(album)
                             })
                         }
@@ -133,9 +131,10 @@ struct FullAlbumGridView: View {
             albums.forEach { cacheAlbum($0) }
             
             Analytics.logEvent(
-                isFromArtist ? "artist_album_grid_viewed" : "album_grid_viewed",
+                "album_grid_viewed",
                 parameters: [
-                    "album_count": filteredAlbums.count
+                    "album_count": filteredAlbums.count,
+                    "source": isFromArtist ? "artist" : "home"
                 ]
             )
         }
@@ -145,11 +144,13 @@ struct FullAlbumGridView: View {
             guard !newValue.isEmpty else { return }
             
             Analytics.logEvent(
-                isFromArtist ? "artist_album_grid_searched" : "album_grid_searched",
+                "album_grid_searched",
                 parameters: [
-                    "query": newValue
+                    "query": newValue,
+                    "source": isFromArtist ? "artist" : "home"
                 ]
             )
+            
         }
         
         .if(networkMonitor.isConnected) { view in
