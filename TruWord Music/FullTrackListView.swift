@@ -80,8 +80,6 @@ struct FullTrackListView: View {
                             )
                             .onTapGesture {
                                 
-                                print("track selected \(isFromArtist)")
-                                
                                 UIApplication.shared.dismissKeyboard()
 
                                 Analytics.logEvent(

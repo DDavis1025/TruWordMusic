@@ -14,6 +14,9 @@ class FavoritesManager: ObservableObject {
     @Published var favoriteSongs: [Song] = []
     @Published private(set) var favoriteOrder: [String] = []
     
+    // Add a callback for when favorites change
+    var onFavoritesChanged: (() -> Void)?
+    
     private let key = "favorite_song_ids"
     
     init() {
@@ -33,8 +36,6 @@ class FavoritesManager: ObservableObject {
         if let index = favoriteOrder.firstIndex(of: id) {
             favoriteOrder.remove(at: index)
             favoriteIDs.remove(id)
-            
-            // ✅ Remove instantly from UI list
             favoriteSongs.removeAll { $0.id.rawValue == id }
         } else {
             favoriteOrder.append(id)
@@ -45,21 +46,25 @@ class FavoritesManager: ObservableObject {
         
         Task {
             await fetchFavoriteSongs()
+            // Notify that favorites have changed
+            await MainActor.run {
+                onFavoritesChanged?()
+            }
         }
     }
-
+    
     
     private func save() {
         UserDefaults.standard.set(favoriteOrder, forKey: key)
     }
-
+    
     private func load() {
         if let saved = UserDefaults.standard.array(forKey: key) as? [String] {
             favoriteOrder = saved
             favoriteIDs = Set(saved)
         }
     }
-
+    
     
     func fetchFavoriteSongs() async {
         guard !favoriteIDs.isEmpty else {

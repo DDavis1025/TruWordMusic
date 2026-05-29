@@ -4,22 +4,22 @@ import FirebaseAnalytics
 
 struct FavoritesView: View {
     @EnvironmentObject var favoritesManager: FavoritesManager
-
+    
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
-
+    
     @Binding var navigationPath: [Route]
     @Binding var currentPlayingSong: Song?
     @Binding var isPlayingFromAlbum: Bool
     @Binding var musicAuthorized: Bool
-
+    
     @State private var searchQuery: String = ""
     
     let albums: [Album]
     @Binding var albumCache: [MusicItemID: Album]
-
+    
     private let bottomPlayerHeight: CGFloat = 77
-
+    
     var filteredSongs: [Song] {
         if searchQuery.isEmpty {
             return favoritesManager.favoriteSongs
@@ -30,42 +30,42 @@ struct FavoritesView: View {
             }
         }
     }
-
+    
     var body: some View {
         NavigationStack(path: $navigationPath) {
             Group {
-
+                
                 // MARK: - No Internet
                 if !networkMonitor.isConnected {
                     noInternetView
-
-                // MARK: - Authorization
+                    
+                    // MARK: - Authorization
                 } else if !musicAuthorized {
                     MusicAuthorizationView(
                         bottomPlayerHeight: bottomPlayerHeight,
                         hasPlayer: playerManager.currentlyPlayingSong != nil
                     )
                     .padding(.horizontal, 16)
-
-                // MARK: - Empty State
+                    
+                    // MARK: - Empty State
                 } else if favoritesManager.favoriteSongs.isEmpty {
                     emptyStateView
-
-                // MARK: - Content
+                    
+                    // MARK: - Content
                 } else {
                     contentView
                 }
             }
             .navigationTitle("Favorites")
             .navigationBarTitleDisplayMode(.inline)
-
+            
             // 🔥 Screen view tracking
             .onAppear {
                 Analytics.logEvent("favorites_viewed", parameters: [
                     "favorite_count": favoritesManager.favoriteSongs.count
                 ])
             }
-
+            
             // 🔥 Search tracking
             .onChange(of: searchQuery) { _, newValue in
                 if !newValue.isEmpty {
@@ -74,22 +74,22 @@ struct FavoritesView: View {
                     ])
                 }
             }
-
-
+            
+            
             .if(networkMonitor.isConnected && musicAuthorized) { view in
                 view.searchable(text: $searchQuery, prompt: "Search Favorites")
             }
-
+            
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .album(let albumID):
-
+                    
                     if let album = albumCache[albumID] {
                         AlbumDetailView(
                             album: album,
                             playSong: { song in
                                 let songsFromFavorites = favoritesManager.favoriteSongs
-
+                                
                                 playerManager.playSong(
                                     song,
                                     from: songsFromFavorites,
@@ -108,7 +108,7 @@ struct FavoritesView: View {
                     } else {
                         Text("Album not found")
                     }
-
+                    
                 case .fullAlbumGrid:
                     EmptyView() // Not used in Favorites, but required
                     
@@ -120,8 +120,29 @@ struct FavoritesView: View {
                         navigationPath: $navigationPath,
                         albumCache: $albumCache
                     )
-                case .fullTrackList:
-                    EmptyView() // Not used in Favorites, but required
+                    
+                case .fullTrackList(_, let songs, let isFromArtist):
+                    FullTrackListView(
+                        songs: songs,
+                        playSong: { song in
+                            
+                            playerManager.playbackSource = .favorites
+                            
+                            playerManager.playSong(
+                                song,
+                                from: songs,
+                                albumWithTracks: nil,
+                                playFromAlbum: false,
+                                networkMonitor: networkMonitor
+                            )
+                        },
+                        isFromArtist: isFromArtist,
+                        currentPlayingSong: $currentPlayingSong,
+                        isPlayingFromAlbum: $isPlayingFromAlbum,
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
+                    )
+                    
                 case .artistAlbumGrid(let title, let albums):
                     FullAlbumGridView(
                         albums: albums,
@@ -136,32 +157,32 @@ struct FavoritesView: View {
                     )
                 }
             }
-
+            
         }
         .task {
             await favoritesManager.fetchFavoriteSongs()
         }
     }
-
+    
     // MARK: - CONTENT VIEW
     private var contentView: some View {
         ScrollView {
             VStack(spacing: 0) {
-
+                
                 ForEach(filteredSongs, id: \.id) { song in
                     HStack(spacing: 6) {
-
+                        
                         SongRowView(
                             song: song,
                             currentPlayingSong: $currentPlayingSong,
                             leftPadding: 8,
                             rightPadding: 0
                         )
-
+                        
                         Button {
                             withAnimation {
                                 favoritesManager.toggleFavorite(song)
-
+                                
                                 // 🔥 Favorite toggle tracking
                                 Analytics.logEvent("favorite_toggled_from_list", parameters: [
                                     "song_id": song.id.rawValue,
@@ -178,16 +199,16 @@ struct FavoritesView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         UIApplication.shared.dismissKeyboard()
-
+                        
                         // 🔥 Playback tracking
                         Analytics.logEvent("favorite_song_played", parameters: [
                             "song_id": song.id.rawValue,
                             "title": song.title,
                             "artist": song.artistName
                         ])
-
+                        
                         playerManager.playbackSource = .favorites
-
+                        
                         playerManager.playSong(
                             song,
                             from: favoritesManager.favoriteSongs,
@@ -207,25 +228,25 @@ struct FavoritesView: View {
             }
         }
     }
-
+    
     // MARK: - EMPTY STATE
     private var emptyStateView: some View {
         VStack(spacing: 12) {
             Spacer()
-
+            
             Image(systemName: "star")
                 .font(.system(size: 40))
                 .foregroundColor(.secondary)
-
+            
             Text("No Favorites Yet")
                 .font(.headline)
-
+            
             Text("Tap the star on any song to save it here")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
-
+            
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -235,19 +256,19 @@ struct FavoritesView: View {
             }
         }
     }
-
+    
     // MARK: - NO INTERNET VIEW
     private var noInternetView: some View {
         VStack(spacing: 8) {
             Spacer()
-
+            
             Text("No Internet connection")
                 .font(.headline)
-
+            
             Text("Your device is not connected to the internet")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-
+            
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

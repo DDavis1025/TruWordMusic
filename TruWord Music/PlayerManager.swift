@@ -45,6 +45,8 @@ class PlayerManager: ObservableObject {
     private var playerStateTask: Task<Void, Never>?
     private var playerPreparationTask: Task<Void, Never>?
     
+    weak var favoritesManager: FavoritesManager?
+    
     // ✅ Track playback state across background/foreground
     private var wasPlayingBeforeBackground: Bool = false
     
@@ -413,7 +415,7 @@ class PlayerManager: ObservableObject {
             player.seek(to: .zero)
         }
     }
-
+    
     
     @MainActor
     private func ensurePlayerIsReadyAndPlays(
@@ -558,4 +560,74 @@ class PlayerManager: ObservableObject {
             appleMusicSubscription = false
         }
     }
+    
+    // Add this function to rebuild the queue when favorites change
+    func rebuildFavoritesQueueIfNeeded(currentSong: Song) {
+        guard playbackSource == .favorites,
+              let favorites = favoritesManager?.favoriteSongs else { return }
+        
+        // Check if current song is still in favorites
+        if !favorites.contains(where: { $0.id == currentSong.id }) {
+            // Current song was removed, find next song
+            if let nextSong = findNextPlayableSong(currentSong: currentSong, in: favorites) {
+                playSong(nextSong, from: favorites, playFromAlbum: false)
+            } else if let previousSong = findPreviousPlayableSong(currentSong: currentSong, in: favorites) {
+                playSong(previousSong, from: favorites, playFromAlbum: false)
+            } else if let firstSong = favorites.first {
+                playSong(firstSong, from: favorites, playFromAlbum: false)
+            } else {
+                stopApplicationMusicPlayer()
+            }
+        } else {
+            // Current song still in favorites, just rebuild the queue
+            if let currentIndex = favorites.firstIndex(of: currentSong) {
+                let reorderedQueue = Array(favorites[currentIndex...]) + Array(favorites[..<currentIndex])
+                ApplicationMusicPlayer.shared.queue = ApplicationMusicPlayer.Queue(for: reorderedQueue)
+            }
+        }
+    }
+    
+    private func findNextPlayableSong(currentSong: Song, in favorites: [Song]) -> Song? {
+        // Use lastPlayedSongs directly - no cast needed
+        guard let originalIndex = lastPlayedSongs.firstIndex(where: { $0.id == currentSong.id }) else {
+            return nil
+        }
+        
+        for nextIndex in (originalIndex + 1)..<lastPlayedSongs.count {
+            let nextSong = lastPlayedSongs[nextIndex]
+            if favorites.contains(where: { $0.id == nextSong.id }) {
+                return nextSong
+            }
+        }
+        return nil
+    }
+    
+    private func findPreviousPlayableSong(currentSong: Song, in favorites: [Song]) -> Song? {
+        // Use lastPlayedSongs directly - no cast needed
+        guard let originalIndex = lastPlayedSongs.firstIndex(where: { $0.id == currentSong.id }) else {
+            return nil
+        }
+        
+        for prevIndex in stride(from: originalIndex - 1, through: 0, by: -1) {
+            let prevSong = lastPlayedSongs[prevIndex]
+            if favorites.contains(where: { $0.id == prevSong.id }) {
+                return prevSong
+            }
+        }
+        return nil
+    }
+    
+    func syncFavoritesQueueWithoutInterruptingPlayback(currentSong: Song) {
+        guard playbackSource == .favorites,
+              let favorites = favoritesManager?.favoriteSongs else { return }
+        
+        guard let currentIndex = favorites.firstIndex(of: currentSong) else {
+            // current song is no longer in favorites BUT DO NOTHING
+            return
+        }
+        
+        let reorderedQueue = Array(favorites[currentIndex...]) + Array(favorites[..<currentIndex])
+        ApplicationMusicPlayer.shared.queue = ApplicationMusicPlayer.Queue(for: reorderedQueue)
+    }
+    
 }

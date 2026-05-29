@@ -36,7 +36,7 @@ struct AlbumDetailView: View {
                     
                     // MARK: - HEADER
                     Section {
-                        VStack(spacing: 6) {
+                        VStack(spacing: 7) {
                             
                             if let artworkURL = album.artwork?.url(width: 1400, height: 1400) {
                                 let screenWidth = UIScreen.main.bounds.width
@@ -60,11 +60,12 @@ struct AlbumDetailView: View {
                                 Task {
                                     await openArtistFromAlbum()
                                 }
-                                
                             } label: {
                                 Text(album.artistName)
                                     .font(.system(size: 18, weight: .regular))
                                     .foregroundColor(.primary)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .multilineTextAlignment(.center)
                             }
                             
                             .buttonStyle(.plain)
@@ -78,7 +79,7 @@ struct AlbumDetailView: View {
                                         .resizable()
                                         .scaledToFit()
                                         .frame(height: min(UIScreen.main.bounds.width * 0.1, 65))
-                                        .padding(.top, 14)
+                                        .padding(.top, 17)
                                         .onTapGesture {
                                             Analytics.logEvent("apple_music_link_tapped", parameters: [
                                                 "source": "album_detail",

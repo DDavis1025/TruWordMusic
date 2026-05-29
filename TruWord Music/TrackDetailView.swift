@@ -204,11 +204,14 @@ struct TrackDetailView: View {
                                 Button(action: {
                                     favoritesManager.toggleFavorite(song)
                                     
+                                    if appleMusicSubscription {
+                                        playerManager.syncFavoritesQueueWithoutInterruptingPlayback(currentSong: song)
+                                    }
+                                    
                                     Analytics.logEvent("favorite_toggled", parameters: [
                                         "song_id": song.id.rawValue,
                                         "is_favorite": favoritesManager.isFavorite(song)
                                     ])
-                                    
                                 }) {
                                     Image(systemName: favoritesManager.isFavorite(song) ? "star.fill" : "star")
                                         .font(.system(size: 24))
@@ -247,7 +250,7 @@ struct TrackDetailView: View {
                             showActionsMenu = false
                             Analytics.logEvent("view_artist_tapped", parameters: [
                                 "song_id": song.id.rawValue,
-                                "artist_name": song.artistName
+                                "artist_name": song.artistName,
                             ])
                             openArtist()
                         } label: {
@@ -305,6 +308,79 @@ struct TrackDetailView: View {
                     dismiss()
                 }
             }
+        }
+    }
+    
+    // Function to rebuild the queue without unfavorited songs
+    private func rebuildFavoritesQueue() {
+        guard playerManager.playbackSource == .favorites else { return }
+        
+        let currentFavorites = favoritesManager.favoriteSongs
+        let player = ApplicationMusicPlayer.shared
+        
+        // Find the current song in the updated favorites list
+        if let currentSongInFavorites = currentFavorites.first(where: { $0.id == song.id }) {
+            // Current song is still favorited, rebuild queue from current position
+            if let startIndex = currentFavorites.firstIndex(of: currentSongInFavorites) {
+                let reorderedQueue = Array(currentFavorites[startIndex...]) + Array(currentFavorites[..<startIndex])
+                player.queue = ApplicationMusicPlayer.Queue(for: reorderedQueue)
+            }
+        } else {
+            // Current song was unfavorited, find next or previous song to play
+            handleCurrentSongRemovedFromFavorites()
+        }
+    }
+    
+    private func handleCurrentSongRemovedFromFavorites() {
+        let currentFavorites = favoritesManager.favoriteSongs
+        
+        guard !currentFavorites.isEmpty else {
+            // No favorites left, stop playback and dismiss
+            ApplicationMusicPlayer.shared.stop()
+            dismiss()
+            return
+        }
+        
+        // Try to find the next song (based on original order)
+        // We need to know the original position to find what comes next
+        
+        // Get the original playlist from when we started
+        let originalPlaylist: [Song] = {
+            switch playerManager.playbackSource {
+            case .favorites:
+                return playerManager.lastPlayedSongs
+            default:
+                return []
+            }
+        }()
+        
+        if let originalIndex = originalPlaylist.firstIndex(where: { $0.id == song.id }) {
+            // Look for the next song in the original list that's still favorited
+            for nextIndex in (originalIndex + 1)..<originalPlaylist.count {
+                let nextSong = originalPlaylist[nextIndex]
+                if favoritesManager.isFavorite(nextSong) {
+                    // Play this song instead
+                    playerManager.playSong(nextSong, from: currentFavorites, playFromAlbum: false)
+                    return
+                }
+            }
+            
+            // If no next song, try previous songs
+            for prevIndex in stride(from: originalIndex - 1, through: 0, by: -1) {
+                let prevSong = originalPlaylist[prevIndex]
+                if favoritesManager.isFavorite(prevSong) {
+                    playerManager.playSong(prevSong, from: currentFavorites, playFromAlbum: false)
+                    return
+                }
+            }
+        }
+        
+        // If no playable song found, just play the first favorite
+        if let firstSong = currentFavorites.first {
+            playerManager.playSong(firstSong, from: currentFavorites, playFromAlbum: false)
+        } else {
+            ApplicationMusicPlayer.shared.stop()
+            dismiss()
         }
     }
     
@@ -447,10 +523,37 @@ struct TrackDetailView: View {
         guard networkMonitor.isConnected else { return }
         
         if appleMusicSubscription {
-            let player = ApplicationMusicPlayer.shared
-            Task {
-                try? await player.skipToNextEntry()
+            // For Apple Music subscription, we need to handle navigation manually
+            // to skip unfavorited songs
+            
+            let currentList: [Song] = {
+                switch playerManager.playbackSource {
+                case .album:
+                    return albumWithTracks?.tracks ?? playerManager.lastPlayedSongs
+                case .favorites:
+                    return playerManager.lastPlayedSongs
+                case .home, .search, .artist, .none:
+                    return playerManager.lastPlayedSongs
+                }
+            }()
+            
+            guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
+            
+            // Find next playable song in current favorites
+            for nextIndex in (currentIndex + 1)..<currentList.count {
+                let nextSong = currentList[nextIndex]
+                let isPlayable = (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date())
+                && nextSong.playParameters != nil
+                
+                if isPlayable {
+                    // Update the UI
+                    song = nextSong
+                    // Play the next song
+                    playerManager.playSong(nextSong, from: currentList, playFromAlbum: false)
+                    return
+                }
             }
+            
             return
         }
         
@@ -490,10 +593,36 @@ struct TrackDetailView: View {
         guard networkMonitor.isConnected else { return }
         
         if appleMusicSubscription {
-            let player = ApplicationMusicPlayer.shared
-            Task {
-                try? await player.skipToPreviousEntry()
+            // For Apple Music subscription, handle navigation manually
+            
+            let currentList: [Song] = {
+                switch playerManager.playbackSource {
+                case .album:
+                    return albumWithTracks?.tracks ?? playerManager.lastPlayedSongs
+                case .favorites:
+                    return favoritesManager.favoriteSongs  // Use live favorites
+                case .home, .search, .artist, .none:
+                    return playerManager.lastPlayedSongs
+                }
+            }()
+            
+            guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
+            
+            // Find previous playable song in current favorites
+            for previousIndex in stride(from: currentIndex - 1, through: 0, by: -1) {
+                let prevSong = currentList[previousIndex]
+                let isPlayable = (prevSong.releaseDate == nil || prevSong.releaseDate! <= Date())
+                && prevSong.playParameters != nil
+                
+                if isPlayable {
+                    // Update the UI
+                    song = prevSong
+                    // Play the previous song
+                    playerManager.playSong(prevSong, from: currentList, playFromAlbum: false)
+                    return
+                }
             }
+            
             return
         }
         

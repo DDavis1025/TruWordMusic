@@ -38,13 +38,10 @@ struct ArtistDetailView: View {
             
             if isLoading {
                 
-                VStack {
-                    Spacer()
-                    
-                    ProgressView("Loading Artist...")
-                    
-                    Spacer()
+                ZStack {
+                    ProgressView("Loading...")
                 }
+                .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
                 
             } else {
                 
@@ -69,6 +66,8 @@ struct ArtistDetailView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
+                            .frame(maxWidth: .infinity)
+                            .multilineTextAlignment(.center)
                             
                             if let appleMusicArtistURL, !playerManager.appleMusicSubscription {
                                 
