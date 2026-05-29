@@ -36,7 +36,7 @@ struct AlbumDetailView: View {
                     
                     // MARK: - HEADER
                     Section {
-                        VStack(spacing: 7) {
+                        VStack(spacing: 8) {
                             
                             if let artworkURL = album.artwork?.url(width: 1400, height: 1400) {
                                 let screenWidth = UIScreen.main.bounds.width
@@ -79,7 +79,7 @@ struct AlbumDetailView: View {
                                         .resizable()
                                         .scaledToFit()
                                         .frame(height: min(UIScreen.main.bounds.width * 0.1, 65))
-                                        .padding(.top, 17)
+                                        .padding(.top, 22)
                                         .onTapGesture {
                                             Analytics.logEvent("apple_music_link_tapped", parameters: [
                                                 "source": "album_detail",

@@ -78,7 +78,7 @@ struct ArtistDetailView: View {
                                         .resizable()
                                         .scaledToFit()
                                         .frame(height: min(UIScreen.main.bounds.width * 0.1, 65))
-                                        .padding(.top, 14)
+                                        .padding(.top, 22)
                                         .onTapGesture {
                                             Analytics.logEvent("apple_music_link_tapped", parameters: [
                                                 "source": "artist_detail",
@@ -113,7 +113,7 @@ struct ArtistDetailView: View {
                                         
                                         NavigationLink(
                                             value: Route.artistAlbumGrid(
-                                                title: artist?.name ?? "Top Releases",
+                                                title: "Top Releases",
                                                 albums: topAlbums
                                             )
                                         ) {
