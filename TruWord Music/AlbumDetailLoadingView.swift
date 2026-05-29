@@ -19,10 +19,16 @@ struct AlbumDetailLoadingView: View {
     @State private var tracks: [Song] = []
     @State private var isLoading = true
     
+    private let bottomPlayerHeight: CGFloat = 77
+
+    
     var body: some View {
         Group {
             if isLoading {
-                ProgressView()
+                ZStack {
+                    ProgressView()
+                }
+                .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
             } else if let album = album {
                 AlbumDetailView(
                     album: album,
