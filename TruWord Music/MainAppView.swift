@@ -126,10 +126,6 @@ struct MainAppView: View {
                 )
             }
         }
-        .onAppear {
-            // Set the favorites manager reference so PlayerManager can access it
-            playerManager.favoritesManager = favoriteManager
-        }
         
         .animation(.spring(), value: playerManager.currentlyPlayingSong)
         .animation(.spring(), value: keyboardObserver.isKeyboardVisible)

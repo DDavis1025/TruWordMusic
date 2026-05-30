@@ -182,15 +182,31 @@ struct FavoritesView: View {
                         Button {
                             withAnimation {
                                 favoritesManager.toggleFavorite(song)
-                                
-                                // 🔥 Favorite toggle tracking
-                                Analytics.logEvent("favorite_toggled_from_list", parameters: [
-                                    "song_id": song.id.rawValue,
-                                    "is_favorite": favoritesManager.isFavorite(song)
-                                ])
                             }
+                            
+                            let wasFavorite = favoritesManager.isFavorite(song)
+                            let removedIndex = favoritesManager.favoriteSongs.firstIndex(where: { $0.id == song.id })
+
+                            // 1. If currently playing source is favorites, handle queue update FIRST
+                            if wasFavorite {
+                                Task { @MainActor in
+                                    playerManager.handleCurrentFavoriteRemoved(
+                                        removedSong: song,
+                                        removedIndex: removedIndex,
+                                        favoritesManager: favoritesManager,
+                                        networkMonitor: networkMonitor
+                                    )
+                                }
+                            }
+
+
+                            Analytics.logEvent("favorite_toggled_from_list", parameters: [
+                                "song_id": song.id.rawValue,
+                                "is_favorite": !wasFavorite
+                            ])
+
                         } label: {
-                            Image(systemName: "star.fill")
+                            Image(systemName: favoritesManager.isFavorite(song) ? "star.fill" : "star")
                                 .foregroundColor(.yellow)
                                 .frame(width: 40, height: 40)
                         }
