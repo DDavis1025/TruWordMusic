@@ -29,8 +29,16 @@ struct AlbumDetailView: View {
                 .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
                 
             } else if tracks.isEmpty {
-                Text("No tracks available")
-                    .padding()
+                VStack {
+                    Spacer()
+                    
+                    Text("No tracks available")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                }
+                .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
             } else {
                 List {
                     

@@ -43,6 +43,28 @@ struct ArtistDetailView: View {
                 }
                 .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
                 
+            } else if !networkMonitor.isConnected {
+                VStack(spacing: 8) {
+                    Spacer()
+
+                    Text("No Internet connection")
+                        .font(.headline)
+                        .multilineTextAlignment(.center)
+
+                    Text("Your device is not connected to the internet")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+                .safeAreaInset(edge: .bottom) {
+                    if playerManager.currentlyPlayingSong != nil {
+                        Color.clear.frame(height: bottomPlayerHeight)
+                    }
+                }
             } else {
                 
                 ScrollView {
