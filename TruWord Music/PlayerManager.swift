@@ -48,8 +48,19 @@ class PlayerManager: ObservableObject {
     // ✅ Track playback state across background/foreground
     private var wasPlayingBeforeBackground: Bool = false
     
-    init(networkMonitor: NetworkMonitor) {
+    private weak var favoritesManager: FavoritesManager?
+    
+    init(networkMonitor: NetworkMonitor, favoritesManager: FavoritesManager) {
         self.networkMonitor = networkMonitor
+        self.favoritesManager = favoritesManager
+        
+        favoritesManager.onFavoritesChanged = { [weak self] updatedSongs in
+            guard let self else { return }
+            
+            if self.playbackSource == .favorites {
+                self.lastPlayedSongs = updatedSongs
+            }
+        }
     }
     
     // MARK: - Background / Foreground

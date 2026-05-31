@@ -15,7 +15,7 @@ class FavoritesManager: ObservableObject {
     @Published private(set) var favoriteOrder: [String] = []
     
     // Add a callback for when favorites change
-    var onFavoritesChanged: (() -> Void)?
+    var onFavoritesChanged: (([Song]) -> Void)?
     
     private let key = "favorite_song_ids"
     
@@ -48,7 +48,7 @@ class FavoritesManager: ObservableObject {
             await fetchFavoriteSongs()
             // Notify that favorites have changed
             await MainActor.run {
-                onFavoritesChanged?()
+                self.onFavoritesChanged?(self.favoriteSongs)
             }
         }
     }

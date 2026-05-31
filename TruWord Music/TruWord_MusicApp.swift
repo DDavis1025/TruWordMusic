@@ -19,15 +19,22 @@ struct TruWord_MusicApp: App {
     @StateObject private var favoritesManager = FavoritesManager()
 
     init() {
-        // ✅ Initialize Firebase FIRST
         FirebaseApp.configure()
-        
+
         #if DEBUG
         Analytics.setAnalyticsCollectionEnabled(false)
         #endif
-        
-        // Initialize PlayerManager once, using the same NetworkMonitor
-        let manager = PlayerManager(networkMonitor: NetworkMonitor())
+
+        let networkMonitor = NetworkMonitor()
+        let favoritesManager = FavoritesManager()
+
+        let manager = PlayerManager(
+            networkMonitor: networkMonitor,
+            favoritesManager: favoritesManager
+        )
+
+        _networkMonitor = StateObject(wrappedValue: networkMonitor)
+        _favoritesManager = StateObject(wrappedValue: favoritesManager)
         _playerManager = StateObject(wrappedValue: manager)
     }
 
