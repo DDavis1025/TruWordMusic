@@ -68,6 +68,11 @@ class PlayerManager: ObservableObject {
     func onAppBackground() {
         let player = ApplicationMusicPlayer.shared
         wasPlayingBeforeBackground = (player.state.playbackStatus == .playing)
+
+        if !appleMusicSubscription {
+            audioPlayer?.pause()
+            isPlaying = false
+        }
     }
     
     func onAppForeground() {
