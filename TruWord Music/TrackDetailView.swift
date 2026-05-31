@@ -547,6 +547,19 @@ struct TrackDetailView: View {
             }
         }
     }
+    
+    private func currentPlaybackList() -> [Song] {
+        switch playerManager.playbackSource {
+        case .favorites:
+            return favoritesManager.favoriteSongs
+
+        case .album:
+            return albumWithTracks?.tracks ?? playerManager.lastPlayedSongs
+
+        case .home, .search, .artist, .none:
+            return playerManager.lastPlayedSongs
+        }
+    }
 }
 
 // Preference key to track button position

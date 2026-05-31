@@ -180,15 +180,31 @@ struct FavoritesView: View {
                         )
                         
                         Button {
+                            let wasFavorite = favoritesManager.isFavorite(song)
+                            let removedIndex = favoritesManager.favoriteSongs.firstIndex(where: { $0.id == song.id })
+                            
                             withAnimation {
                                 favoritesManager.toggleFavorite(song)
                             }
                             
-                            let wasFavorite = favoritesManager.isFavorite(song)
-                            let removedIndex = favoritesManager.favoriteSongs.firstIndex(where: { $0.id == song.id })
-
-                            // 1. If currently playing source is favorites, handle queue update FIRST
-                            if wasFavorite {
+                            // ✅ Remove just the specific entry from queue
+                            if wasFavorite && playerManager.appleMusicSubscription && playerManager.playbackSource == .favorites {
+                                let player = ApplicationMusicPlayer.shared
+                                
+                                // Find the queue entry for the unfavorited song
+                                if let entryToRemove = player.queue.entries.first(where: { entry in
+                                    if case .song(let queueSong) = entry.item {
+                                        return queueSong.id == song.id
+                                    }
+                                    return false
+                                }) {
+                                    // Remove it from the queue
+                                    player.queue.entries.removeAll { $0.id == entryToRemove.id }
+                                }
+                            }
+                            
+                            // Handle preview mode removal
+                            if wasFavorite && !playerManager.appleMusicSubscription {
                                 Task { @MainActor in
                                     playerManager.handleCurrentFavoriteRemoved(
                                         removedSong: song,
@@ -198,13 +214,12 @@ struct FavoritesView: View {
                                     )
                                 }
                             }
-
-
+                            
                             Analytics.logEvent("favorite_toggled_from_list", parameters: [
                                 "song_id": song.id.rawValue,
                                 "is_favorite": !wasFavorite
                             ])
-
+                            
                         } label: {
                             Image(systemName: favoritesManager.isFavorite(song) ? "star.fill" : "star")
                                 .foregroundColor(.yellow)
@@ -248,24 +263,20 @@ struct FavoritesView: View {
     // MARK: - EMPTY STATE
     private var emptyStateView: some View {
         VStack(spacing: 12) {
-            Spacer()
-            
             Image(systemName: "star")
                 .font(.system(size: 40))
                 .foregroundColor(.secondary)
-            
+
             Text("No Favorites Yet")
                 .font(.headline)
-            
+
             Text("Tap the star on any song to save it here")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
-            
-            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .safeAreaInset(edge: .bottom) {
             if playerManager.currentlyPlayingSong != nil {
                 Color.clear.frame(height: bottomPlayerHeight)
