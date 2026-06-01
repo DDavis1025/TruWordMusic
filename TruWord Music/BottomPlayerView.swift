@@ -14,9 +14,10 @@ struct BottomPlayerView: View {
             HStack {
                 let screenWidth = UIScreen.main.bounds.width
                 let songArtworkSize = min(max(screenWidth * 0.10, 30), 60)
-                
-                // Artwork
-                let artworkURL = song.artwork?.url(width: 120, height: 120)
+
+                let pixelSize = Int(songArtworkSize * UIScreen.main.scale * 2)
+
+                let artworkURL = song.artwork?.url(width: pixelSize, height: pixelSize)
                 CustomAsyncImage(url: artworkURL, isCircle: false)
                     .frame(width: songArtworkSize, height: songArtworkSize)
                 

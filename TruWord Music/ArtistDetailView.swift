@@ -74,7 +74,10 @@ struct ArtistDetailView: View {
                         // MARK: - Artist Header
                         
                         VStack(spacing: 7) {
-                            let artworkURL = artist?.artwork?.url(width: 320, height: 320)
+                            let displaySize: CGFloat = 160
+                            let scale = UIScreen.main.scale
+                            let pixelSize = Int(displaySize * scale * 2) // extra sharp (2x retina)
+                            let artworkURL = artist?.artwork?.url(width: pixelSize, height: pixelSize)
                             
                             CustomAsyncImage(url: artworkURL, isCircle: true)
                                     .frame(width: 160, height: 160)

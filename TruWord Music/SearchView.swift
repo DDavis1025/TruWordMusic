@@ -2,6 +2,20 @@ import SwiftUI
 import MusicKit
 import FirebaseAnalytics
 
+enum RecentSearchItem: Identifiable, Codable, Equatable {
+    case song(id: MusicItemID, title: String, artist: String, artworkURL: URL?)
+    case album(id: MusicItemID, title: String, artist: String, artworkURL: URL?)
+    case artist(id: MusicItemID, name: String, artworkURL: URL?)
+    
+    var id: String {
+        switch self {
+        case .song(let id, _, _, _): return id.rawValue
+        case .album(let id, _, _, _): return id.rawValue
+        case .artist(let id, _, _): return id.rawValue
+        }
+    }
+}
+
 // MARK: - Unified Result Model
 enum SearchResultItem: Identifiable {
     case song(Song)
@@ -48,15 +62,19 @@ enum SearchResultItem: Identifiable {
     }
     
     var artworkURL: URL? {
+        let baseSize: CGFloat = 60 // matches your SongRowLikeView image frame
+        let scale = UIScreen.main.scale
+        let pixelSize = Int(baseSize * scale * 2)
+
         switch self {
         case .song(let song):
-            return song.artwork?.url(width: 150, height: 150)
-            
+            return song.artwork?.url(width: pixelSize, height: pixelSize)
+
         case .album(let album):
-            return album.artwork?.url(width: 150, height: 150)
-            
+            return album.artwork?.url(width: pixelSize, height: pixelSize)
+
         case .artist(let artist):
-            return artist.artwork?.url(width: 150, height: 150)
+            return artist.artwork?.url(width: pixelSize, height: pixelSize)
         }
     }
 }
@@ -78,18 +96,27 @@ struct SearchView: View {
     @Binding var navigationPath: [Route]
     @Binding var musicAuthorized: Bool
     
+    @AppStorage("recent_searches") private var recentSearchData: Data = Data()
+    @State private var recentSearches: [RecentSearchItem] = []
     @State private var searchQuery: String = ""
     @State private var searchResults: [SearchResultItem] = []
     @State private var isSearching: Bool = false
     @State private var selectedTab: SearchTab = .all
+    @State private var showClearRecentAlert = false
+    
+    @FocusState private var isSearchFocused: Bool
     
     @Binding var albumCache: [MusicItemID: Album]
     
     let albums: [Album]
     
-    
     @Namespace private var tabNamespace
+    
     private let bottomPlayerHeight: CGFloat = 77
+    
+    private var shouldShowRecentSearches: Bool {
+        searchQuery.isEmpty && searchResults.isEmpty
+    }
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -107,42 +134,42 @@ struct SearchView: View {
                     VStack(spacing: 0) {
                         
                         // MARK: - Tab Bar
-                        HStack(spacing: 0) {
-                            ForEach(SearchTab.allCases) { tab in
-                                Button {
-                                    withAnimation(.spring()) {
-                                        selectedTab = tab
-                                    }
-                                    
-                                    // 🔥 Track tab change
-                                    Analytics.logEvent("search_tab_changed", parameters: [
-                                        "tab": tab.rawValue
-                                    ])
-                                    
-                                } label: {
-                                    Text(tab.rawValue)
-                                        .font(.subheadline)
-                                        .fontWeight(selectedTab == tab ? .semibold : .regular)
-                                        .foregroundColor(selectedTab == tab ? .accentColor : .secondary)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            ZStack {
-                                                if selectedTab == tab {
-                                                    RoundedRectangle(cornerRadius: 8)
-                                                        .fill(Color(.systemGray6))
-                                                        .matchedGeometryEffect(id: "tabHighlight", in: tabNamespace)
+                        if !shouldShowRecentSearches {
+                            HStack(spacing: 0) {
+                                ForEach(SearchTab.allCases) { tab in
+                                    Button {
+                                        withAnimation(.spring()) {
+                                            selectedTab = tab
+                                        }
+                                        
+                                        Analytics.logEvent("search_tab_changed", parameters: [
+                                            "tab": tab.rawValue
+                                        ])
+                                    } label: {
+                                        Text(tab.rawValue)
+                                            .font(.subheadline)
+                                            .fontWeight(selectedTab == tab ? .semibold : .regular)
+                                            .foregroundColor(selectedTab == tab ? .accentColor : .secondary)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 8)
+                                            .background(
+                                                ZStack {
+                                                    if selectedTab == tab {
+                                                        RoundedRectangle(cornerRadius: 8)
+                                                            .fill(Color(.systemGray6))
+                                                            .matchedGeometryEffect(id: "tabHighlight", in: tabNamespace)
+                                                    }
                                                 }
-                                            }
-                                        )
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                            
+                            Divider()
                         }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                        
-                        Divider()
                         
                         // MARK: - Content
                         if isSearching {
@@ -154,6 +181,8 @@ struct SearchView: View {
                                          : 0
                                 )
                             
+                        } else if shouldShowRecentSearches {
+                            recentSearchView
                         } else if filteredResults.isEmpty && !searchQuery.isEmpty {
                             VStack {
                                 Spacer()
@@ -235,6 +264,17 @@ struct SearchView: View {
                                                     
                                                     playerManager.isPlayingFromAlbum = false
                                                     
+                                                    let baseSize: CGFloat = 60
+                                                    let scale = UIScreen.main.scale
+                                                    let pixelSize = Int(baseSize * scale * 2)
+                                                    
+                                                    addRecentSearch(.song(
+                                                        id: song.id,
+                                                        title: song.title,
+                                                        artist: song.artistName,
+                                                        artworkURL: song.artwork?.url(width: pixelSize, height: pixelSize)
+                                                    ))
+                                                    
                                                 case .album(let album):
                                                     
                                                     Analytics.logEvent("search_result_album_tapped", parameters: [
@@ -243,6 +283,17 @@ struct SearchView: View {
                                                         "artist": album.artistName,
                                                         "query": searchQuery
                                                     ])
+                                                    
+                                                    let baseSize: CGFloat = 60
+                                                    let scale = UIScreen.main.scale
+                                                    let pixelSize = Int(baseSize * scale * 2)
+                                                    
+                                                    addRecentSearch(.album(
+                                                        id: album.id,
+                                                        title: album.title,
+                                                        artist: album.artistName,
+                                                        artworkURL: album.artwork?.url(width: pixelSize, height: pixelSize)
+                                                    ))
                                                     
                                                     navigationPath.append(.album(album.id))
                                                     
@@ -253,6 +304,16 @@ struct SearchView: View {
                                                         "artist_name": artist.name,
                                                         "query": searchQuery
                                                     ])
+                                                    
+                                                    let baseSize: CGFloat = 60
+                                                    let scale = UIScreen.main.scale
+                                                    let pixelSize = Int(baseSize * scale * 2)
+                                                    
+                                                    addRecentSearch(.artist(
+                                                        id: artist.id,
+                                                        name: artist.name,
+                                                        artworkURL: artist.artwork?.url(width: pixelSize, height: pixelSize)
+                                                    ))
                                                     
                                                     navigationPath.append(.artist(artist.id))
                                                 }
@@ -278,6 +339,7 @@ struct SearchView: View {
                         }
                     }
                     .searchable(text: $searchQuery, prompt: "Search Christian music")
+                    .focused($isSearchFocused)
                     .onSubmit(of: .search) {
                         Task { await performSearch() }
                     }
@@ -286,9 +348,23 @@ struct SearchView: View {
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.inline)
             
-            // 🔥 Track screen view
             .onAppear {
+                loadRecentSearches()
                 Analytics.logEvent("search_viewed", parameters: nil)
+            }
+            
+            .onChange(of: isSearchFocused) { oldValue, newValue in
+                if newValue == false {
+                    searchResults = []
+                    isSearching = false
+                }
+            }
+            
+            .onChange(of: searchQuery) { oldValue, newValue in
+                if newValue.isEmpty {
+                    searchResults = []
+                    isSearching = false
+                }
             }
             
             .navigationDestination(for: Route.self) { route in
@@ -347,7 +423,7 @@ struct SearchView: View {
                         songs: songs,
                         playSong: { song in
                             playerManager.playbackSource = isFromArtist ? .artist : .search
-
+                            
                             playerManager.playSong(
                                 song,
                                 from: songs,
@@ -379,6 +455,27 @@ struct SearchView: View {
         }
     }
     
+    
+    private func loadRecentSearches() {
+        guard let decoded = try? JSONDecoder().decode([RecentSearchItem].self, from: recentSearchData) else {
+            recentSearches = []
+            return
+        }
+        recentSearches = decoded
+    }
+    
+    private func addRecentSearch(_ item: RecentSearchItem) {
+        recentSearches.removeAll { $0.id == item.id }
+        recentSearches.insert(item, at: 0)
+        
+        if recentSearches.count > 20 {
+            recentSearches = Array(recentSearches.prefix(20))
+        }
+        
+        if let encoded = try? JSONEncoder().encode(recentSearches) {
+            recentSearchData = encoded
+        }
+    }
     
     // MARK: - Filtered Results
     private var filteredResults: [SearchResultItem] {
@@ -422,12 +519,19 @@ struct SearchView: View {
             
             Text("No Internet connection")
                 .font(.headline)
-            
+                
             Text("Your device is not connected to the internet")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
             Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+        .safeAreaInset(edge: .bottom) {
+            if playerManager.currentlyPlayingSong != nil {
+                Color.clear.frame(height: bottomPlayerHeight)
+            }
         }
     }
     
@@ -558,6 +662,127 @@ struct SearchView: View {
             searchResults = []
         }
     }
+    
+    private func handleRecentSearchTap(_ item: RecentSearchItem) {
+        switch item {
+            
+        case .song(let id, _, _, _):
+            Task {
+                do {
+                    let request = MusicCatalogResourceRequest<Song>(
+                        matching: \.id,
+                        equalTo: id
+                    )
+                    
+                    let response = try await request.response()
+                    
+                    guard let song = response.items.first else { return }
+                    
+                    await MainActor.run {
+                        let songsFromContext: [Song] = [] // optional fallback context
+                        
+                        playerManager.playbackSource = .search
+                        
+                        playerManager.playSong(
+                            song,
+                            from: songsFromContext
+                        )
+                    }
+                    
+                } catch {
+                    print("Failed to load song from recent search: \(error)")
+                }
+            }
+            
+        case .album(_, _, _, _):
+            navigationPath.append(.album(MusicItemID(item.id)))
+            
+        case .artist(_, _, _):
+            navigationPath.append(.artist(MusicItemID(item.id)))
+        }
+    }
+    
+    private var recentSearchView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+
+                HStack {
+                    Text("Recent Searches")
+                        .font(.headline)
+
+                    Spacer()
+
+                    if !recentSearches.isEmpty {
+                        Button("Clear") {
+                            showClearRecentAlert = true
+                        }
+                        .font(.footnote)
+                        .foregroundColor(.red)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 10)
+
+                if recentSearches.isEmpty {
+                    Text("No recent searches")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.top, 10)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(recentSearches) { item in
+                            SongRowLikeView(
+                                title: {
+                                    switch item {
+                                    case .song(_, let title, _, _): return title
+                                    case .album(_, let title, _, _): return title
+                                    case .artist(_, let name, _): return name
+                                    }
+                                }(),
+                                artistName: {
+                                    switch item {
+                                    case .song(_, _, let artist, _):
+                                        return "Song | \(artist)"
+                                    case .album(_, _, let artist, _):
+                                        return "Album | \(artist)"
+                                    case .artist:
+                                        return "Artist"
+                                    }
+                                }(),
+                                artworkURL: {
+                                    switch item {
+                                    case .song(_, _, _, let url),
+                                         .album(_, _, _, let url),
+                                         .artist(_, _, let url):
+                                        return url
+                                    }
+                                }(),
+                                isArtist: {
+                                    if case .artist = item { return true }
+                                    return false
+                                }(),
+                                currentlyPlayingSong: $playerManager.currentlyPlayingSong
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                handleRecentSearchTap(item)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(minLength: 80)
+            }
+        }
+        .alert("Clear recent searches?", isPresented: $showClearRecentAlert) {
+            Button("Clear", role: .destructive) {
+                recentSearches = []
+                recentSearchData = Data()
+            }
+            Button("Cancel", role: .cancel) { }
+        }
+    }
 }
 
 // MARK: - Row View (Shared by Songs & Albums)
@@ -573,7 +798,7 @@ struct SongRowLikeView: View {
     var body: some View {
         HStack(spacing: 8) {
             CustomAsyncImage(url: artworkURL, isCircle: isArtist)
-                    .frame(width: 60, height: 60)
+                .frame(width: 60, height: 60)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)

@@ -22,7 +22,10 @@ struct SongOfTheDayView: View {
             HStack(spacing: 12) {
                 
                 // Artwork
-                let artworkURL = song.artwork?.url(width: 120, height: 120)
+                let displaySize: CGFloat = 120
+                let pixelSize = Int(displaySize * UIScreen.main.scale * 2)
+
+                let artworkURL = song.artwork?.url(width: pixelSize, height: pixelSize)
                 CustomAsyncImage(url: artworkURL, isCircle: false)
                     .frame(width: 50, height: 50)
                 

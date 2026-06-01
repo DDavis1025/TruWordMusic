@@ -31,7 +31,7 @@ struct FullAlbumGridView: View {
     var body: some View {
         let screenWidth = UIScreen.main.bounds.width
         let albumSize = max(min(screenWidth * 0.4, 255), 150)
-        
+
         let columns = [
             GridItem(.adaptive(minimum: albumSize), spacing: 20)
         ]
@@ -81,16 +81,20 @@ struct FullAlbumGridView: View {
                             NavigationLink(value: Route.album(album.id)) {
                                 
                                 VStack {
-                                    let artworkURL = album.artwork?.url(width: 280, height: 280)
+                                    let pixelSize = Int(albumSize * UIScreen.main.scale * 2)
+
+                                    let artworkURL = album.artwork?.url(width: pixelSize, height: pixelSize)
+
                                     CustomAsyncImage(url: artworkURL, isCircle: false)
                                         .frame(width: albumSize, height: albumSize)
-                                    
+                                        .clipped()
+
                                     Text(album.title)
                                         .font(.caption)
                                         .foregroundColor(.primary)
                                         .lineLimit(1)
                                         .frame(width: albumSize - 20)
-                                    
+
                                     Text(album.artistName)
                                         .font(.caption2)
                                         .foregroundColor(.secondary)

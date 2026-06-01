@@ -14,37 +14,35 @@ import FirebaseAnalytics
 struct SongRowView: View {
     let song: Song
     @Binding var currentPlayingSong: Song?
-    var leftPadding: CGFloat = 0 // Default left padding
-    var rightPadding: CGFloat = 0 // Default right padding
-    
+    var leftPadding: CGFloat = 0
+    var rightPadding: CGFloat = 0
+
     var body: some View {
         HStack {
-            // Album Artwork with configurable left padding
-            let screenWidth = UIScreen.main.bounds.width
-            let songArtworkSize = min(max(screenWidth * 0.15, 50), 100) // Scales dynamically between 50-100pt
-            
-            let artworkURL = song.artwork?.url(width: 150, height: 150)
+
+            let songArtworkSize: CGFloat = 70
+            let scale = UIScreen.main.scale
+            let pixelSize = Int(songArtworkSize * scale * 2)
+
+            let artworkURL = song.artwork?.url(width: pixelSize, height: pixelSize)
+
             CustomAsyncImage(url: artworkURL, isCircle: false)
                 .frame(width: songArtworkSize, height: songArtworkSize)
-                .padding(.leading, leftPadding) // Use configurable left padding
-            
-            // Song Title and Artist Name with configurable right padding
+                .padding(.leading, leftPadding)
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.title)
                     .font(.subheadline)
                     .lineLimit(1)
-                    .multilineTextAlignment(.leading)
-                
+
                 Text(song.artistName)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
-                    .multilineTextAlignment(.leading)
             }
-            .padding(.trailing, rightPadding) // Use configurable right padding
-            
+            .padding(.trailing, rightPadding)
+
             Spacer()
-            
         }
         .padding(.vertical, 4)
     }
