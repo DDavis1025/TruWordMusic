@@ -567,6 +567,7 @@ class PlayerManager: ObservableObject {
         albumWithTracks: AlbumWithTracks?,
         playFromAlbum: Bool
     ) {
+        
         playbackObservationTask?.cancel()
         playbackObservationTask = Task {
             let player = ApplicationMusicPlayer.shared

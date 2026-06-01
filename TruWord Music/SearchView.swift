@@ -665,40 +665,58 @@ struct SearchView: View {
     
     private func handleRecentSearchTap(_ item: RecentSearchItem) {
         switch item {
-            
-        case .song(let id, _, _, _):
+
+        case .song(let id, let title, let artist, _):
+
+            Analytics.logEvent("recent_search_tapped_song", parameters: [
+                "song_id": id.rawValue,
+                "title": title,
+                "artist": artist
+            ])
+
             Task {
                 do {
                     let request = MusicCatalogResourceRequest<Song>(
                         matching: \.id,
                         equalTo: id
                     )
-                    
+
                     let response = try await request.response()
-                    
+
                     guard let song = response.items.first else { return }
-                    
+
                     await MainActor.run {
-                        let songsFromContext: [Song] = [] // optional fallback context
-                        
                         playerManager.playbackSource = .search
-                        
+
                         playerManager.playSong(
                             song,
-                            from: songsFromContext
+                            from: []
                         )
                     }
-                    
+
                 } catch {
                     print("Failed to load song from recent search: \(error)")
                 }
             }
-            
-        case .album(_, _, _, _):
-            navigationPath.append(.album(MusicItemID(item.id)))
-            
-        case .artist(_, _, _):
-            navigationPath.append(.artist(MusicItemID(item.id)))
+
+        case .album(let id, let title, let artist, _):
+
+            Analytics.logEvent("recent_search_tapped_album", parameters: [
+                "album_id": id.rawValue,
+                "title": title,
+                "artist": artist
+            ])
+
+            navigationPath.append(.album(MusicItemID(id.rawValue)))
+
+        case .artist(let id, let name, _):
+
+            Analytics.logEvent("recent_search_tapped_artist", parameters: [
+                "artist_id": id.rawValue,
+                "name": name
+            ])
+
+            navigationPath.append(.artist(MusicItemID(id.rawValue)))
         }
     }
     

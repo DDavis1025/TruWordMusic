@@ -20,7 +20,7 @@ struct SongRowView: View {
     var body: some View {
         HStack {
 
-            let songArtworkSize: CGFloat = 70
+            let songArtworkSize: CGFloat = 60
             let scale = UIScreen.main.scale
             let pixelSize = Int(songArtworkSize * scale * 2)
 
