@@ -39,7 +39,7 @@ struct ContentView: View {
     @Binding var albumCache: [MusicItemID: Album]
     
     @Binding var navigationPath: [Route]
-
+    
     @Environment(\.scenePhase) private var scenePhase
     private let bottomPlayerHeight: CGFloat = 77
     
@@ -82,7 +82,7 @@ struct ContentView: View {
                     )
                     
                 case .album(let albumID):
-
+                    
                     if let album = albumCache[albumID] {
                         AlbumDetailView(
                             album: album,
@@ -120,7 +120,7 @@ struct ContentView: View {
                         songs: songs,
                         playSong: { song in
                             playerManager.playbackSource = isFromArtist ? .artist : .home
-
+                            
                             playerManager.playSong(
                                 song,
                                 from: songs,
@@ -234,7 +234,7 @@ struct ContentView: View {
             
             Text("No Internet connection")
                 .font(.headline)
-                
+            
             Text("Your device is not connected to the internet")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
@@ -300,54 +300,58 @@ struct ContentView: View {
     // MARK: - Songs Section
     
     private var songsSection: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Text("Top Christian Songs")
-                    .font(.system(size: 18)).bold()
-                
-                Spacer()
-                
-                if songs.count > 5 {
-                    NavigationLink(
-                        value: Route.fullTrackList(
-                            title: "Top Songs",
-                            songs: songs,
-                            isFromArtist: false
-                        )
-                    ) {
-                        Text("View More")
+        if songs.isEmpty { return AnyView(EmptyView()) }
+        
+        return AnyView(
+            VStack(alignment: .leading) {
+                HStack {
+                    Text("Top Christian Songs")
+                        .font(.system(size: 18)).bold()
+                    
+                    Spacer()
+                    
+                    if songs.count > 5 {
+                        NavigationLink(
+                            value: Route.fullTrackList(
+                                title: "Top Songs",
+                                songs: songs,
+                                isFromArtist: false
+                            )
+                        ) {
+                            Text("View More")
+                        }
+                        .simultaneousGesture(TapGesture().onEnded {
+                            Analytics.logEvent("view_more_songs", parameters: nil)
+                        })
+                        .foregroundColor(.blue)
+                        .font(.system(size: 15))
                     }
-                    .simultaneousGesture(TapGesture().onEnded {
-                        Analytics.logEvent("view_more_songs", parameters: nil)
-                    })
-                    .foregroundColor(.blue)
-                    .font(.system(size: 15))
+                }
+                .padding(.vertical, 4)
+                
+                ForEach(songs.prefix(5), id: \.id) { song in
+                    SongRowView(song: song, currentPlayingSong: $playerManager.currentlyPlayingSong)
+                        .onTapGesture {
+                            playerManager.playbackSource = .home
+                            playerManager.isPlayingFromAlbum = false
+                            
+                            playerManager.playSong(
+                                song,
+                                from: songs,
+                                albumWithTracks: nil,
+                                playFromAlbum: false,
+                                networkMonitor: networkMonitor
+                            )
+                            
+                            Analytics.logEvent("song_played_from_home", parameters: [
+                                "song_id": song.id,
+                                "song_name": song.title,
+                                "artist": song.artistName
+                            ])
+                        }
                 }
             }
-            .padding(.vertical, 4)
-            
-            ForEach(songs.prefix(5), id: \.id) { song in
-                SongRowView(song: song, currentPlayingSong: $playerManager.currentlyPlayingSong)
-                    .onTapGesture {
-                        playerManager.playbackSource = .home
-                        playerManager.isPlayingFromAlbum = false
-                        
-                        playerManager.playSong(
-                            song,
-                            from: songs,
-                            albumWithTracks: nil,
-                            playFromAlbum: false,
-                            networkMonitor: networkMonitor
-                        )
-                        
-                        Analytics.logEvent("song_played_from_home", parameters: [
-                            "song_id": song.id,
-                            "song_name": song.title,
-                            "artist": song.artistName
-                        ])
-                    }
-            }
-        }
+        )
     }
     // MARK: - MusicKit
     
@@ -421,13 +425,13 @@ struct ContentView: View {
             let fetchedAlbums = response.albumCharts.flatMap { $0.items }
             
             await MainActor.run {
-
+                
                 self.albums = fetchedAlbums
                 // also push into cache
                 for album in fetchedAlbums {
                     albumCache[album.id] = album
                 }
-
+                
             }
             
         } catch {
