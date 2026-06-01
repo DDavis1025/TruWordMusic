@@ -413,7 +413,7 @@ struct ContentView: View {
     private func fetchChristianAlbums() async {
         do {
             guard let genre = try await fetchChristianGenre() else { return }
-            
+           
             var request = MusicCatalogChartsRequest(
                 genre: genre,
                 types: [Album.self]
