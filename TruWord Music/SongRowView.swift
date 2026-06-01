@@ -23,11 +23,11 @@ struct SongRowView: View {
             let screenWidth = UIScreen.main.bounds.width
             let songArtworkSize = min(max(screenWidth * 0.15, 50), 100) // Scales dynamically between 50-100pt
             
-            if let artworkURL = song.artwork?.url(width: 150, height: 150) {
-                CustomAsyncImage(url: artworkURL, isCircle: false)
-                    .frame(width: songArtworkSize, height: songArtworkSize)
-                    .padding(.leading, leftPadding) // Use configurable left padding
-            }
+            let artworkURL = song.artwork?.url(width: 150, height: 150)
+            CustomAsyncImage(url: artworkURL, isCircle: false)
+                .frame(width: songArtworkSize, height: songArtworkSize)
+                .padding(.leading, leftPadding) // Use configurable left padding
+            
             // Song Title and Artist Name with configurable right padding
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.title)

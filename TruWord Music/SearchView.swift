@@ -572,10 +572,8 @@ struct SongRowLikeView: View {
     
     var body: some View {
         HStack(spacing: 8) {
-            if let url = artworkURL {
-                CustomAsyncImage(url: url, isCircle: isArtist)
+            CustomAsyncImage(url: artworkURL, isCircle: isArtist)
                     .frame(width: 60, height: 60)
-            }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)

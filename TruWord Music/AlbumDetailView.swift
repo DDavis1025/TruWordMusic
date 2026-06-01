@@ -46,13 +46,13 @@ struct AlbumDetailView: View {
                     Section {
                         VStack(spacing: 8) {
                             
-                            if let artworkURL = album.artwork?.url(width: 1400, height: 1400) {
-                                let screenWidth = UIScreen.main.bounds.width
-                                let albumSize = min(max(screenWidth * 0.5, 150), 300)
-                                
-                                CustomAsyncImage(url: artworkURL, isCircle: false)
-                                    .frame(width: albumSize, height: albumSize)
-                            }
+                            let artworkURL = album.artwork?.url(width: 1400, height: 1400)
+                            let screenWidth = UIScreen.main.bounds.width
+                            let albumSize = min(max(screenWidth * 0.5, 150), 300)
+                            
+                            CustomAsyncImage(url: artworkURL, isCircle: false)
+                                .frame(width: albumSize, height: albumSize)
+                            
                             
                             Text(album.title)
                                 .font(.system(size: 20, weight: .bold))

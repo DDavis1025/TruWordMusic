@@ -74,11 +74,10 @@ struct ArtistDetailView: View {
                         // MARK: - Artist Header
                         
                         VStack(spacing: 7) {
+                            let artworkURL = artist?.artwork?.url(width: 320, height: 320)
                             
-                            if let artworkURL = artist?.artwork?.url(width: 320, height: 320) {
-                                CustomAsyncImage(url: artworkURL, isCircle: true)
+                            CustomAsyncImage(url: artworkURL, isCircle: true)
                                     .frame(width: 160, height: 160)
-                            }
                             
                             VStack(spacing: 2) {
                                 Text(artist?.name ?? "")

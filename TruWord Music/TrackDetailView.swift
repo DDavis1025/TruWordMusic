@@ -47,15 +47,15 @@ struct TrackDetailView: View {
                         let displaySize = geometry.size.width * 0.85
                         let scale = UIScreen.main.scale
                         
-                        if let artworkURL = song.artwork?.url(
+                        let artworkURL = song.artwork?.url(
                             width: Int(displaySize * scale * 2),
                             height: Int(displaySize * scale * 2)
-                        ) {
-                            CustomAsyncImage(url: artworkURL, isCircle: false)
-                                .frame(width: geometry.size.width * 0.85,
-                                       height: geometry.size.width * 0.85)
-                                .id(song.id)
-                        }
+                        )
+                        
+                        CustomAsyncImage(url: artworkURL, isCircle: false)
+                            .frame(width: geometry.size.width * 0.85,
+                                   height: geometry.size.width * 0.85)
+                            .id(song.id)
                         
                         if !appleMusicSubscription {
                             Text("Preview")
@@ -203,35 +203,35 @@ struct TrackDetailView: View {
                             if networkMonitor.isConnected {
                                 Button(action: {
                                     let wasFavorite = favoritesManager.isFavorite(song)
-
-                                        // capture index BEFORE mutation
-                                        let currentIndex = favoritesManager.favoriteSongs.firstIndex(where: {
-                                            $0.id == song.id
-                                        })
-
-                                        favoritesManager.toggleFavorite(song)
-
-                                        if wasFavorite {
-
-                                            Task {
-                                                try? await Task.sleep(nanoseconds: 200_000_000)
-
-                                                await MainActor.run {
-                                                    playerManager.handleCurrentFavoriteRemoved(
-                                                        removedSong: song,
-                                                        removedIndex: currentIndex,
-                                                        favoritesManager: favoritesManager,
-                                                        networkMonitor: networkMonitor
-                                                    )
-                                                }
+                                    
+                                    // capture index BEFORE mutation
+                                    let currentIndex = favoritesManager.favoriteSongs.firstIndex(where: {
+                                        $0.id == song.id
+                                    })
+                                    
+                                    favoritesManager.toggleFavorite(song)
+                                    
+                                    if wasFavorite {
+                                        
+                                        Task {
+                                            try? await Task.sleep(nanoseconds: 200_000_000)
+                                            
+                                            await MainActor.run {
+                                                playerManager.handleCurrentFavoriteRemoved(
+                                                    removedSong: song,
+                                                    removedIndex: currentIndex,
+                                                    favoritesManager: favoritesManager,
+                                                    networkMonitor: networkMonitor
+                                                )
                                             }
                                         }
-
+                                    }
+                                    
                                     Analytics.logEvent("favorite_toggled", parameters: [
                                         "song_id": song.id.rawValue,
                                         "is_favorite": favoritesManager.isFavorite(song)
                                     ])
-
+                                    
                                 }) {
                                     Image(systemName: favoritesManager.isFavorite(song) ? "star.fill" : "star")
                                         .font(.system(size: 24))
@@ -552,10 +552,10 @@ struct TrackDetailView: View {
         switch playerManager.playbackSource {
         case .favorites:
             return favoritesManager.favoriteSongs
-
+            
         case .album:
             return albumWithTracks?.tracks ?? playerManager.lastPlayedSongs
-
+            
         case .home, .search, .artist, .none:
             return playerManager.lastPlayedSongs
         }

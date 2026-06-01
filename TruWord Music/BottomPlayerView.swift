@@ -7,35 +7,34 @@ struct BottomPlayerView: View {
     @Binding var isPlaying: Bool
     let togglePlayPause: () -> Void
     let playerIsReady: Bool
-
+    
     var body: some View {
         VStack(spacing: 0) {
-
+            
             HStack {
                 let screenWidth = UIScreen.main.bounds.width
                 let songArtworkSize = min(max(screenWidth * 0.10, 30), 60)
-
+                
                 // Artwork
-                if let artworkURL = song.artwork?.url(width: 120, height: 120) {
-                    CustomAsyncImage(url: artworkURL, isCircle: false)
-                        .frame(width: songArtworkSize, height: songArtworkSize)
-                }
-
+                let artworkURL = song.artwork?.url(width: 120, height: 120)
+                CustomAsyncImage(url: artworkURL, isCircle: false)
+                    .frame(width: songArtworkSize, height: songArtworkSize)
+                
                 // Info
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title)
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .lineLimit(1)
-
+                    
                     Text(song.artistName)
                         .font(.caption)
                         .fontWeight(.regular)
                         .lineLimit(1)
                 }
-
+                
                 Spacer()
-
+                
                 // MARK: - Play / Pause
                 if playerIsReady {
                     Button(action: {
@@ -65,7 +64,7 @@ struct BottomPlayerView: View {
         .shadow(color: .black.opacity(0.24), radius: 8, x: 0, y: 0)
         .padding(.horizontal, 10)
         .padding(.bottom, 5)
-
+        
         // 🔥 Track visibility
         .onAppear {
             Analytics.logEvent("bottom_player_shown", parameters: [
