@@ -21,13 +21,14 @@ struct SongOfTheDayView: View {
         if let song {
             HStack(spacing: 12) {
                 
-                // Artwork
-                let displaySize: CGFloat = 120
-                let pixelSize = Int(displaySize * UIScreen.main.scale * 2)
+                let imageSize: CGFloat = 57
+                let scale = UIScreen.main.scale
+                let pixelSize = Int(imageSize * scale * 2)
 
                 let artworkURL = song.artwork?.url(width: pixelSize, height: pixelSize)
+
                 CustomAsyncImage(url: artworkURL, isCircle: false)
-                    .frame(width: 50, height: 50)
+                    .frame(width: imageSize, height: imageSize)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     

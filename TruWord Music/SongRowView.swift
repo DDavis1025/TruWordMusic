@@ -19,12 +19,16 @@ struct SongRowView: View {
 
     var body: some View {
         HStack {
+            let screenWidth = UIScreen.main.bounds.width
+            let songArtworkSize = min(max(screenWidth * 0.15, 50), 100)
 
-            let songArtworkSize: CGFloat = 60
             let scale = UIScreen.main.scale
             let pixelSize = Int(songArtworkSize * scale * 2)
 
-            let artworkURL = song.artwork?.url(width: pixelSize, height: pixelSize)
+            let artworkURL = song.artwork?.url(
+                width: pixelSize,
+                height: pixelSize
+            )
 
             CustomAsyncImage(url: artworkURL, isCircle: false)
                 .frame(width: songArtworkSize, height: songArtworkSize)

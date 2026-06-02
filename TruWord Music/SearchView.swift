@@ -803,7 +803,6 @@ struct SearchView: View {
     }
 }
 
-// MARK: - Row View (Shared by Songs & Albums)
 struct SongRowLikeView: View {
     let title: String
     let artistName: String
@@ -815,22 +814,29 @@ struct SongRowLikeView: View {
     
     var body: some View {
         HStack(spacing: 8) {
-            CustomAsyncImage(url: artworkURL, isCircle: isArtist)
-                .frame(width: 60, height: 60)
-            
+
+            let screenWidth = UIScreen.main.bounds.width
+            let artworkSize = min(max(screenWidth * 0.15, 50), 100)
+
+            // If you control URL creation upstream, prefer passing a pre-sized URL.
+            let highResURL = artworkURL
+
+            CustomAsyncImage(url: highResURL, isCircle: isArtist)
+                .frame(width: artworkSize, height: artworkSize)
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.subheadline)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                
+
                 Text(artistName)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, 8)
