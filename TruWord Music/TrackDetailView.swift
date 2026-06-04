@@ -239,6 +239,30 @@ struct TrackDetailView: View {
                                         .frame(width: 44, height: 44)
                                         .contentShape(Rectangle())
                                 }
+                                
+                                Button {
+                                    playerManager.toggleRepeatMode()
+                                } label: {
+                                    Image(systemName: {
+                                        switch playerManager.repeatMode {
+                                        case .off:
+                                            return "repeat"
+
+                                        case .all:
+                                            return "repeat"
+
+                                        case .one:
+                                            return "repeat.1"
+                                        }
+                                    }())
+                                    .font(.system(size: 22))
+                                    .foregroundColor(
+                                        playerManager.repeatMode == .off
+                                        ? .primary
+                                        : .blue
+                                    )
+                                    .frame(width: 44, height: 44)
+                                }
                             }
                             
                             // Close Button

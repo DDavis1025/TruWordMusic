@@ -19,6 +19,12 @@ enum PlaybackSource {
     case artist
 }
 
+enum RepeatMode: String {
+    case off
+    case all
+    case one
+}
+
 
 @MainActor
 class PlayerManager: ObservableObject {
@@ -38,6 +44,12 @@ class PlayerManager: ObservableObject {
     @Published var lastPlayFromAlbum: Bool = false
     @Published var playbackSource: PlaybackSource = .none
     
+    @Published var repeatMode: RepeatMode = .off {
+        didSet {
+            UserDefaults.standard.set(repeatMode.rawValue, forKey: "repeatMode")
+        }
+    }
+    
     // MARK: - Private
     private var audioPlayer: AVPlayer?
     private var previewDidEnd: Bool = false
@@ -47,9 +59,25 @@ class PlayerManager: ObservableObject {
     
     private weak var favoritesManager: FavoritesManager?
     
+    
+    
     init(networkMonitor: NetworkMonitor, favoritesManager: FavoritesManager) {
         self.networkMonitor = networkMonitor
         self.favoritesManager = favoritesManager
+        
+        if let savedRepeatMode = UserDefaults.standard.string(forKey: "repeatMode"),
+           let mode = RepeatMode(rawValue: savedRepeatMode) {
+            self.repeatMode = mode
+        }
+        
+        applySavedRepeatMode()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioInterruption),
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance()
+        )
         
         favoritesManager.onFavoritesChanged = { [weak self] updatedSongs in
             guard let self else { return }
@@ -58,6 +86,10 @@ class PlayerManager: ObservableObject {
                 self.lastPlayedSongs = updatedSongs
             }
         }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - Background / Foreground
@@ -193,13 +225,13 @@ class PlayerManager: ObservableObject {
     func stopAndReplaceAVPlayer() {
         audioPlayer?.pause()
         audioPlayer = nil
-
+        
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-
+        
         previewDidEnd = false
-
+        
         guard let currentSong = currentlyPlayingSong else { return }
-
+        
         Task { @MainActor in
             await ensurePlayerIsReady(
                 song: currentSong,
@@ -384,6 +416,16 @@ class PlayerManager: ObservableObject {
             }
         }()
         
+        if repeatMode == .one {
+            playSong(
+                currentSong,
+                from: currentList,
+                albumWithTracks: isPlayingFromAlbum ? albumWithTracks : nil,
+                playFromAlbum: isPlayingFromAlbum
+            )
+            return
+        }
+        
         // ✅ Find next playable song
         var nextSong: Song? = nil
         
@@ -407,11 +449,24 @@ class PlayerManager: ObservableObject {
                 playFromAlbum: isPlayingFromAlbum
             )
         } else {
-            isPlaying = false
-            player.seek(to: .zero)
+            
+            if repeatMode == .all,
+               let firstSong = currentList.first {
+                
+                playSong(
+                    firstSong,
+                    from: currentList,
+                    albumWithTracks: isPlayingFromAlbum ? albumWithTracks : nil,
+                    playFromAlbum: isPlayingFromAlbum
+                )
+                
+            } else {
+                isPlaying = false
+                player.seek(to: .zero)
+            }
         }
     }
-
+    
     
     @MainActor
     private func ensurePlayerIsReadyAndPlays(
@@ -470,16 +525,16 @@ class PlayerManager: ObservableObject {
         albumWithTracks: AlbumWithTracks? = nil,
         playFromAlbum: Bool = false
     ) async {
-
+        
         let player = ApplicationMusicPlayer.shared
         self.playerIsReady = false
-
+        
         if player.queue.currentEntry == nil {
             guard let song = song else {
                 self.playerIsReady = true
                 return
             }
-
+            
             let queueSongs: [Song]
             if let albumWithTracks,
                albumWithTracks.tracks.contains(song),
@@ -490,29 +545,29 @@ class PlayerManager: ObservableObject {
             } else {
                 queueSongs = [song]
             }
-
+            
             guard let startIndex = queueSongs.firstIndex(of: song) else {
                 player.queue = ApplicationMusicPlayer.Queue(for: [song])
                 self.playerIsReady = true
                 return
             }
-
+            
             let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
             player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
-
+            
             observePlaybackState(
                 songs: queueSongs,
                 albumWithTracks: albumWithTracks,
                 playFromAlbum: playFromAlbum
             )
         }
-
+        
         do {
             try await player.prepareToPlay()
         } catch {
             print("prepare failed: \(error)")
         }
-
+        
         self.playerIsReady = true
     }
     
@@ -640,13 +695,13 @@ class PlayerManager: ObservableObject {
         else {
             return
         }
-
+        
         let updatedFavorites = favoritesManager.favoriteSongs
-
+        
         guard !updatedFavorites.isEmpty else {
             currentlyPlayingSong = nil
             isPlaying = false
-
+            
             if appleMusicSubscription {
                 ApplicationMusicPlayer.shared.stop()
             } else {
@@ -654,9 +709,9 @@ class PlayerManager: ObservableObject {
             }
             return
         }
-
+        
         var nextSong: Song?
-
+        
         if let index = removedIndex {
             // after removal, index shifts left automatically
             let safeIndex = min(index, updatedFavorites.count - 1)
@@ -664,9 +719,9 @@ class PlayerManager: ObservableObject {
         } else {
             nextSong = updatedFavorites.first
         }
-
+        
         guard let nextSong else { return }
-
+        
         playSong(
             nextSong,
             from: updatedFavorites,
@@ -674,5 +729,72 @@ class PlayerManager: ObservableObject {
             playFromAlbum: false,
             networkMonitor: networkMonitor
         )
+    }
+    
+    func toggleRepeatMode() {
+        switch repeatMode {
+        case .off:
+            repeatMode = .all
+            
+        case .all:
+            repeatMode = .one
+            
+        case .one:
+            repeatMode = .off
+        }
+        
+        let player = ApplicationMusicPlayer.shared
+        
+        switch repeatMode {
+        case .off:
+            player.state.repeatMode = MusicPlayer.RepeatMode.none
+            
+        case .all:
+            player.state.repeatMode = MusicPlayer.RepeatMode.all
+            
+        case .one:
+            player.state.repeatMode = MusicPlayer.RepeatMode.one
+        }
+    }
+    
+    private func applySavedRepeatMode() {
+        let player = ApplicationMusicPlayer.shared
+        
+        switch repeatMode {
+        case .off:
+            player.state.repeatMode = MusicPlayer.RepeatMode.none
+            
+        case .all:
+            player.state.repeatMode = MusicPlayer.RepeatMode.all
+            
+        case .one:
+            player.state.repeatMode = MusicPlayer.RepeatMode.one
+        }
+    }
+    
+    @objc private func handleAudioInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue)
+        else {
+            return
+        }
+        
+        switch type {
+        case .began:
+            isPlaying = false
+            
+            if appleMusicSubscription {
+                ApplicationMusicPlayer.shared.pause()
+            } else {
+                audioPlayer?.pause()
+            }
+            
+        case .ended:
+            break
+            
+        @unknown default:
+            break
+        }
     }
 }
