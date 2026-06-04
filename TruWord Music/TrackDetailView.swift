@@ -449,12 +449,14 @@ struct TrackDetailView: View {
 
         let hasChristianAlbum = fullArtist.albums?.contains { album in
             album.genreNames.contains("Christian") ||
-            album.genreNames.contains("Christian & Gospel")
+            album.genreNames.contains("Christian & Gospel") &&
+            album.contentRating != .explicit
         } ?? false
         
         let hasChristianSong = fullArtist.topSongs?.contains { song in
             song.genreNames.contains("Christian") ||
-            song.genreNames.contains("Christian & Gospel")
+            song.genreNames.contains("Christian & Gospel") &&
+            song.contentRating != .explicit
         } ?? false
 
         return hasChristianAlbum || hasChristianSong

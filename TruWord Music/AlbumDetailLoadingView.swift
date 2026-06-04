@@ -49,7 +49,8 @@ struct AlbumDetailLoadingView: View {
                     albumWithTracks: $playerManager.albumWithTracks,
                     networkMonitor: networkMonitor,
                     playerManager: playerManager,
-                    navigationPath: $navigationPath
+                    navigationPath: $navigationPath,
+                    albumCache: $albumCache
                 )
             }
         }

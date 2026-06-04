@@ -8,12 +8,15 @@ struct AlbumDetailView: View {
     @State private var tracks: [Song] = []
     @State private var isLoading = true
     @State private var isArtistPressed = false
+    @State private var relatedAlbums: [Album] = []
+    @State private var resolvedAlbum: Album?
     @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
     @Binding var navigationPath: [Route]
+    @Binding var albumCache: [MusicItemID: Album]
     
     private let bottomPlayerHeight: CGFloat = 77
     
@@ -198,6 +201,44 @@ struct AlbumDetailView: View {
                         .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 30, trailing: 16))
                         .listRowSeparator(.hidden)
                     }
+                    // MARK: - RELATED ALBUMS
+                    if !relatedAlbums.isEmpty {
+                        Section {
+                            VStack(alignment: .leading, spacing: 12) {
+
+                                HStack {
+                                    Text("Related Albums")
+                                        .font(.system(size: 20, weight: .bold))
+                                    Spacer()
+                                }
+                                .padding(.leading, 10)
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 16) {
+
+                                        ForEach(relatedAlbums, id: \.id) { album in
+                                            AlbumCarouselItemView(album: album)
+                                                .onTapGesture {
+                                                    albumCache[album.id] = album   // 🔥 ADD THIS
+
+                                                    navigationPath.append(.album(album.id))
+
+                                                    Analytics.logEvent("related_album_opened", parameters: [
+                                                        "album_id": album.id.rawValue,
+                                                        "album_title": album.title
+                                                    ])
+                                                }
+                                        }
+                                    }
+                                    .padding(.leading, 8)
+                                    .padding(.trailing, 16)
+                                }
+                            }
+                            .padding(.bottom, 20)
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                        }
+                    }
                 }
                 .listStyle(.plain)
                 .safeAreaInset(edge: .bottom) {
@@ -212,11 +253,14 @@ struct AlbumDetailView: View {
         .task(id: album.id) {
             isLoading = true
             tracks = []
-            
-            let fetchedTracks = await fetchAlbumTracks(album: album)
-            
+
+            async let fetchedTracks = fetchAlbumTracks(album: album)
+            async let fetchedRelated = fetchRelatedAlbums()
+
+            let (tracksResult, _) = await (fetchedTracks, fetchedRelated)
+
             await MainActor.run {
-                self.tracks = fetchedTracks
+                self.tracks = tracksResult
                 self.isLoading = false
             }
         }
@@ -227,6 +271,42 @@ struct AlbumDetailView: View {
                 "album_title": album.title,
                 "artist_name": album.artistName
             ])
+        }
+    }
+    
+    private func fetchRelatedAlbums() async {
+        do {
+            var request = MusicCatalogResourceRequest<Album>(
+                matching: \.id,
+                equalTo: album.id
+            )
+
+            request.properties = [.relatedAlbums]
+            request.limit = 1
+
+            let response = try await request.response()
+
+            guard let fullAlbum = response.items.first,
+                  let albums = fullAlbum.relatedAlbums else {
+                return
+            }
+
+            let filtered = albums.filter { album in
+                let isChristian =
+                    album.genreNames.contains("Christian") ||
+                    album.genreNames.contains("Christian & Gospel")
+
+                let isNotExplicit = album.contentRating != .explicit
+
+                return isChristian && isNotExplicit
+            }
+
+            await MainActor.run {
+                self.relatedAlbums = filtered
+            }
+
+        } catch {
+            print("Error fetching related albums: \(error)")
         }
     }
     
@@ -273,12 +353,14 @@ struct AlbumDetailView: View {
 
         let hasChristianAlbum = fullArtist.albums?.contains { album in
             album.genreNames.contains("Christian") ||
-            album.genreNames.contains("Christian & Gospel")
+            album.genreNames.contains("Christian & Gospel") &&
+            album.contentRating != .explicit
         } ?? false
         
         let hasChristianSong = fullArtist.topSongs?.contains { song in
             song.genreNames.contains("Christian") ||
-            song.genreNames.contains("Christian & Gospel")
+            song.genreNames.contains("Christian & Gospel") &&
+            song.contentRating != .explicit
         } ?? false
 
         return hasChristianAlbum || hasChristianSong

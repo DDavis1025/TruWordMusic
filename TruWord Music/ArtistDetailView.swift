@@ -24,6 +24,7 @@ struct ArtistDetailView: View {
     @State private var artist: Artist?
     @State private var topAlbums: [Album] = []
     @State private var topSongs: [Song] = []
+    @State private var similarArtists: [Artist] = []
     
     @State private var isLoading = true
     
@@ -246,6 +247,38 @@ struct ArtistDetailView: View {
                                 }
                             }
                         }
+                        // MARK: - Similar Artists
+                        if !similarArtists.isEmpty {
+                            
+                            VStack(alignment: .leading) {
+                                
+                                HStack {
+                                    Text("Similar Artists")
+                                        .font(.system(size: 20, weight: .bold))
+                                    Spacer()
+                                }
+                                
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    
+                                    HStack(spacing: 16) {
+                                        
+                                        ForEach(similarArtists, id: \.id) { artist in
+                                            SimilarArtistCarouselItemView(artist: artist)
+                                                .onTapGesture {
+                                                    navigationPath.append(.artist(artist.id))
+                                                    
+                                                    Analytics.logEvent("similar_artist_opened", parameters: [
+                                                        "artist_id": artist.id.rawValue,
+                                                        "artist_name": artist.name
+                                                    ])
+                                                }
+                                        }
+                                    }
+                                    .padding(.leading, 8)
+                                    .padding(.trailing, 16)
+                                }
+                            }
+                        }
                     }
                     .padding()
                     .padding(.bottom,
@@ -316,7 +349,8 @@ struct ArtistDetailView: View {
             
             request.properties = [
                 .albums,
-                .topSongs
+                .topSongs,
+                .similarArtists
             ]
             
             request.limit = 1
@@ -355,6 +389,22 @@ struct ArtistDetailView: View {
                     .sorted {
                         ($0.releaseDate ?? .distantPast) > ($1.releaseDate ?? .distantPast)
                     }
+                
+                self.similarArtists = Array(fetchedArtist.similarArtists ?? []).filter { artist in
+                    let hasChristianAlbum = (artist.albums ?? []).contains {
+                        $0.genreNames.contains("Christian") ||
+                        $0.genreNames.contains("Christian & Gospel") &&
+                       $0.contentRating != .explicit
+                    }
+                    
+                    let hasChristianSong = (artist.topSongs ?? []).contains {
+                        $0.genreNames.contains("Christian") ||
+                        $0.genreNames.contains("Christian & Gospel") &&
+                        $0.contentRating != .explicit
+                    }
+                    
+                    return hasChristianAlbum || hasChristianSong
+                }
                 
                 self.isLoading = false
             }
