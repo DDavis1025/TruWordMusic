@@ -404,41 +404,74 @@ struct TrackDetailView: View {
         dismiss()
     }
     
-    private func fetchSongWithArtists() async throws -> Song {
+    private func fetchPreferredArtist() async throws -> Artist {
         var request = MusicCatalogResourceRequest<Song>(
             matching: \.id,
             equalTo: song.id
         )
-        
+
         request.properties = [.artists]
         request.limit = 1
-        
+
         let response = try await request.response()
-        
-        guard let fullSong = response.items.first else {
+
+        guard let fullSong = response.items.first,
+              let artists = fullSong.artists,
+              let firstArtist = artists.first else {
             throw URLError(.badServerResponse)
         }
+
+        // Check each artist
+        for artist in artists {
+            if try await artistHasChristianContent(artist) {
+                return artist
+            }
+        }
+
+        // Fallback
+        return firstArtist
+    }
+    
+    private func artistHasChristianContent(_ artist: Artist) async throws -> Bool {
+        var request = MusicCatalogResourceRequest<Artist>(
+            matching: \.id,
+            equalTo: artist.id
+        )
+
+        request.properties = [.albums, .topSongs]
+        request.limit = 1
+
+        let response = try await request.response()
+
+        guard let fullArtist = response.items.first else {
+            return false
+        }
+
+        let hasChristianAlbum = fullArtist.albums?.contains { album in
+            album.genreNames.contains("Christian") ||
+            album.genreNames.contains("Christian & Gospel")
+        } ?? false
         
-        return fullSong
+        let hasChristianSong = fullArtist.topSongs?.contains { song in
+            song.genreNames.contains("Christian") ||
+            song.genreNames.contains("Christian & Gospel")
+        } ?? false
+
+        return hasChristianAlbum || hasChristianSong
     }
     
     private func openArtist() {
         Task {
             do {
-                
+
                 dismiss()
-                
-                let fullSong = try await fetchSongWithArtists()
-                
-                guard let artist = fullSong.artists?.first else {
-                    print("No artist found even after full fetch")
-                    return
-                }
-                
+
+                let artist = try await fetchPreferredArtist()
+
                 let artistID = artist.id
-                
+
                 await MainActor.run {
-                    
+
                     switch activeTab {
                     case .home:
                         homeNavigationPath.append(.artist(artistID))
@@ -447,17 +480,16 @@ struct TrackDetailView: View {
                     case .favorites:
                         favoritesNavigationPath.append(.artist(artistID))
                     }
-                    
+
                     Analytics.logEvent("artist_opened", parameters: [
                         "artist_id": artist.id.rawValue,
                         "artist_name": artist.name,
                         "song_id": song.id.rawValue
                     ])
-                    
                 }
-                
+
             } catch {
-                print("Error fetching song with artists: \(error)")
+                print("Error fetching preferred artist: \(error)")
             }
         }
     }

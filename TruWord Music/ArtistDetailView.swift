@@ -46,16 +46,16 @@ struct ArtistDetailView: View {
             } else if !networkMonitor.isConnected {
                 VStack(spacing: 8) {
                     Spacer()
-
+                    
                     Text("No Internet connection")
                         .font(.headline)
                         .multilineTextAlignment(.center)
-
+                    
                     Text("Your device is not connected to the internet")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-
+                    
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -80,7 +80,7 @@ struct ArtistDetailView: View {
                             let artworkURL = artist?.artwork?.url(width: pixelSize, height: pixelSize)
                             
                             CustomAsyncImage(url: artworkURL, isCircle: true)
-                                    .frame(width: 160, height: 160)
+                                .frame(width: 160, height: 160)
                             
                             VStack(spacing: 2) {
                                 Text(artist?.name ?? "")
@@ -115,6 +115,12 @@ struct ArtistDetailView: View {
                                     
                                     Spacer()
                                 }
+                            }
+                            if !isLoading && topAlbums.isEmpty && topSongs.isEmpty {
+                                Text("No Christian music available")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding(.top, 35)
                             }
                         }
                         .frame(maxWidth: .infinity)

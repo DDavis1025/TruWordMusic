@@ -7,6 +7,7 @@ struct AlbumDetailView: View {
     let playSong: (Song) -> Void
     @State private var tracks: [Song] = []
     @State private var isLoading = true
+    @State private var isArtistPressed = false
     @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
     @ObservedObject var networkMonitor: NetworkMonitor
@@ -58,13 +59,24 @@ struct AlbumDetailView: View {
                                 .font(.system(size: 20, weight: .bold))
                                 .multilineTextAlignment(.center)
                                 .padding(.top, 4)
+                                .padding(.horizontal, 10)
                             
                             Button {
+                                withAnimation(.easeOut(duration: 0.1)) {
+                                    isArtistPressed = true
+                                }
+
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    withAnimation(.easeOut(duration: 0.1)) {
+                                        isArtistPressed = false
+                                    }
+                                }
+
                                 Analytics.logEvent("artist_from_album_tapped", parameters: [
                                     "artist_name": album.artistName,
                                     "album_id": album.id.rawValue
                                 ])
-                                
+
                                 Task {
                                     await openArtistFromAlbum()
                                 }
@@ -73,8 +85,11 @@ struct AlbumDetailView: View {
                                     .font(.system(size: 18, weight: .regular))
                                     .foregroundColor(.primary)
                                     .frame(maxWidth: .infinity, alignment: .center)
+                                    .padding(.horizontal, 10)
                                     .multilineTextAlignment(.center)
+                                    .scaleEffect(isArtistPressed ? 0.96 : 1.0)
                             }
+                            .buttonStyle(.plain)
                             
                             .buttonStyle(.plain)
                             
@@ -215,38 +230,69 @@ struct AlbumDetailView: View {
         }
     }
     
-    private func fetchAlbumWithArtists() async throws -> Album {
+    private func fetchPreferredArtistFromAlbum() async throws -> Artist {
         var request = MusicCatalogResourceRequest<Album>(
             matching: \.id,
             equalTo: album.id
         )
-        
+
         request.properties = [.artists]
-        
+
         let response = try await request.response()
-        
-        guard let fullAlbum = response.items.first else {
+
+        guard let fullAlbum = response.items.first,
+              let artists = fullAlbum.artists,
+              let firstArtist = artists.first else {
             throw URLError(.badServerResponse)
         }
-        
-        return fullAlbum
+
+        for artist in artists {
+            if try await artistHasChristianContent(artist) {
+                return artist
+            }
+        }
+
+        // Fallback to the first artist if none are Christian
+        return firstArtist
     }
+    
+    private func artistHasChristianContent(_ artist: Artist) async throws -> Bool {
+        var request = MusicCatalogResourceRequest<Artist>(
+            matching: \.id,
+            equalTo: artist.id
+        )
+
+        request.properties = [.albums, .topSongs]
+        request.limit = 1
+
+        let response = try await request.response()
+
+        guard let fullArtist = response.items.first else {
+            return false
+        }
+
+        let hasChristianAlbum = fullArtist.albums?.contains { album in
+            album.genreNames.contains("Christian") ||
+            album.genreNames.contains("Christian & Gospel")
+        } ?? false
+        
+        let hasChristianSong = fullArtist.topSongs?.contains { song in
+            song.genreNames.contains("Christian") ||
+            song.genreNames.contains("Christian & Gospel")
+        } ?? false
+
+        return hasChristianAlbum || hasChristianSong
+    }
+    
     
     private func openArtistFromAlbum() async {
         do {
-            let fullAlbum = try await fetchAlbumWithArtists()
-            
-            guard let artist = fullAlbum.artists?.first else {
-                print("No artist found")
-                return
-            }
-            
-            let artistID = artist.id
-            
+            let artist = try await fetchPreferredArtistFromAlbum()
+
             await MainActor.run {
-                navigationPath.append(.artist(artistID))
+                navigationPath.append(.artist(artist.id))
             }
-            
+
         } catch {
             print("Failed to open artist: \(error)")
         }
