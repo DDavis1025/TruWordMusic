@@ -25,6 +25,12 @@ enum RepeatMode: String {
     case one
 }
 
+struct RecentlyPlayedAlbumItem: Codable, Identifiable {
+    let id: String
+    let title: String
+    let artistName: String
+}
+
 
 @MainActor
 class PlayerManager: ObservableObject {
@@ -43,6 +49,7 @@ class PlayerManager: ObservableObject {
     @Published var lastAlbumWithTracks: AlbumWithTracks? = nil
     @Published var lastPlayFromAlbum: Bool = false
     @Published var playbackSource: PlaybackSource = .none
+    @Published var recentlyPlayedAlbums: [RecentlyPlayedAlbumItem] = []
     
     @Published var repeatMode: RepeatMode = .off {
         didSet {
@@ -56,6 +63,9 @@ class PlayerManager: ObservableObject {
     private var playbackObservationTask: Task<Void, Never>?
     private var playerStateTask: Task<Void, Never>?
     private var playerPreparationTask: Task<Void, Never>?
+    
+    private let recentlyPlayedKey = "recentlyPlayedAlbums"
+    private let maxRecentlyPlayed = 40
     
     private weak var favoritesManager: FavoritesManager?
     
@@ -71,6 +81,8 @@ class PlayerManager: ObservableObject {
         }
         
         applySavedRepeatMode()
+        
+        loadRecentlyPlayedAlbums()
         
         NotificationCenter.default.addObserver(
             self,
@@ -155,7 +167,10 @@ class PlayerManager: ObservableObject {
                     playFromAlbum: playFromAlbum
                 )
             } else {
-                playWithPreview(song, songs: validSongs, networkMonitor: networkMonitor)
+                playWithPreview(song,
+                                songs: validSongs,
+                                albumWithTracks: albumWithTracks,
+                                networkMonitor: networkMonitor)
             }
         }
     }
@@ -294,6 +309,10 @@ class PlayerManager: ObservableObject {
             self.lastPlayedSongs = songs
             self.lastAlbumWithTracks = albumWithTracks
             self.lastPlayFromAlbum = playFromAlbum
+            
+            if playFromAlbum, let albumWithTracks {
+                addRecentlyPlayedAlbum(albumWithTracks.album)
+            }
         }
         
         guard let startIndex = queueSongs.firstIndex(of: song) else {
@@ -333,6 +352,7 @@ class PlayerManager: ObservableObject {
     func playWithPreview(
         _ song: Song,
         songs: [Song],
+        albumWithTracks: AlbumWithTracks?,
         networkMonitor: NetworkMonitor?
     ) {
         guard let previewURL = song.previewAssets?.first?.url else {
@@ -389,6 +409,10 @@ class PlayerManager: ObservableObject {
         Task { @MainActor in
             self.currentlyPlayingSong = song
             self.isPlaying = true
+            
+            if let albumWithTracks {
+                addRecentlyPlayedAlbum(albumWithTracks.album)
+            }
         }
         
         clearApplicationMusicPlayer()
@@ -796,5 +820,35 @@ class PlayerManager: ObservableObject {
         @unknown default:
             break
         }
+    }
+    
+    private func addRecentlyPlayedAlbum(_ album: Album) {
+        let item = RecentlyPlayedAlbumItem(
+            id: album.id.rawValue,
+            title: album.title,
+            artistName: album.artistName
+        )
+
+        recentlyPlayedAlbums.removeAll { $0.id == item.id }
+        recentlyPlayedAlbums.insert(item, at: 0)
+
+        if recentlyPlayedAlbums.count > 40 {
+            recentlyPlayedAlbums = Array(recentlyPlayedAlbums.prefix(40))
+        }
+
+        saveRecentlyPlayedAlbums()
+    }
+    
+    private func saveRecentlyPlayedAlbums() {
+        let data = try? JSONEncoder().encode(recentlyPlayedAlbums)
+        UserDefaults.standard.set(data, forKey: recentlyPlayedKey)
+    }
+
+    private func loadRecentlyPlayedAlbums() {
+        guard let data = UserDefaults.standard.data(forKey: recentlyPlayedKey),
+              let decoded = try? JSONDecoder().decode([RecentlyPlayedAlbumItem].self, from: data)
+        else { return }
+
+        self.recentlyPlayedAlbums = decoded
     }
 }

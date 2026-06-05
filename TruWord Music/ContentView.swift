@@ -18,6 +18,7 @@ enum Route: Hashable {
     case artistAlbumGrid(title: String, albums: [Album])
     case album(MusicItemID)
     case artist(MusicItemID)
+    case recentlyPlayedGrid
 }
 
 // MARK: - ContentView
@@ -148,6 +149,20 @@ struct ContentView: View {
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
                     )
+                case .recentlyPlayedGrid:
+                    FullAlbumGridView(
+                        albums: playerManager.recentlyPlayedAlbums.compactMap {
+                            albumCache[MusicItemID($0.id)]
+                        },
+                        title: "Recently Played",
+                        cacheAlbum: { album in
+                            albumCache[album.id] = album
+                        },
+                        isFromArtist: false,
+                        navigationPath: $navigationPath,
+                        networkMonitor: networkMonitor,
+                        playerManager: playerManager
+                    )
                 }
             }
             
@@ -191,7 +206,8 @@ struct ContentView: View {
                             playerManager: playerManager,
                             songs: songs
                         )
-                        Spacer().frame(height: 15)
+                        Spacer().frame(height: 20)
+                        recentlyPlayedAlbums
                         albumsSection
                         songsSection
                     }
@@ -251,6 +267,45 @@ struct ContentView: View {
         }
     }
     
+    @ViewBuilder
+    private var recentlyPlayedAlbums: some View {
+        if !playerManager.recentlyPlayedAlbums.isEmpty {
+            let items = Array(playerManager.recentlyPlayedAlbums.prefix(7))
+
+            VStack(alignment: .leading) {
+
+                HStack {
+                    Text("Recently Played")
+                        .font(.system(size: 18, weight: .bold))
+
+                    Spacer()
+
+                    if playerManager.recentlyPlayedAlbums.count > 7 {
+                        NavigationLink(value: Route.recentlyPlayedGrid) {
+                            Text("View More")
+                                .font(.system(size: 15))
+                        }
+                    }
+                }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(items) { item in
+                            if let album = albumCache[MusicItemID(item.id)] {
+                                AlbumCarouselItemView(album: album)
+                                    .onTapGesture {
+                                        navigationPath.append(.album(album.id))
+                                    }
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.bottom, 14)
+        }
+    }
+    
     // MARK: - Albums Section
     
     private var albumsSection: some View {
@@ -264,7 +319,7 @@ struct ContentView: View {
                     
                     Spacer()
                     
-                    if albums.count > 5 {
+                    if albums.count > 7 {
                         NavigationLink(value: Route.fullAlbumGrid) {
                             Text("View More")
                         }
@@ -279,7 +334,7 @@ struct ContentView: View {
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
-                        ForEach(albums.prefix(5), id: \.id) { album in
+                        ForEach(albums.prefix(7), id: \.id) { album in
                             AlbumCarouselItemView(album: album)
                                 .onTapGesture {
                                     navigationPath.append(.album(album.id))
@@ -414,7 +469,7 @@ struct ContentView: View {
     private func fetchChristianAlbums() async {
         do {
             guard let genre = try await fetchChristianGenre() else { return }
-           
+            
             var request = MusicCatalogChartsRequest(
                 genre: genre,
                 types: [Album.self]

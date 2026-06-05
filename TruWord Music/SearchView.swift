@@ -451,6 +451,8 @@ struct SearchView: View {
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
                     )
+                case .recentlyPlayedGrid:
+                    EmptyView() // Not used here
                 }
             }
         }
