@@ -667,6 +667,9 @@ struct SearchView: View {
     }
     
     private func handleRecentSearchTap(_ item: RecentSearchItem) {
+        
+        addRecentSearch(item)
+        
         switch item {
 
         case .song(let id, let title, let artist, _):

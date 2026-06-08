@@ -32,6 +32,8 @@ struct TrackDetailView: View {
     @State private var showActionsMenu = false
     @State private var menuPosition: CGPoint = .zero
     
+    @State private var isScrubbing = false
+    
     private var appleMusicURL: URL? {
         URL(string: "https://music.apple.com/us/song/\(song.id)")
     }
@@ -89,7 +91,63 @@ struct TrackDetailView: View {
                     .foregroundColor(.secondary)
                     .id("artist-\(song.id)")
                     
-                    Spacer().frame(height: 30)
+                    Spacer().frame(height: 34)
+
+                    VStack(spacing: 4) {
+
+                        ZStack {
+                            if playerManager.appleMusicSubscription {
+
+                                Slider(
+                                    value: Binding(
+                                        get: {
+                                            playerManager.trackDuration > 0
+                                            ? playerManager.playbackTime / playerManager.trackDuration
+                                            : 0
+                                        },
+                                        set: { newValue in
+                                            playerManager.playbackTime = newValue * playerManager.trackDuration
+                                        }
+                                    ),
+                                    in: 0...1,
+                                    onEditingChanged: { editing in
+                                        playerManager.isScrubbing = editing
+
+                                        if !editing {
+                                            ApplicationMusicPlayer.shared.playbackTime =
+                                                playerManager.playbackTime
+                                        }
+                                    }
+                                )
+                                .tint(.blue)
+
+                            } else {
+
+                                ProgressView(
+                                    value: playerManager.playbackTime,
+                                    total: 30
+                                )
+                                .tint(.gray)
+                            }
+                        }
+                        .frame(height: 20)
+                        .frame(maxWidth: .infinity)
+
+                        HStack {
+
+                            Text(formatTime(playerManager.playbackTime))
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+
+                            Spacer()
+
+                            Text(formatTime(playerManager.trackDuration))
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.top, 4)
+                    }
+                    .padding(.horizontal, 8)
                     
                     // Controls
                     HStack(spacing: 40) {
@@ -617,6 +675,16 @@ struct TrackDetailView: View {
         case .home, .search, .artist, .none:
             return playerManager.lastPlayedSongs
         }
+    }
+    
+    private func formatTime(_ seconds: TimeInterval) -> String {
+
+        let totalSeconds = Int(seconds)
+
+        let minutes = totalSeconds / 60
+        let remainingSeconds = totalSeconds % 60
+
+        return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 }
 

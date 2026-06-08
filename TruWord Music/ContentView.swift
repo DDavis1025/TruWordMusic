@@ -173,15 +173,17 @@ struct ContentView: View {
             .task {
                 isLoading = true
                 await requestMusicAuthorization()
-                
+
                 if musicAuthorized {
                     await withTaskGroup(of: Void.self) { group in
                         group.addTask { await checkAppleMusicStatus() }
                         group.addTask { await fetchChristianSongs() }
                         group.addTask { await fetchChristianAlbums() }
                     }
+
+                    await loadRecentlyPlayedAlbumsIntoCache()
                 }
-                
+
                 isLoading = false
             }
             
@@ -492,6 +494,36 @@ struct ContentView: View {
             
         } catch {
             print("Error fetching albums: \(error)")
+        }
+    }
+    
+    private func loadRecentlyPlayedAlbumsIntoCache() async {
+        for item in playerManager.recentlyPlayedAlbums {
+
+            let albumID = MusicItemID(item.id)
+
+            // Skip albums already cached
+            if albumCache[albumID] != nil {
+                continue
+            }
+
+            do {
+                var request = MusicCatalogResourceRequest<Album>(
+                    matching: \.id,
+                    equalTo: albumID
+                )
+
+                request.limit = 1
+
+                if let album = try await request.response().items.first {
+                    await MainActor.run {
+                        albumCache[album.id] = album
+                    }
+                }
+
+            } catch {
+                print("Failed to load album \(item.id): \(error)")
+            }
         }
     }
 }
