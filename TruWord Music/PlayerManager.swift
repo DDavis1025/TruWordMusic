@@ -53,6 +53,14 @@ class PlayerManager: ObservableObject {
     @Published var playbackTime: TimeInterval = 0
     @Published var trackDuration: TimeInterval = 0
     @Published var isScrubbing: Bool = false
+    @Published var originalQueue: [Song] = []
+    @Published var shuffledQueue: [Song] = []
+    
+    @Published var isShuffled: Bool = UserDefaults.standard.bool(forKey: "isShuffled") {
+        didSet {
+            UserDefaults.standard.set(isShuffled, forKey: "isShuffled")
+        }
+    }
     
     @Published var repeatMode: RepeatMode = .off {
         didSet {
@@ -678,7 +686,12 @@ class PlayerManager: ObservableObject {
                         
                         if let matchedSong, matchedSong != previousSong {
                             previousSong = matchedSong
+
                             currentlyPlayingSong = matchedSong
+                            playbackTime = 0
+                            isScrubbing = false
+                            trackDuration = matchedSong.duration ?? 0
+
                             isPlaying = true
                         }
                     default: break
@@ -890,6 +903,48 @@ class PlayerManager: ObservableObject {
                     self.trackDuration = 30
                 }
             }
+        }
+    }
+    
+    func toggleShuffle() {
+        isShuffled.toggle()
+
+        let currentList: [Song]
+
+        switch playbackSource {
+        case .favorites:
+            currentList = favoritesManager?.favoriteSongs ?? []
+        case .album:
+            currentList = albumWithTracks?.tracks ?? lastPlayedSongs
+        case .home, .search, .artist, .none:
+            currentList = lastPlayedSongs
+        }
+
+        guard let currentSong = currentlyPlayingSong else { return }
+
+        if isShuffled {
+
+            // Save original order once
+            originalQueue = currentList
+
+            let remaining = currentList.filter { $0.id != currentSong.id }
+            let shuffled = remaining.shuffled()
+
+            shuffledQueue = [currentSong] + shuffled
+
+            applyQueue(shuffledQueue)
+
+        } else {
+            applyQueue(originalQueue)
+        }
+    }
+    
+    private func applyQueue(_ queue: [Song]) {
+        lastPlayedSongs = queue
+
+        if appleMusicSubscription {
+            let player = ApplicationMusicPlayer.shared
+            player.queue = ApplicationMusicPlayer.Queue(for: queue)
         }
     }
 }
