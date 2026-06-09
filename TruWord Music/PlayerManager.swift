@@ -53,14 +53,6 @@ class PlayerManager: ObservableObject {
     @Published var playbackTime: TimeInterval = 0
     @Published var trackDuration: TimeInterval = 0
     @Published var isScrubbing: Bool = false
-    @Published var originalQueue: [Song] = []
-    @Published var shuffledQueue: [Song] = []
-    
-    @Published var isShuffled: Bool = UserDefaults.standard.bool(forKey: "isShuffled") {
-        didSet {
-            UserDefaults.standard.set(isShuffled, forKey: "isShuffled")
-        }
-    }
     
     @Published var repeatMode: RepeatMode = .off {
         didSet {
@@ -686,12 +678,12 @@ class PlayerManager: ObservableObject {
                         
                         if let matchedSong, matchedSong != previousSong {
                             previousSong = matchedSong
-
+                            
                             currentlyPlayingSong = matchedSong
                             playbackTime = 0
                             isScrubbing = false
                             trackDuration = matchedSong.duration ?? 0
-
+                            
                             isPlaying = true
                         }
                     default: break
@@ -851,14 +843,14 @@ class PlayerManager: ObservableObject {
             title: album.title,
             artistName: album.artistName
         )
-
+        
         recentlyPlayedAlbums.removeAll { $0.id == item.id }
         recentlyPlayedAlbums.insert(item, at: 0)
-
+        
         if recentlyPlayedAlbums.count > 40 {
             recentlyPlayedAlbums = Array(recentlyPlayedAlbums.prefix(40))
         }
-
+        
         saveRecentlyPlayedAlbums()
     }
     
@@ -866,85 +858,53 @@ class PlayerManager: ObservableObject {
         let data = try? JSONEncoder().encode(recentlyPlayedAlbums)
         UserDefaults.standard.set(data, forKey: recentlyPlayedKey)
     }
-
+    
     private func loadRecentlyPlayedAlbums() {
         guard let data = UserDefaults.standard.data(forKey: recentlyPlayedKey),
               let decoded = try? JSONDecoder().decode([RecentlyPlayedAlbumItem].self, from: data)
         else { return }
-
+        
         self.recentlyPlayedAlbums = decoded
     }
     
     func startPlaybackTimer() {
         playbackTimer?.invalidate()
-
+        
         playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self else { return }
-
+            
             Task { @MainActor in
-
+                
+                if self.isScrubbing { return }
+                
                 if self.appleMusicSubscription {
-
+                    
                     let player = ApplicationMusicPlayer.shared
-
+                    
                     // ✅ Don’t fight the user while scrubbing
                     if !self.isScrubbing {
-                        self.playbackTime = player.playbackTime
+                        let newTime = player.playbackTime
+                        
+                        if let song = self.currentlyPlayingSong {
+                            let duration = song.duration ?? 0
+                            self.playbackTime = min(newTime, duration)
+                            self.trackDuration = duration
+                        } else {
+                            self.playbackTime = newTime
+                        }
                     }
-
+                    
                     if let song = self.currentlyPlayingSong {
                         self.trackDuration = song.duration ?? 0
                     }
-
+                    
                 } else if let audioPlayer = self.audioPlayer {
-
+                    
                     self.playbackTime = audioPlayer.currentTime().seconds
-
+                    
                     self.trackDuration = 30
                 }
             }
-        }
-    }
-    
-    func toggleShuffle() {
-        isShuffled.toggle()
-
-        let currentList: [Song]
-
-        switch playbackSource {
-        case .favorites:
-            currentList = favoritesManager?.favoriteSongs ?? []
-        case .album:
-            currentList = albumWithTracks?.tracks ?? lastPlayedSongs
-        case .home, .search, .artist, .none:
-            currentList = lastPlayedSongs
-        }
-
-        guard let currentSong = currentlyPlayingSong else { return }
-
-        if isShuffled {
-
-            // Save original order once
-            originalQueue = currentList
-
-            let remaining = currentList.filter { $0.id != currentSong.id }
-            let shuffled = remaining.shuffled()
-
-            shuffledQueue = [currentSong] + shuffled
-
-            applyQueue(shuffledQueue)
-
-        } else {
-            applyQueue(originalQueue)
-        }
-    }
-    
-    private func applyQueue(_ queue: [Song]) {
-        lastPlayedSongs = queue
-
-        if appleMusicSubscription {
-            let player = ApplicationMusicPlayer.shared
-            player.queue = ApplicationMusicPlayer.Queue(for: queue)
         }
     }
 }

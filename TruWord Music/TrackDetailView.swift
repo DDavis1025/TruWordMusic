@@ -33,6 +33,8 @@ struct TrackDetailView: View {
     @State private var menuPosition: CGPoint = .zero
     
     @State private var isScrubbing = false
+    @State private var sliderValue: Double = 0
+    @State private var scrubValue: Double = 0
     
     private var appleMusicURL: URL? {
         URL(string: "https://music.apple.com/us/song/\(song.id)")
@@ -101,21 +103,27 @@ struct TrackDetailView: View {
                                 Slider(
                                     value: Binding(
                                         get: {
-                                            playerManager.trackDuration > 0
-                                            ? playerManager.playbackTime / playerManager.trackDuration
-                                            : 0
+                                            isScrubbing ? scrubValue :
+                                            (playerManager.trackDuration > 0
+                                                ? playerManager.playbackTime / playerManager.trackDuration
+                                                : 0)
                                         },
                                         set: { newValue in
-                                            playerManager.playbackTime = newValue * playerManager.trackDuration
+                                            scrubValue = newValue
+                                            isScrubbing = true
+                                            playerManager.isScrubbing = true
                                         }
                                     ),
                                     in: 0...1,
                                     onEditingChanged: { editing in
+                                        isScrubbing = editing
                                         playerManager.isScrubbing = editing
 
                                         if !editing {
-                                            ApplicationMusicPlayer.shared.playbackTime =
-                                                playerManager.playbackTime
+                                            let newTime = scrubValue * playerManager.trackDuration
+
+                                            playerManager.playbackTime = newTime
+                                            ApplicationMusicPlayer.shared.playbackTime = newTime
                                         }
                                     }
                                 )
@@ -135,7 +143,11 @@ struct TrackDetailView: View {
 
                         HStack {
 
-                            Text(formatTime(playerManager.playbackTime))
+                            Text(formatTime(
+                                playerManager.isScrubbing
+                                ? scrubValue * playerManager.trackDuration
+                                : playerManager.playbackTime
+                            ))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
 
@@ -150,42 +162,25 @@ struct TrackDetailView: View {
                     .padding(.horizontal, 24)
                     
                     // Controls
-                    HStack(spacing: 28) {
-
-                        // Shuffle
-                        Button {
-                            playerManager.toggleShuffle()
-                        } label: {
-                            Image(systemName: "shuffle")
-                                .font(.system(size: 20))
-                                .foregroundColor(
-                                    playerManager.isShuffled ? .blue : .primary
-                                )
-                        }
-                        .disabled(!networkMonitor.isConnected)
-
-                        // Previous
+                    HStack(spacing: 40) {
                         Button(action: playPreviousSong) {
                             Image(systemName: "backward.fill")
                                 .font(.system(size: 28))
                                 .foregroundColor(networkMonitor.isConnected ? .primary : .gray)
                         }
                         .disabled(!networkMonitor.isConnected)
-
-                        // Play / Pause
+                        
                         ZStack {
                             if playerIsReady {
                                 Button(action: {
                                     togglePlayPause()
-
+                                    
                                     Analytics.logEvent("track_play_pause_tapped", parameters: [
                                         "song_id": song.id.rawValue,
                                         "is_playing": isPlaying
                                     ])
                                 }) {
-                                    Image(systemName: isPlaying
-                                          ? "pause.circle.fill"
-                                          : "play.circle.fill")
+                                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
                                         .resizable()
                                         .scaledToFit()
                                         .foregroundColor(.primary)
@@ -195,38 +190,16 @@ struct TrackDetailView: View {
                             }
                         }
                         .frame(width: 60, height: 60)
-
-                        // Next
+                        
                         Button(action: playNextSong) {
                             Image(systemName: "forward.fill")
                                 .font(.system(size: 28))
                                 .foregroundColor(networkMonitor.isConnected ? .primary : .gray)
                         }
                         .disabled(!networkMonitor.isConnected)
-
-                        // Repeat
-                        Button {
-                            playerManager.toggleRepeatMode()
-                        } label: {
-                            Image(systemName: {
-                                switch playerManager.repeatMode {
-                                case .off:
-                                    return "repeat"
-                                case .all:
-                                    return "repeat"
-                                case .one:
-                                    return "repeat.1"
-                                }
-                            }())
-                            .font(.system(size: 20))
-                            .foregroundColor(
-                                playerManager.repeatMode == .off
-                                ? .primary
-                                : .blue
-                            )
-                        }
                     }
                     .padding(.bottom, 22)
+                    
                     
                     if networkMonitor.isConnected {
                         
@@ -335,6 +308,30 @@ struct TrackDetailView: View {
                                         .foregroundColor(favoritesManager.isFavorite(song) ? .yellow : .primary)
                                         .frame(width: 44, height: 44)
                                         .contentShape(Rectangle())
+                                }
+                                
+                                Button {
+                                    playerManager.toggleRepeatMode()
+                                } label: {
+                                    Image(systemName: {
+                                        switch playerManager.repeatMode {
+                                        case .off:
+                                            return "repeat"
+
+                                        case .all:
+                                            return "repeat"
+
+                                        case .one:
+                                            return "repeat.1"
+                                        }
+                                    }())
+                                    .font(.system(size: 22))
+                                    .foregroundColor(
+                                        playerManager.repeatMode == .off
+                                        ? .primary
+                                        : .blue
+                                    )
+                                    .frame(width: 44, height: 44)
                                 }
                             }
                             
