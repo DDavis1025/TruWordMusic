@@ -67,6 +67,7 @@ class PlayerManager: ObservableObject {
     private var playerStateTask: Task<Void, Never>?
     private var playerPreparationTask: Task<Void, Never>?
     private var playbackTimer: Timer?
+    private var lastSeekTime: TimeInterval = 0
     
     private let recentlyPlayedKey = "recentlyPlayedAlbums"
     private let maxRecentlyPlayed = 40
@@ -887,7 +888,7 @@ class PlayerManager: ObservableObject {
                         
                         if let song = self.currentlyPlayingSong {
                             let duration = song.duration ?? 0
-                            self.playbackTime = min(newTime, duration)
+                            self.playbackTime = newTime
                             self.trackDuration = duration
                         } else {
                             self.playbackTime = newTime
@@ -906,5 +907,15 @@ class PlayerManager: ObservableObject {
                 }
             }
         }
+    }
+    
+    func seek(to time: TimeInterval) {
+        lastSeekTime = time
+
+        playbackTime = time   // 🔥 add this line
+
+        if appleMusicSubscription {
+            ApplicationMusicPlayer.shared.playbackTime = time
+        } 
     }
 }

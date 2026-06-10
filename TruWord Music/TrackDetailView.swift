@@ -101,29 +101,20 @@ struct TrackDetailView: View {
                             if playerManager.appleMusicSubscription {
 
                                 Slider(
-                                    value: Binding(
-                                        get: {
-                                            isScrubbing ? scrubValue :
-                                            (playerManager.trackDuration > 0
-                                                ? playerManager.playbackTime / playerManager.trackDuration
-                                                : 0)
-                                        },
-                                        set: { newValue in
-                                            scrubValue = newValue
-                                            isScrubbing = true
-                                            playerManager.isScrubbing = true
-                                        }
-                                    ),
+                                    value: $scrubValue,
                                     in: 0...1,
                                     onEditingChanged: { editing in
                                         isScrubbing = editing
                                         playerManager.isScrubbing = editing
 
-                                        if !editing {
+                                        if editing {
+                                            // lock slider to current playback position at start
+                                            scrubValue = playerManager.trackDuration > 0
+                                                ? playerManager.playbackTime / playerManager.trackDuration
+                                                : 0
+                                        } else {
                                             let newTime = scrubValue * playerManager.trackDuration
-
-                                            playerManager.playbackTime = newTime
-                                            ApplicationMusicPlayer.shared.playbackTime = newTime
+                                            playerManager.seek(to: newTime)
                                         }
                                     }
                                 )
@@ -142,12 +133,15 @@ struct TrackDetailView: View {
                         .frame(maxWidth: .infinity)
 
                         HStack {
+                            let currentTime: TimeInterval = {
+                                if isScrubbing {
+                                    return scrubValue * playerManager.trackDuration
+                                } else {
+                                    return playerManager.playbackTime
+                                }
+                            }()
 
-                            Text(formatTime(
-                                playerManager.isScrubbing
-                                ? scrubValue * playerManager.trackDuration
-                                : playerManager.playbackTime
-                            ))
+                            Text(formatTime(currentTime))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
 
@@ -420,6 +414,17 @@ struct TrackDetailView: View {
             .onChange(of: playerManager.currentlyPlayingSong) {
                 if playerManager.currentlyPlayingSong == nil {
                     dismiss()
+                }
+            }
+            .onChange(of: playerManager.currentlyPlayingSong) { _, newSong in
+                guard newSong != nil else { return }
+
+                isScrubbing = false
+
+                if playerManager.trackDuration > 0 {
+                    scrubValue = playerManager.playbackTime / playerManager.trackDuration
+                } else {
+                    scrubValue = 0
                 }
             }
         }
