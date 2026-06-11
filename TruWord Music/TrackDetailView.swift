@@ -32,10 +32,6 @@ struct TrackDetailView: View {
     @State private var showActionsMenu = false
     @State private var menuPosition: CGPoint = .zero
     
-    @State private var isScrubbing = false
-    @State private var sliderValue: Double = 0
-    @State private var scrubValue: Double = 0
-    
     private var appleMusicURL: URL? {
         URL(string: "https://music.apple.com/us/song/\(song.id)")
     }
@@ -93,65 +89,31 @@ struct TrackDetailView: View {
                     .foregroundColor(.secondary)
                     .id("artist-\(song.id)")
                     
-                    Spacer().frame(height: 34)
+                    Spacer().frame(height: 30)
+                    
+                    // Progress + Time
+                    VStack(spacing: 6) {
+                        
+                        let duration = playerManager.currentTrackDuration
 
-                    VStack(spacing: 4) {
-
-                        ZStack {
-                            if playerManager.appleMusicSubscription {
-
-                                Slider(
-                                    value: $scrubValue,
-                                    in: 0...1,
-                                    onEditingChanged: { editing in
-                                        isScrubbing = editing
-                                        playerManager.isScrubbing = editing
-
-                                        if editing {
-                                            // lock slider to current playback position at start
-                                            scrubValue = playerManager.trackDuration > 0
-                                                ? playerManager.playbackTime / playerManager.trackDuration
-                                                : 0
-                                        } else {
-                                            let newTime = scrubValue * playerManager.trackDuration
-                                            playerManager.seek(to: newTime)
-                                        }
-                                    }
-                                )
-                                .tint(.blue)
-
-                            } else {
-
-                                ProgressView(
-                                    value: playerManager.playbackTime,
-                                    total: 30
-                                )
-                                .tint(.gray)
-                            }
-                        }
-                        .frame(height: 20)
+                        ProgressView(
+                            value: min(max(playerManager.playbackTime, 0), duration),
+                            total: max(duration, 1)
+                        )
+                        .tint(.primary)
                         .frame(maxWidth: .infinity)
 
                         HStack {
-                            let currentTime: TimeInterval = {
-                                if isScrubbing {
-                                    return scrubValue * playerManager.trackDuration
-                                } else {
-                                    return playerManager.playbackTime
-                                }
-                            }()
-
-                            Text(formatTime(currentTime))
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                            Text(formatTime(playerManager.playbackTime))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
 
                             Spacer()
 
-                            Text(formatTime(playerManager.trackDuration))
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                            Text(formatTime(duration))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
                         }
-                        .padding(.top, 4)
                     }
                     .padding(.horizontal, 24)
                     
@@ -414,17 +376,6 @@ struct TrackDetailView: View {
             .onChange(of: playerManager.currentlyPlayingSong) {
                 if playerManager.currentlyPlayingSong == nil {
                     dismiss()
-                }
-            }
-            .onChange(of: playerManager.currentlyPlayingSong) { _, newSong in
-                guard newSong != nil else { return }
-
-                isScrubbing = false
-
-                if playerManager.trackDuration > 0 {
-                    scrubValue = playerManager.playbackTime / playerManager.trackDuration
-                } else {
-                    scrubValue = 0
                 }
             }
         }
@@ -694,12 +645,13 @@ struct TrackDetailView: View {
         }
     }
     
-    private func formatTime(_ seconds: TimeInterval) -> String {
+    private func formatTime(_ seconds: Double) -> String {
+        guard seconds.isFinite && seconds > 0 else {
+            return "0:00"
+        }
 
-        let totalSeconds = Int(seconds)
-
-        let minutes = totalSeconds / 60
-        let remainingSeconds = totalSeconds % 60
+        let minutes = Int(seconds) / 60
+        let remainingSeconds = Int(seconds) % 60
 
         return String(format: "%d:%02d", minutes, remainingSeconds)
     }

@@ -52,7 +52,6 @@ class PlayerManager: ObservableObject {
     @Published var recentlyPlayedAlbums: [RecentlyPlayedAlbumItem] = []
     @Published var playbackTime: TimeInterval = 0
     @Published var trackDuration: TimeInterval = 0
-    @Published var isScrubbing: Bool = false
     
     @Published var repeatMode: RepeatMode = .off {
         didSet {
@@ -67,14 +66,19 @@ class PlayerManager: ObservableObject {
     private var playerStateTask: Task<Void, Never>?
     private var playerPreparationTask: Task<Void, Never>?
     private var playbackTimer: Timer?
-    private var lastSeekTime: TimeInterval = 0
     
     private let recentlyPlayedKey = "recentlyPlayedAlbums"
     private let maxRecentlyPlayed = 40
     
-    
     private weak var favoritesManager: FavoritesManager?
     
+    var currentTrackDuration: Double {
+        if appleMusicSubscription {
+            return currentlyPlayingSong?.duration ?? 0
+        } else {
+            return 30
+        }
+    }
     
     
     init(networkMonitor: NetworkMonitor, favoritesManager: FavoritesManager) {
@@ -679,12 +683,7 @@ class PlayerManager: ObservableObject {
                         
                         if let matchedSong, matchedSong != previousSong {
                             previousSong = matchedSong
-                            
                             currentlyPlayingSong = matchedSong
-                            playbackTime = 0
-                            isScrubbing = false
-                            trackDuration = matchedSong.duration ?? 0
-                            
                             isPlaying = true
                         }
                     default: break
@@ -844,14 +843,14 @@ class PlayerManager: ObservableObject {
             title: album.title,
             artistName: album.artistName
         )
-        
+
         recentlyPlayedAlbums.removeAll { $0.id == item.id }
         recentlyPlayedAlbums.insert(item, at: 0)
-        
+
         if recentlyPlayedAlbums.count > 40 {
             recentlyPlayedAlbums = Array(recentlyPlayedAlbums.prefix(40))
         }
-        
+
         saveRecentlyPlayedAlbums()
     }
     
@@ -859,63 +858,32 @@ class PlayerManager: ObservableObject {
         let data = try? JSONEncoder().encode(recentlyPlayedAlbums)
         UserDefaults.standard.set(data, forKey: recentlyPlayedKey)
     }
-    
+
     private func loadRecentlyPlayedAlbums() {
         guard let data = UserDefaults.standard.data(forKey: recentlyPlayedKey),
               let decoded = try? JSONDecoder().decode([RecentlyPlayedAlbumItem].self, from: data)
         else { return }
-        
+
         self.recentlyPlayedAlbums = decoded
     }
     
     func startPlaybackTimer() {
         playbackTimer?.invalidate()
-        
+
         playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self else { return }
-            
+
             Task { @MainActor in
-                
-                if self.isScrubbing { return }
-                
+
                 if self.appleMusicSubscription {
-                    
                     let player = ApplicationMusicPlayer.shared
-                    
-                    // ✅ Don’t fight the user while scrubbing
-                    if !self.isScrubbing {
-                        let newTime = player.playbackTime
-                        
-                        if let song = self.currentlyPlayingSong {
-                            let duration = song.duration ?? 0
-                            self.playbackTime = newTime
-                            self.trackDuration = duration
-                        } else {
-                            self.playbackTime = newTime
-                        }
-                    }
-                    
-                    if let song = self.currentlyPlayingSong {
-                        self.trackDuration = song.duration ?? 0
-                    }
-                    
+                    self.playbackTime = player.playbackTime
+                    self.trackDuration = self.currentlyPlayingSong?.duration ?? 0
                 } else if let audioPlayer = self.audioPlayer {
-                    
                     self.playbackTime = audioPlayer.currentTime().seconds
-                    
-                    self.trackDuration = 30
+                    self.trackDuration = audioPlayer.currentItem?.duration.seconds ?? 30
                 }
             }
         }
-    }
-    
-    func seek(to time: TimeInterval) {
-        lastSeekTime = time
-
-        playbackTime = time   // 🔥 add this line
-
-        if appleMusicSubscription {
-            ApplicationMusicPlayer.shared.playbackTime = time
-        } 
     }
 }
