@@ -66,6 +66,7 @@ class PlayerManager: ObservableObject {
     private var playerStateTask: Task<Void, Never>?
     private var playerPreparationTask: Task<Void, Never>?
     private var playbackTimer: Timer?
+    private var queueWasExplicitlySet = false
     
     private let recentlyPlayedKey = "recentlyPlayedAlbums"
     private let maxRecentlyPlayed = 40
@@ -337,6 +338,8 @@ class PlayerManager: ObservableObject {
         let queue = ApplicationMusicPlayer.Queue(for: queueSongs, startingAt: queueSongs[startIndex])
         player.queue = queue
         
+        queueWasExplicitlySet = true
+        
         observePlaybackState(
             songs: queueSongs,
             albumWithTracks: albumWithTracks,
@@ -518,7 +521,8 @@ class PlayerManager: ObservableObject {
         let player = ApplicationMusicPlayer.shared
         self.playerIsReady = false
         
-        if player.queue.currentEntry == nil {
+        if !queueWasExplicitlySet {
+            
             guard let song = song else {
                 print("⚠️ No song provided and queue is empty.")
                 self.playerIsReady = true
@@ -653,6 +657,8 @@ class PlayerManager: ObservableObject {
             
             playbackObservationTask?.cancel()
             playerStateTask?.cancel()
+            
+            queueWasExplicitlySet = false
         }
     }
     

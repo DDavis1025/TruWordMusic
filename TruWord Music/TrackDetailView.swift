@@ -619,6 +619,7 @@ struct TrackDetailView: View {
         }()
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
+
         
         for previousIndex in stride(from: currentIndex - 1, through: 0, by: -1) {
             let prevSong = currentList[previousIndex]
