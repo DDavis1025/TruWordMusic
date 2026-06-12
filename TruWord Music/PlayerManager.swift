@@ -73,15 +73,6 @@ class PlayerManager: ObservableObject {
     
     private weak var favoritesManager: FavoritesManager?
     
-    var currentTrackDuration: Double {
-        if appleMusicSubscription {
-            return currentlyPlayingSong?.duration ?? 0
-        } else {
-            return 30
-        }
-    }
-    
-    
     init(networkMonitor: NetworkMonitor, favoritesManager: FavoritesManager) {
         self.networkMonitor = networkMonitor
         self.favoritesManager = favoritesManager

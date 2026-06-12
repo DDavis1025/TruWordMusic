@@ -15,14 +15,18 @@ struct SimilarArtistCarouselItemView: View {
 
         VStack(spacing: 6) {
 
-            let size: CGFloat = 90
-            let scale = UIScreen.main.scale
-            let pixelSize = Int(size * scale * 2)
+            let screenWidth = UIScreen.main.bounds.width
+            let artistSize = max(min(screenWidth * 0.25, 120), 80)
 
-            let artworkURL = artist.artwork?.url(width: pixelSize, height: pixelSize)
+            let pixelSize = Int(artistSize * UIScreen.main.scale * 2)
+
+            let artworkURL = artist.artwork?.url(
+                width: pixelSize,
+                height: pixelSize
+            )
 
             CustomAsyncImage(url: artworkURL, isCircle: true)
-                .frame(width: size, height: size)
+                .frame(width: artistSize, height: artistSize)
 
             Text(artist.name)
                 .font(.caption)

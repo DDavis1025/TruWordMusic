@@ -65,14 +65,10 @@ struct AlbumDetailView: View {
                                 .padding(.horizontal, 10)
                             
                             Button {
-                                withAnimation(.easeOut(duration: 0.1)) {
-                                    isArtistPressed = true
-                                }
+                                isArtistPressed = true
 
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                    withAnimation(.easeOut(duration: 0.1)) {
-                                        isArtistPressed = false
-                                    }
+                                    isArtistPressed = false
                                 }
 
                                 Analytics.logEvent("artist_from_album_tapped", parameters: [
@@ -86,14 +82,12 @@ struct AlbumDetailView: View {
                             } label: {
                                 Text(album.artistName)
                                     .font(.system(size: 18, weight: .regular))
-                                    .foregroundColor(.primary)
+                                    .foregroundColor(isArtistPressed ? .secondary : .primary)
                                     .frame(maxWidth: .infinity, alignment: .center)
                                     .padding(.horizontal, 10)
                                     .multilineTextAlignment(.center)
-                                    .scaleEffect(isArtistPressed ? 0.96 : 1.0)
+                                    .animation(.easeOut(duration: 0.1), value: isArtistPressed)
                             }
-                            .buttonStyle(.plain)
-                            
                             .buttonStyle(.plain)
                             
                             if let appleMusicURL, !playerManager.appleMusicSubscription {

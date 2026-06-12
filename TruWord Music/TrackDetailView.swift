@@ -94,28 +94,26 @@ struct TrackDetailView: View {
                     // Progress + Time
                     VStack(spacing: 6) {
                         
-                        let duration = playerManager.currentTrackDuration
-
                         ProgressView(
-                            value: min(max(playerManager.playbackTime, 0), duration),
-                            total: max(duration, 1)
+                            value: playerManager.playbackTime,
+                            total: playerManager.trackDuration
                         )
                         .tint(.primary)
                         .frame(maxWidth: .infinity)
 
                         HStack {
                             Text(formatTime(playerManager.playbackTime))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
 
                             Spacer()
 
-                            Text(formatTime(duration))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                            Text(formatTime(playerManager.trackDuration))
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
                         }
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 27)
                     
                     // Controls
                     HStack(spacing: 40) {
