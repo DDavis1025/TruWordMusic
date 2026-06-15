@@ -411,6 +411,7 @@ class PlayerManager: ObservableObject {
         
         DispatchQueue.main.async {
             audioPlayer.play()
+            ReviewManager.recordSongPlayed()
         }
         
         startPlaybackTimer()
@@ -432,6 +433,10 @@ class PlayerManager: ObservableObject {
             isPlaying = false
             player.seek(to: .zero)
             return
+        }
+        
+        if ReviewManager.shouldShowReviewPrompt() {
+            ReviewManager.requestReview()
         }
         
         guard let currentSong = currentlyPlayingSong else { return }
@@ -616,6 +621,7 @@ class PlayerManager: ObservableObject {
             // 2. User just clicked play (forcePlay)
             if forcePlay {
                 try await player.play()
+                ReviewManager.recordSongPlayed()
             }
             
         } catch {
@@ -679,6 +685,10 @@ class PlayerManager: ObservableObject {
                         }
                         
                         if let matchedSong, matchedSong != previousSong {
+                            if ReviewManager.shouldShowReviewPrompt() {
+                                ReviewManager.requestReview()
+                            }
+                            
                             previousSong = matchedSong
                             currentlyPlayingSong = matchedSong
                             isPlaying = true

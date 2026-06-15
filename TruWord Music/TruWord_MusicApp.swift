@@ -19,6 +19,8 @@ struct TruWord_MusicApp: App {
     @StateObject private var favoritesManager = FavoritesManager()
 
     init() {
+        ReviewManager.recordAppOpen()
+        
         FirebaseApp.configure()
 
         #if DEBUG
@@ -53,9 +55,6 @@ struct TruWord_MusicApp: App {
                     default:
                         break
                     }
-                }
-                .onAppear {
-                    ReviewManager.recordAppOpen()
                 }
         }
     }
