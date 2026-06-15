@@ -234,7 +234,6 @@ struct FavoritesView: View {
                     .onTapGesture {
                         UIApplication.shared.dismissKeyboard()
                         
-                        // 🔥 Playback tracking
                         Analytics.logEvent("favorite_song_played", parameters: [
                             "song_id": song.id.rawValue,
                             "title": song.title,
@@ -250,7 +249,9 @@ struct FavoritesView: View {
                             playFromAlbum: false,
                             networkMonitor: networkMonitor
                         )
+                        
                         isPlayingFromAlbum = false
+                        
                     }
                     .padding(.vertical, 4)
                 }

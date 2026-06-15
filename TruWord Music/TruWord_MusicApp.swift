@@ -54,6 +54,9 @@ struct TruWord_MusicApp: App {
                         break
                     }
                 }
+                .onAppear {
+                    ReviewManager.recordAppOpen()
+                }
         }
     }
 }

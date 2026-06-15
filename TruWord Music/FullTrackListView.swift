@@ -94,6 +94,7 @@ struct FullTrackListView: View {
 
                                 playSong(song)
                                 isPlayingFromAlbum = false
+                                
                             }
                             .padding(.vertical, 4)
                             .background(Color(.systemBackground))

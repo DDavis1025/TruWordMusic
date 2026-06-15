@@ -144,6 +144,7 @@ struct AlbumDetailView: View {
                                 playSong(song)
                                 isPlayingFromAlbum = true
                                 
+                                
                             } label: {
                                 VStack(alignment: .leading, spacing: 2) {
                                     

@@ -275,6 +275,7 @@ struct SearchView: View {
                                                         artworkURL: song.artwork?.url(width: pixelSize, height: pixelSize)
                                                     ))
                                                     
+                                                    
                                                 case .album(let album):
                                                     
                                                     Analytics.logEvent("search_result_album_tapped", parameters: [

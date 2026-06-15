@@ -390,6 +390,7 @@ struct ContentView: View {
                 ForEach(songs.prefix(5), id: \.id) { song in
                     SongRowView(song: song, currentPlayingSong: $playerManager.currentlyPlayingSong)
                         .onTapGesture {
+            
                             playerManager.playbackSource = .home
                             playerManager.isPlayingFromAlbum = false
                             
