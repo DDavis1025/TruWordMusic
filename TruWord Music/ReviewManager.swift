@@ -7,6 +7,7 @@ enum ReviewManager {
     private static let daysUsedKey = "daysUsed"
     private static let lastOpenDateKey = "lastOpenDate"
     private static let reviewRequestedKey = "reviewRequested"
+    private static let reviewPendingKey = "reviewPending"
 
     private static var sessionSongCount = 0
     private static var hasRequestedThisSession = false
@@ -43,10 +44,6 @@ enum ReviewManager {
         defaults.set(count, forKey: songsPlayedKey)
 
         sessionSongCount += 1
-
-        print("print - 🎵 SONG PLAYED")
-        print("print - Total songs played:", count)
-        print("print - Session songs played:", sessionSongCount)
     }
 
     static func shouldShowReviewPrompt() -> Bool {
@@ -56,21 +53,10 @@ enum ReviewManager {
         let daysUsed = defaults.integer(forKey: daysUsedKey)
         let reviewRequested = defaults.bool(forKey: reviewRequestedKey)
 
-        print("Review Check")
-        print("songsPlayed:", songsPlayed)
-        print("daysUsed:", daysUsed)
-        print("sessionSongCount:", sessionSongCount)
-        print("reviewRequested:", reviewRequested)
-
-//        return songsPlayed >= 10 &&
-//               daysUsed >= 3 &&
-//               sessionSongCount >= 3 &&
-//               !reviewRequested &&
-//               !hasRequestedThisSession
-        
-        return songsPlayed >= 2 &&
-               daysUsed >= 1 &&
-               sessionSongCount >= 1 &&
+        return songsPlayed >= 10 &&
+               daysUsed >= 3 &&
+               sessionSongCount >= 3 &&
+               !reviewRequested &&
                !hasRequestedThisSession
     }
 
@@ -100,7 +86,19 @@ enum ReviewManager {
 
         sessionSongCount = 0
         hasRequestedThisSession = false
+    }
+    
+    static func markReviewPending() {
+        UserDefaults.standard.set(true, forKey: reviewPendingKey)
+    }
 
-        print("✅ Review data reset")
+    static func showPendingReviewIfNeeded() {
+        let defaults = UserDefaults.standard
+
+        guard defaults.bool(forKey: reviewPendingKey) else { return }
+
+        defaults.set(false, forKey: reviewPendingKey)
+
+        requestReview()
     }
 }

@@ -118,6 +118,8 @@ class PlayerManager: ObservableObject {
     }
     
     func onAppForeground() {
+        ReviewManager.showPendingReviewIfNeeded()
+
         Task {
             let previousStatus = appleMusicSubscription
             await checkAppleMusicStatus()
@@ -674,6 +676,7 @@ class PlayerManager: ObservableObject {
 
             // NEW: track end detection
             var didFireEndForCurrentSong: Bool = false
+            var previousTime: TimeInterval = 0
 
             while true {
                 if Task.isCancelled { break }
@@ -684,26 +687,36 @@ class PlayerManager: ObservableObject {
                 let duration = self.currentlyPlayingSong?.duration ?? 0
 
                 if duration > 0 {
-                    let isNearEnd = (duration - currentTime) <= 0.2
 
-                    if isNearEnd && !didFireEndForCurrentSong {
+                    // Song restarted (repeat one / restarted from beginning)
+                    let didRestart = currentTime < previousTime
+
+                    if didRestart && !didFireEndForCurrentSong {
+
                         didFireEndForCurrentSong = true
 
                         let wasSkip = userSkippedSong
+
                         userSkippedSong = false
 
                         if !wasSkip {
                             if ReviewManager.shouldShowReviewPrompt() {
-                                ReviewManager.requestReview()
+                                if UIApplication.shared.applicationState == .active {
+                                    ReviewManager.requestReview()
+                                } else {
+                                    ReviewManager.markReviewPending()
+                                }
                             }
                         }
                     }
 
-                    // reset once song restarts / changes
-                    if currentTime < 1.0 {
+                    // reset once playback has progressed again
+                    if currentTime > 1.0 {
                         didFireEndForCurrentSong = false
                     }
                 }
+
+                previousTime = currentTime
 
                 // MARK: - EXISTING QUEUE TRACKING (UNCHANGED LOGIC)
                 if let currentEntry = player.queue.currentEntry {
@@ -724,7 +737,11 @@ class PlayerManager: ObservableObject {
 
                             if !wasSkip {
                                 if ReviewManager.shouldShowReviewPrompt() {
-                                    ReviewManager.requestReview()
+                                    if UIApplication.shared.applicationState == .active {
+                                        ReviewManager.requestReview()
+                                    } else {
+                                        ReviewManager.markReviewPending()
+                                    }
                                 }
                             }
 
