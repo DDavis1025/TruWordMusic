@@ -52,6 +52,7 @@ class PlayerManager: ObservableObject {
     @Published var recentlyPlayedAlbums: [RecentlyPlayedAlbumItem] = []
     @Published var playbackTime: TimeInterval = 0
     @Published var trackDuration: TimeInterval = 0
+    @Published var userSkippedSong: Bool = false
     
     @Published var repeatMode: RepeatMode = .off {
         didSet {
@@ -67,6 +68,7 @@ class PlayerManager: ObservableObject {
     private var playerPreparationTask: Task<Void, Never>?
     private var playbackTimer: Timer?
     private var queueWasExplicitlySet = false
+    private var didAutoAdvance = false
     
     private let recentlyPlayedKey = "recentlyPlayedAlbums"
     private let maxRecentlyPlayed = 40
@@ -664,36 +666,74 @@ class PlayerManager: ObservableObject {
         albumWithTracks: AlbumWithTracks?,
         playFromAlbum: Bool
     ) {
-        
+
         playbackObservationTask?.cancel()
         playbackObservationTask = Task {
             let player = ApplicationMusicPlayer.shared
             var previousSong: Song? = currentlyPlayingSong
-            
+
+            // NEW: track end detection
+            var didFireEndForCurrentSong: Bool = false
+
             while true {
                 if Task.isCancelled { break }
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
-                
+
+                // MARK: - END DETECTION (Apple Music fix)
+                let currentTime = player.playbackTime
+                let duration = self.currentlyPlayingSong?.duration ?? 0
+
+                if duration > 0 {
+                    let isNearEnd = (duration - currentTime) <= 0.2
+
+                    if isNearEnd && !didFireEndForCurrentSong {
+                        didFireEndForCurrentSong = true
+
+                        let wasSkip = userSkippedSong
+                        userSkippedSong = false
+
+                        if !wasSkip {
+                            if ReviewManager.shouldShowReviewPrompt() {
+                                ReviewManager.requestReview()
+                            }
+                        }
+                    }
+
+                    // reset once song restarts / changes
+                    if currentTime < 1.0 {
+                        didFireEndForCurrentSong = false
+                    }
+                }
+
+                // MARK: - EXISTING QUEUE TRACKING (UNCHANGED LOGIC)
                 if let currentEntry = player.queue.currentEntry {
                     switch currentEntry.item {
                     case .song(let song):
                         let matchedSong: Song?
+
                         if playFromAlbum, let albumWithTracks {
                             matchedSong = albumWithTracks.tracks.first(where: { $0.id == song.id })
                         } else {
                             matchedSong = songs.first(where: { $0.id == song.id })
                         }
-                        
+
                         if let matchedSong, matchedSong != previousSong {
-                            if ReviewManager.shouldShowReviewPrompt() {
-                                ReviewManager.requestReview()
+
+                            let wasSkip = userSkippedSong
+                            userSkippedSong = false
+
+                            if !wasSkip {
+                                if ReviewManager.shouldShowReviewPrompt() {
+                                    ReviewManager.requestReview()
+                                }
                             }
-                            
+
                             previousSong = matchedSong
                             currentlyPlayingSong = matchedSong
                             isPlaying = true
                         }
-                    default: break
+                    default:
+                        break
                     }
                 } else {
                     isPlaying = false

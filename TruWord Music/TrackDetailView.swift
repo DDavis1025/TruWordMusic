@@ -94,9 +94,12 @@ struct TrackDetailView: View {
                     // Progress + Time
                     VStack(spacing: 6) {
                         
+                        let safeDuration = max(playerManager.trackDuration, 0.1)
+                        let safeProgress = min(max(playerManager.playbackTime, 0), safeDuration)
+
                         ProgressView(
-                            value: playerManager.playbackTime,
-                            total: playerManager.trackDuration
+                            value: safeProgress,
+                            total: safeDuration
                         )
                         .tint(.primary)
                         .frame(maxWidth: .infinity)
@@ -552,6 +555,8 @@ struct TrackDetailView: View {
         guard networkMonitor.isConnected else { return }
         
         if appleMusicSubscription {
+            playerManager.userSkippedSong = true
+            
             let player = ApplicationMusicPlayer.shared
             Task {
                 try? await player.skipToNextEntry()
@@ -595,6 +600,8 @@ struct TrackDetailView: View {
         guard networkMonitor.isConnected else { return }
         
         if appleMusicSubscription {
+            playerManager.userSkippedSong = true
+            
             let player = ApplicationMusicPlayer.shared
             Task {
                 try? await player.skipToPreviousEntry()
