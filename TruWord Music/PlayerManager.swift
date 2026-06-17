@@ -118,13 +118,12 @@ class PlayerManager: ObservableObject {
     }
     
     func onAppForeground() {
-        ReviewManager.showPendingReviewIfNeeded()
-
         Task {
             let previousStatus = appleMusicSubscription
             await checkAppleMusicStatus()
             refreshCurrentSong()
             await waitForAppleMusicStatusUpdate(previousStatus: previousStatus)
+            ReviewManager.showPendingReviewIfNeeded()
         }
     }
     
@@ -136,6 +135,7 @@ class PlayerManager: ObservableObject {
             // If the status changed compared to before, stop waiting
             if appleMusicSubscription != previousStatus {
                 if appleMusicSubscription {
+                    UserDefaults.standard.set(false, forKey: "reviewPending")
                     stopAndReplaceAVPlayer()
                 } else {
                     stopApplicationMusicPlayer()
@@ -376,8 +376,8 @@ class PlayerManager: ObservableObject {
         audioPlayer?.pause()
         
         self.lastPlayedSongs = songs
-        self.lastPlayFromAlbum = false
-        self.lastAlbumWithTracks = nil
+        self.lastPlayFromAlbum = albumWithTracks?.tracks.contains(song) == true
+        self.lastAlbumWithTracks = albumWithTracks
         
         if let currentItem = audioPlayer?.currentItem {
             NotificationCenter.default.removeObserver(

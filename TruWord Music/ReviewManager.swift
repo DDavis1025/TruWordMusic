@@ -58,6 +58,12 @@ enum ReviewManager {
                sessionSongCount >= 3 &&
                !reviewRequested &&
                !hasRequestedThisSession
+        
+// TEST CODE
+//        return songsPlayed >= 2 &&
+//                       daysUsed >= 1 &&
+//                       sessionSongCount >= 1 &&
+//                       !hasRequestedThisSession
     }
 
     static func requestReview() {
