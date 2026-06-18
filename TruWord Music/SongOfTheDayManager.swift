@@ -19,8 +19,13 @@ class SongOfTheDayManager: ObservableObject {
     private let indexKey = "song_of_day_index"
 
     func loadSongs(_ songs: [Song]) {
-        guard !songs.isEmpty else { return }
-        self.songs = songs
+        let cleanSongs = songs.filter {
+            $0.contentRating != .explicit
+        }
+
+        guard !cleanSongs.isEmpty else { return }
+
+        self.songs = cleanSongs
         pickSongForToday()
     }
 

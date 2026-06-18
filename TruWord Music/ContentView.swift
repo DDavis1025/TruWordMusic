@@ -456,6 +456,7 @@ struct ContentView: View {
             let fetchedSongs = (try await request.response())
                 .songCharts
                 .flatMap { $0.items }
+                .filter { $0.contentRating != .explicit }
             
             await MainActor.run {
                 self.songs = fetchedSongs
@@ -481,7 +482,9 @@ struct ContentView: View {
             request.limit = 70
             
             let response = try await request.response()
-            let fetchedAlbums = response.albumCharts.flatMap { $0.items }
+            let fetchedAlbums = response.albumCharts
+                .flatMap { $0.items }
+                .filter { $0.contentRating != .explicit }
             
             await MainActor.run {
                 
