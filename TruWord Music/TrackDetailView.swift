@@ -36,6 +36,18 @@ struct TrackDetailView: View {
         URL(string: "https://music.apple.com/us/song/\(song.id)")
     }
     
+    private var shareText: String {
+        """
+        Listening to "\(song.title)" by \(song.artistName) on TruWord Music.
+
+        Listen on Apple Music:
+        \(appleMusicURL?.absoluteString ?? "")
+
+        Download TruWord Music:
+        https://apps.apple.com/app/id6744539952
+        """
+    }
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -159,34 +171,77 @@ struct TrackDetailView: View {
                     
                     
                     if networkMonitor.isConnected {
-                        
-                        Button {
-                            // Get the button's position before showing menu
-                            if let buttonFrame = getButtonFrame() {
-                                menuPosition = CGPoint(
-                                    x: buttonFrame.midX,
-                                    y: buttonFrame.minY
-                                )
-                            }
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                showActionsMenu = true
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle.fill")
-                                .font(.system(size: 28))
-                                .foregroundColor(.primary)
-                                .background(
-                                    GeometryReader { geo in
-                                        Color.clear
-                                            .preference(
-                                                key: ButtonPositionKey.self,
-                                                value: geo.frame(in: .global)
-                                            )
+
+                        HStack(spacing: 55) {
+
+                            // Repeat
+                            Button {
+                                playerManager.toggleRepeatMode()
+                            } label: {
+                                Image(systemName: {
+                                    switch playerManager.repeatMode {
+                                    case .off:
+                                        return "repeat"
+                                    case .all:
+                                        return "repeat"
+                                    case .one:
+                                        return "repeat.1"
                                     }
+                                }())
+                                .font(.system(size: 24))
+                                .foregroundColor(
+                                    playerManager.repeatMode == .off
+                                    ? .primary
+                                    : .blue
                                 )
+                            }
+
+                            // More
+                            Button {
+                                if let buttonFrame = getButtonFrame() {
+                                    menuPosition = CGPoint(
+                                        x: buttonFrame.midX,
+                                        y: buttonFrame.minY
+                                    )
+                                }
+
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    showActionsMenu = true
+                                }
+
+                            } label: {
+                                Image(systemName: "ellipsis.circle.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.primary)
+                                    .background(
+                                        GeometryReader { geo in
+                                            Color.clear
+                                                .preference(
+                                                    key: ButtonPositionKey.self,
+                                                    value: geo.frame(in: .global)
+                                                )
+                                        }
+                                    )
+                            }
+
+                            // Share
+                            ShareLink(
+                                item: shareText,
+                                subject: Text("Check out this song")
+                            ) {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.primary)
+                            }
+                            .simultaneousGesture(TapGesture().onEnded {
+                                Analytics.logEvent("share_sheet_opened", parameters: [
+                                    "song_id": song.id.rawValue,
+                                    "artist_name": song.artistName,
+                                    "source": "track_detail"
+                                ])
+                            })
                         }
                         .padding(.top, 6)
-                        
                     }
                     
                     Spacer()
@@ -265,30 +320,6 @@ struct TrackDetailView: View {
                                         .foregroundColor(favoritesManager.isFavorite(song) ? .yellow : .primary)
                                         .frame(width: 44, height: 44)
                                         .contentShape(Rectangle())
-                                }
-                                
-                                Button {
-                                    playerManager.toggleRepeatMode()
-                                } label: {
-                                    Image(systemName: {
-                                        switch playerManager.repeatMode {
-                                        case .off:
-                                            return "repeat"
-
-                                        case .all:
-                                            return "repeat"
-
-                                        case .one:
-                                            return "repeat.1"
-                                        }
-                                    }())
-                                    .font(.system(size: 22))
-                                    .foregroundColor(
-                                        playerManager.repeatMode == .off
-                                        ? .primary
-                                        : .blue
-                                    )
-                                    .frame(width: 44, height: 44)
                                 }
                             }
                             

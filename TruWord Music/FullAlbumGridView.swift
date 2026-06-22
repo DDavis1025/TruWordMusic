@@ -110,7 +110,7 @@ struct FullAlbumGridView: View {
                                         "album_id": album.id.rawValue,
                                         "album_title": album.title,
                                         "artist_name": album.artistName,
-                                        "source": isFromArtist ? "artist" : "home"
+                                        "source": title == "Recently Played" ? "recently_played" : (isFromArtist ? "artist" : "home")
                                     ]
                                 )
                                 cacheAlbum(album)

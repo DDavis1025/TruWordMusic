@@ -163,6 +163,11 @@ struct ContentView: View {
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
                     )
+                    .onAppear {
+                            Analytics.logEvent("recently_played_grid_viewed", parameters: [
+                                "album_count": playerManager.recentlyPlayedAlbums.count
+                            ])
+                        }
                 }
             }
             
@@ -297,6 +302,13 @@ struct ContentView: View {
                                 AlbumCarouselItemView(album: album)
                                     .onTapGesture {
                                         navigationPath.append(.album(album.id))
+                                        
+                                        Analytics.logEvent("album_opened", parameters: [
+                                                "album_id": album.id.rawValue,
+                                                "album_name": album.title,
+                                                "artist_name": album.artistName,
+                                                "source": "recently_played"
+                                            ])
                                     }
                             }
                         }
