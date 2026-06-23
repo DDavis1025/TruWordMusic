@@ -261,7 +261,6 @@ struct TrackDetailView: View {
                                 Image(systemName: favoritesManager.isFavorite(song) ? "star.fill" : "star")
                                     .font(.system(size: 24))
                                     .foregroundColor(favoritesManager.isFavorite(song) ? .yellow : .primary)
-                                    .frame(width: 44, height: 44)
                                     .contentShape(Rectangle())
                             }
                             
