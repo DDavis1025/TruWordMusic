@@ -45,6 +45,28 @@ struct AlbumDetailView: View {
                 }
                 .padding(.bottom, playerManager.currentlyPlayingSong != nil ? bottomPlayerHeight : 0)
                 
+            } else if !networkMonitor.isConnected {
+                VStack(spacing: 8) {
+                    Spacer()
+                    
+                    Text("No Internet connection")
+                        .font(.headline)
+                        .multilineTextAlignment(.center)
+                    
+                    Text("Your device is not connected to the internet")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+                .safeAreaInset(edge: .bottom) {
+                    if playerManager.currentlyPlayingSong != nil {
+                        Color.clear.frame(height: bottomPlayerHeight)
+                    }
+                }
             } else if tracks.isEmpty {
                 VStack {
                     Spacer()
@@ -144,7 +166,7 @@ struct AlbumDetailView: View {
                             song.playParameters != nil
                             
                             Button {
-                                guard isPlayable && networkMonitor.isConnected else { return }
+                                guard isPlayable else { return }
                                 
                                 Analytics.logEvent("album_song_selected", parameters: [
                                     "song_id": song.id.rawValue,
@@ -165,7 +187,7 @@ struct AlbumDetailView: View {
                                         .font(.subheadline)
                                         .lineLimit(1)
                                         .foregroundColor(
-                                            isPlayable && networkMonitor.isConnected
+                                            isPlayable
                                             ? .primary
                                             : Color(UIColor.lightGray)
                                         )
@@ -174,14 +196,14 @@ struct AlbumDetailView: View {
                                         .font(.caption)
                                         .lineLimit(1)
                                         .foregroundColor(
-                                            isPlayable && networkMonitor.isConnected
+                                            isPlayable
                                             ? Color(white: 0.48)
                                             : Color(UIColor.lightGray)
                                         )
                                 }
                                 .padding(.vertical, 4)
                             }
-                            .disabled(!isPlayable || !networkMonitor.isConnected)
+                            .disabled(!isPlayable)
                         }
                     }
                     .listSectionSeparator(.visible, edges: .top)
@@ -258,22 +280,24 @@ struct AlbumDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                ShareLink(
-                    item: shareText,
-                    preview: SharePreview(
-                        "\(album.title) — \(album.artistName)",
-                        image: sharePreviewImage ?? Image("AppIcon")
-                    )
-                ) {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .onTapGesture {
-                    Analytics.logEvent("share_sheet_opened", parameters: [
-                        "album_id": album.id.rawValue,
-                        "artist_name": album.artistName,
-                        "source": "album_detail"
-                    ])
+            if networkMonitor.isConnected {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink(
+                        item: shareText,
+                        preview: SharePreview(
+                            "\(album.title) — \(album.artistName)",
+                            image: sharePreviewImage ?? Image("AppIcon")
+                        )
+                    ) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .onTapGesture {
+                        Analytics.logEvent("share_sheet_opened", parameters: [
+                            "album_id": album.id.rawValue,
+                            "artist_name": album.artistName,
+                            "source": "album_detail"
+                        ])
+                    }
                 }
             }
         }
