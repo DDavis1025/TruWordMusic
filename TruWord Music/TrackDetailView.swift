@@ -32,6 +32,9 @@ struct TrackDetailView: View {
     @State private var showActionsMenu = false
     @State private var menuPosition: CGPoint = .zero
     
+    @State private var showShareSheet = false
+    @State private var sharePreviewImage: Image?
+    
     private var appleMusicURL: URL? {
         URL(string: "https://music.apple.com/us/song/\(song.id)")
     }
@@ -39,10 +42,10 @@ struct TrackDetailView: View {
     private var shareText: String {
         """
         Listening to "\(song.title)" by \(song.artistName) on TruWord Music.
-
+        
         Listen on Apple Music:
         \(appleMusicURL?.absoluteString ?? "")
-
+        
         Download TruWord Music:
         https://apps.apple.com/app/id6744539952
         """
@@ -108,21 +111,21 @@ struct TrackDetailView: View {
                         
                         let safeDuration = max(playerManager.trackDuration, 0.1)
                         let safeProgress = min(max(playerManager.playbackTime, 0), safeDuration)
-
+                        
                         ProgressView(
                             value: safeProgress,
                             total: safeDuration
                         )
                         .tint(.primary)
                         .frame(maxWidth: .infinity)
-
+                        
                         HStack {
                             Text(formatTime(playerManager.playbackTime))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-
+                            
                             Spacer()
-
+                            
                             Text(formatTime(playerManager.trackDuration))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
@@ -171,9 +174,9 @@ struct TrackDetailView: View {
                     
                     
                     if networkMonitor.isConnected {
-
+                        
                         HStack(spacing: 55) {
-
+                            
                             // Repeat
                             Button {
                                 playerManager.toggleRepeatMode()
@@ -195,7 +198,7 @@ struct TrackDetailView: View {
                                     : .blue
                                 )
                             }
-
+                            
                             // More
                             Button {
                                 if let buttonFrame = getButtonFrame() {
@@ -204,11 +207,11 @@ struct TrackDetailView: View {
                                         y: buttonFrame.minY
                                     )
                                 }
-
+                                
                                 withAnimation(.easeInOut(duration: 0.15)) {
                                     showActionsMenu = true
                                 }
-
+                                
                             } label: {
                                 Image(systemName: "ellipsis.circle.fill")
                                     .font(.system(size: 28))
@@ -223,23 +226,45 @@ struct TrackDetailView: View {
                                         }
                                     )
                             }
-
-                            // Share
-                            ShareLink(
-                                item: shareText,
-                                subject: Text("Check out this song")
-                            ) {
-                                Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.primary)
-                            }
-                            .simultaneousGesture(TapGesture().onEnded {
-                                Analytics.logEvent("share_sheet_opened", parameters: [
+                            Button(action: {
+                                let wasFavorite = favoritesManager.isFavorite(song)
+                                
+                                // capture index BEFORE mutation
+                                let currentIndex = favoritesManager.favoriteSongs.firstIndex(where: {
+                                    $0.id == song.id
+                                })
+                                
+                                favoritesManager.toggleFavorite(song)
+                                
+                                if wasFavorite {
+                                    
+                                    Task {
+                                        try? await Task.sleep(nanoseconds: 200_000_000)
+                                        
+                                        await MainActor.run {
+                                            playerManager.handleCurrentFavoriteRemoved(
+                                                removedSong: song,
+                                                removedIndex: currentIndex,
+                                                favoritesManager: favoritesManager,
+                                                networkMonitor: networkMonitor
+                                            )
+                                        }
+                                    }
+                                }
+                                
+                                Analytics.logEvent("favorite_toggled", parameters: [
                                     "song_id": song.id.rawValue,
-                                    "artist_name": song.artistName,
-                                    "source": "track_detail"
+                                    "is_favorite": favoritesManager.isFavorite(song)
                                 ])
-                            })
+                                
+                            }) {
+                                Image(systemName: favoritesManager.isFavorite(song) ? "star.fill" : "star")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(favoritesManager.isFavorite(song) ? .yellow : .primary)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            
                         }
                         .padding(.top, 6)
                     }
@@ -279,48 +304,27 @@ struct TrackDetailView: View {
                     HStack {
                         Spacer()
                         
-                        HStack(spacing: 18) {
-                            
-                            // Favorite Button
+                        HStack(spacing: 34) {
                             if networkMonitor.isConnected {
-                                Button(action: {
-                                    let wasFavorite = favoritesManager.isFavorite(song)
-                                    
-                                    // capture index BEFORE mutation
-                                    let currentIndex = favoritesManager.favoriteSongs.firstIndex(where: {
-                                        $0.id == song.id
-                                    })
-                                    
-                                    favoritesManager.toggleFavorite(song)
-                                    
-                                    if wasFavorite {
-                                        
-                                        Task {
-                                            try? await Task.sleep(nanoseconds: 200_000_000)
-                                            
-                                            await MainActor.run {
-                                                playerManager.handleCurrentFavoriteRemoved(
-                                                    removedSong: song,
-                                                    removedIndex: currentIndex,
-                                                    favoritesManager: favoritesManager,
-                                                    networkMonitor: networkMonitor
-                                                )
-                                            }
-                                        }
-                                    }
-                                    
-                                    Analytics.logEvent("favorite_toggled", parameters: [
-                                        "song_id": song.id.rawValue,
-                                        "is_favorite": favoritesManager.isFavorite(song)
-                                    ])
-                                    
-                                }) {
-                                    Image(systemName: favoritesManager.isFavorite(song) ? "star.fill" : "star")
+                                // Share
+                                ShareLink(
+                                    item: shareText,
+                                    preview: SharePreview(
+                                        "\(song.title) — \(song.artistName)",
+                                        image: sharePreviewImage ?? Image("AppIcon")
+                                    )
+                                ) {
+                                    Image(systemName: "square.and.arrow.up")
                                         .font(.system(size: 24))
-                                        .foregroundColor(favoritesManager.isFavorite(song) ? .yellow : .primary)
-                                        .frame(width: 44, height: 44)
-                                        .contentShape(Rectangle())
+                                        .foregroundColor(.primary)
                                 }
+                                .simultaneousGesture(TapGesture().onEnded {
+                                    Analytics.logEvent("share_sheet_opened", parameters: [
+                                        "song_id": song.id.rawValue,
+                                        "artist_name": song.artistName,
+                                        "source": "track_detail"
+                                    ])
+                                })
                             }
                             
                             // Close Button
@@ -394,6 +398,24 @@ struct TrackDetailView: View {
             }
             .padding(.horizontal)
             .frame(width: geometry.size.width, height: geometry.size.height)
+            
+            .task(id: song.id) {
+                guard let artworkURL = song.artwork?.url(width: 500, height: 500) else {
+                    return
+                }
+
+                do {
+                    let (data, _) = try await URLSession.shared.data(from: artworkURL)
+
+                    if let uiImage = UIImage(data: data) {
+                        await MainActor.run {
+                            sharePreviewImage = Image(uiImage: uiImage)
+                        }
+                    }
+                } catch {
+                    print("Failed to load share artwork: \(error)")
+                }
+            }
             
             
             // 🔥 Track screen view
@@ -491,25 +513,25 @@ struct TrackDetailView: View {
             matching: \.id,
             equalTo: song.id
         )
-
+        
         request.properties = [.artists]
         request.limit = 1
-
+        
         let response = try await request.response()
-
+        
         guard let fullSong = response.items.first,
               let artists = fullSong.artists,
               let firstArtist = artists.first else {
             throw URLError(.badServerResponse)
         }
-
+        
         // Check each artist
         for artist in artists {
             if try await artistHasChristianContent(artist) {
                 return artist
             }
         }
-
+        
         // Fallback
         return firstArtist
     }
@@ -519,16 +541,16 @@ struct TrackDetailView: View {
             matching: \.id,
             equalTo: artist.id
         )
-
+        
         request.properties = [.albums, .topSongs]
         request.limit = 1
-
+        
         let response = try await request.response()
-
+        
         guard let fullArtist = response.items.first else {
             return false
         }
-
+        
         let hasChristianAlbum = fullArtist.albums?.contains { album in
             album.genreNames.contains("Christian") ||
             album.genreNames.contains("Christian & Gospel") &&
@@ -540,22 +562,22 @@ struct TrackDetailView: View {
             song.genreNames.contains("Christian & Gospel") &&
             song.contentRating != .explicit
         } ?? false
-
+        
         return hasChristianAlbum || hasChristianSong
     }
     
     private func openArtist() {
         Task {
             do {
-
+                
                 dismiss()
-
+                
                 let artist = try await fetchPreferredArtist()
-
+                
                 let artistID = artist.id
-
+                
                 await MainActor.run {
-
+                    
                     switch activeTab {
                     case .home:
                         homeNavigationPath.append(.artist(artistID))
@@ -564,14 +586,14 @@ struct TrackDetailView: View {
                     case .favorites:
                         favoritesNavigationPath.append(.artist(artistID))
                     }
-
+                    
                     Analytics.logEvent("artist_opened", parameters: [
                         "artist_id": artist.id.rawValue,
                         "artist_name": artist.name,
                         "song_id": song.id.rawValue
                     ])
                 }
-
+                
             } catch {
                 print("Error fetching preferred artist: \(error)")
             }
@@ -655,7 +677,7 @@ struct TrackDetailView: View {
         }()
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
-
+        
         
         for previousIndex in stride(from: currentIndex - 1, through: 0, by: -1) {
             let prevSong = currentList[previousIndex]
@@ -686,10 +708,10 @@ struct TrackDetailView: View {
         guard seconds.isFinite && seconds > 0 else {
             return "0:00"
         }
-
+        
         let minutes = Int(seconds) / 60
         let remainingSeconds = Int(seconds) % 60
-
+        
         return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 }

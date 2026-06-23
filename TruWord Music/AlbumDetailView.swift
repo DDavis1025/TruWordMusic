@@ -10,6 +10,7 @@ struct AlbumDetailView: View {
     @State private var isArtistPressed = false
     @State private var relatedAlbums: [Album] = []
     @State private var resolvedAlbum: Album?
+    @State private var sharePreviewImage: Image?
     @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
     @ObservedObject var networkMonitor: NetworkMonitor
@@ -23,6 +24,18 @@ struct AlbumDetailView: View {
     private var appleMusicURL: URL? {
         URL(string: "https://music.apple.com/us/album/\(album.id)")
     }
+    
+    private var shareText: String {
+            """
+            Listening to "\(album.title)" by \(album.artistName) on TruWord Music.
+
+            Listen on Apple Music:
+            \(appleMusicURL?.absoluteString ?? "")
+
+            Download TruWord Music:
+            https://apps.apple.com/app/id6744539952
+            """
+        }
     
     var body: some View {
         Group {
@@ -244,6 +257,44 @@ struct AlbumDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                ShareLink(
+                    item: shareText,
+                    preview: SharePreview(
+                        "\(album.title) — \(album.artistName)",
+                        image: sharePreviewImage ?? Image("AppIcon")
+                    )
+                ) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .onTapGesture {
+                    Analytics.logEvent("share_sheet_opened", parameters: [
+                        "album_id": album.id.rawValue,
+                        "artist_name": album.artistName,
+                        "source": "album_detail"
+                    ])
+                }
+            }
+        }
+        
+        .task(id: album.id) {
+            guard let artworkURL = album.artwork?.url(width: 500, height: 500) else {
+                return
+            }
+
+            do {
+                let (data, _) = try await URLSession.shared.data(from: artworkURL)
+
+                if let uiImage = UIImage(data: data) {
+                    await MainActor.run {
+                        sharePreviewImage = Image(uiImage: uiImage)
+                    }
+                }
+            } catch {
+                print("Failed to load share artwork: \(error)")
+            }
+        }
         
         .task(id: album.id) {
             isLoading = true
