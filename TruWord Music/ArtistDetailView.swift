@@ -30,8 +30,6 @@ struct ArtistDetailView: View {
     
     private let bottomPlayerHeight: CGFloat = 77
     
-    private let partnerID = "1010l3QqF"
-    
     private var appleMusicArtistURL: URL? {
         AppleMusicAffiliateManager.makeURL(type: .artist, id: artistID)
     }
@@ -293,6 +291,28 @@ struct ArtistDetailView: View {
         }
         .navigationTitle(artist?.name ?? "Artist")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                if networkMonitor.isConnected {
+                    ShareLink(
+                        item: appleMusicArtistURL ?? URL(string: "https://apps.apple.com/app/id6744539952")!
+                    ) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            if let artist {
+                                Analytics.logEvent("share_sheet_opened", parameters: [
+                                    "artist_id": artist.id.rawValue,
+                                    "artist_name": artist.name,
+                                    "source": "artist_detail"
+                                ])
+                            }
+                        }
+                    )
+                }
+            }
+        }
         
         .task {
             await fetchArtistData()
@@ -419,25 +439,5 @@ struct ArtistDetailView: View {
                 self.isLoading = false
             }
         }
-    }
-
-    private func makeAppleMusicArtistAffiliateURL(artistID: MusicItemID) -> URL? {
-        var components = URLComponents()
-        
-        components.scheme = "https"
-        components.host = "music.apple.com"
-        components.path = "/us/artist/\(artistID.rawValue)"
-        
-        components.queryItems = [
-            URLQueryItem(name: "itscg", value: "30200"),
-            URLQueryItem(name: "itsct", value: "toolbox_linkbuilder"),
-            URLQueryItem(name: "at", value: partnerID),
-            URLQueryItem(name: "ct", value: "truwordmusic_artist_detail"),
-            URLQueryItem(name: "mttnsubad", value: artistID.rawValue),
-            URLQueryItem(name: "ls", value: "1"),
-            URLQueryItem(name: "app", value: "music")
-        ]
-        
-        return components.url
     }
 }

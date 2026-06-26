@@ -34,8 +34,6 @@ struct TrackDetailView: View {
     
     @State private var showShareSheet = false
     
-    private let partnerID = "1010l3QqF"
-    
     private var appleMusicURL: URL? {
         AppleMusicAffiliateManager.makeURL(type: .track, id: song.id)
     }
@@ -677,24 +675,6 @@ struct TrackDetailView: View {
         let remainingSeconds = Int(seconds) % 60
         
         return String(format: "%d:%02d", minutes, remainingSeconds)
-    }
-
-    private func makeAppleMusicAffiliateURL(song: Song, albumID: String?) -> URL? {
-        var components = URLComponents()
-        
-        components.scheme = "https"
-        components.host = "geo.music.apple.com"
-        components.path = "/us/song/\(song.id.rawValue)"
-        
-        components.queryItems = [
-            URLQueryItem(name: "itscg", value: "30200"),
-            URLQueryItem(name: "itsct", value: "toolbox_linkbuilder"),
-            URLQueryItem(name: "at", value: partnerID),
-            URLQueryItem(name: "ct", value: "truword_track_\(song.id.rawValue)"),
-            URLQueryItem(name: "app", value: "music")
-        ]
-        
-        return components.url
     }
 }
 

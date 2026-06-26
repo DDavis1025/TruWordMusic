@@ -19,9 +19,7 @@ struct AlbumDetailView: View {
     @Binding var albumCache: [MusicItemID: Album]
     
     private let bottomPlayerHeight: CGFloat = 77
-    
-    private let partnerID = "1010l3QqF"
-    
+  
     private var appleMusicURL: URL? {
         AppleMusicAffiliateManager.makeURL(type: .album, id: album.id)
     }
@@ -452,25 +450,5 @@ struct AlbumDetailView: View {
             print("Error fetching album tracks: \(error)")
             return []
         }
-    }
-
-    private func makeAppleMusicAlbumAffiliateURL(album: Album) -> URL? {
-        var components = URLComponents()
-        
-        components.scheme = "https"
-        components.host = "geo.music.apple.com"
-        components.path = "/us/album/\(album.id.rawValue)"
-        
-        components.queryItems = [
-            URLQueryItem(name: "itscg", value: "30200"),
-            URLQueryItem(name: "itsct", value: "toolbox_linkbuilder"),
-            URLQueryItem(name: "at", value: partnerID),
-            URLQueryItem(name: "ct", value: "truwordmusic_album_detail"),
-            URLQueryItem(name: "mttnsubad", value: album.id.rawValue),
-            URLQueryItem(name: "ls", value: "1"),
-            URLQueryItem(name: "app", value: "music")
-        ]
-        
-        return components.url
     }
 }
