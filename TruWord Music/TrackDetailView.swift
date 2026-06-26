@@ -33,22 +33,11 @@ struct TrackDetailView: View {
     @State private var menuPosition: CGPoint = .zero
     
     @State private var showShareSheet = false
-    @State private var sharePreviewImage: Image?
+    
+    private let partnerID = "1010l3QqF"
     
     private var appleMusicURL: URL? {
-        URL(string: "https://music.apple.com/us/song/\(song.id)")
-    }
-    
-    private var shareText: String {
-        """
-        Listening to "\(song.title)" by \(song.artistName) on TruWord Music.
-        
-        Listen on Apple Music:
-        \(appleMusicURL?.absoluteString ?? "")
-        
-        Download TruWord Music:
-        https://apps.apple.com/app/id6744539952
-        """
+        AppleMusicAffiliateManager.makeURL(type: .track, id: song.id)
     }
     
     var body: some View {
@@ -280,8 +269,7 @@ struct TrackDetailView: View {
                                 .padding(.top, 10)
                         }
                         .padding()
-                        .simultaneousGesture(TapGesture().onEnded {
-                            Analytics.logEvent("apple_music_link_tapped", parameters: [
+                        .simultaneousGesture(TapGesture().onEnded {                            Analytics.logEvent("apple_music_link_tapped", parameters: [
                                 "source": "track_detail",
                                 "song_id": song.id.rawValue
                             ])
@@ -306,13 +294,9 @@ struct TrackDetailView: View {
                         HStack(spacing: 34) {
                             if networkMonitor.isConnected {
                                 // Share
-                                ShareLink(
-                                    item: shareText,
-                                    preview: SharePreview(
-                                        "\(song.title) — \(song.artistName)",
-                                        image: sharePreviewImage ?? Image("AppIcon")
-                                    )
-                                ) {
+                                ShareLink(item: appleMusicURL ??
+                                          URL(string: "https://apps.apple.com/app/id6744539952")!)
+                                {
                                     Image(systemName: "square.and.arrow.up")
                                         .font(.system(size: 24))
                                         .foregroundColor(.primary)
@@ -397,25 +381,6 @@ struct TrackDetailView: View {
             }
             .padding(.horizontal)
             .frame(width: geometry.size.width, height: geometry.size.height)
-            
-            .task(id: song.id) {
-                guard let artworkURL = song.artwork?.url(width: 500, height: 500) else {
-                    return
-                }
-
-                do {
-                    let (data, _) = try await URLSession.shared.data(from: artworkURL)
-
-                    if let uiImage = UIImage(data: data) {
-                        await MainActor.run {
-                            sharePreviewImage = Image(uiImage: uiImage)
-                        }
-                    }
-                } catch {
-                    print("Failed to load share artwork: \(error)")
-                }
-            }
-            
             
             // 🔥 Track screen view
             .onAppear {
@@ -712,6 +677,24 @@ struct TrackDetailView: View {
         let remainingSeconds = Int(seconds) % 60
         
         return String(format: "%d:%02d", minutes, remainingSeconds)
+    }
+
+    private func makeAppleMusicAffiliateURL(song: Song, albumID: String?) -> URL? {
+        var components = URLComponents()
+        
+        components.scheme = "https"
+        components.host = "geo.music.apple.com"
+        components.path = "/us/song/\(song.id.rawValue)"
+        
+        components.queryItems = [
+            URLQueryItem(name: "itscg", value: "30200"),
+            URLQueryItem(name: "itsct", value: "toolbox_linkbuilder"),
+            URLQueryItem(name: "at", value: partnerID),
+            URLQueryItem(name: "ct", value: "truword_track_\(song.id.rawValue)"),
+            URLQueryItem(name: "app", value: "music")
+        ]
+        
+        return components.url
     }
 }
 

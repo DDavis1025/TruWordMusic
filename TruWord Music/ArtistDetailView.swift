@@ -30,8 +30,10 @@ struct ArtistDetailView: View {
     
     private let bottomPlayerHeight: CGFloat = 77
     
+    private let partnerID = "1010l3QqF"
+    
     private var appleMusicArtistURL: URL? {
-        URL(string: "https://music.apple.com/us/artist/\(artistID)")
+        AppleMusicAffiliateManager.makeURL(type: .artist, id: artistID)
     }
     
     var body: some View {
@@ -417,5 +419,25 @@ struct ArtistDetailView: View {
                 self.isLoading = false
             }
         }
+    }
+
+    private func makeAppleMusicArtistAffiliateURL(artistID: MusicItemID) -> URL? {
+        var components = URLComponents()
+        
+        components.scheme = "https"
+        components.host = "music.apple.com"
+        components.path = "/us/artist/\(artistID.rawValue)"
+        
+        components.queryItems = [
+            URLQueryItem(name: "itscg", value: "30200"),
+            URLQueryItem(name: "itsct", value: "toolbox_linkbuilder"),
+            URLQueryItem(name: "at", value: partnerID),
+            URLQueryItem(name: "ct", value: "truwordmusic_artist_detail"),
+            URLQueryItem(name: "mttnsubad", value: artistID.rawValue),
+            URLQueryItem(name: "ls", value: "1"),
+            URLQueryItem(name: "app", value: "music")
+        ]
+        
+        return components.url
     }
 }

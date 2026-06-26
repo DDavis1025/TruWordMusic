@@ -10,7 +10,6 @@ struct AlbumDetailView: View {
     @State private var isArtistPressed = false
     @State private var relatedAlbums: [Album] = []
     @State private var resolvedAlbum: Album?
-    @State private var sharePreviewImage: Image?
     @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
     @ObservedObject var networkMonitor: NetworkMonitor
@@ -21,21 +20,11 @@ struct AlbumDetailView: View {
     
     private let bottomPlayerHeight: CGFloat = 77
     
-    private var appleMusicURL: URL? {
-        URL(string: "https://music.apple.com/us/album/\(album.id)")
-    }
+    private let partnerID = "1010l3QqF"
     
-    private var shareText: String {
-            """
-            Listening to "\(album.title)" by \(album.artistName) on TruWord Music.
-
-            Listen on Apple Music:
-            \(appleMusicURL?.absoluteString ?? "")
-
-            Download TruWord Music:
-            https://apps.apple.com/app/id6744539952
-            """
-        }
+    private var appleMusicURL: URL? {
+        AppleMusicAffiliateManager.makeURL(type: .album, id: album.id)
+    }
     
     var body: some View {
         Group {
@@ -283,11 +272,7 @@ struct AlbumDetailView: View {
             if networkMonitor.isConnected {
                 ToolbarItem(placement: .topBarTrailing) {
                     ShareLink(
-                        item: shareText,
-                        preview: SharePreview(
-                            "\(album.title) — \(album.artistName)",
-                            image: sharePreviewImage ?? Image("AppIcon")
-                        )
+                        item: appleMusicURL ?? URL(string: "https://apps.apple.com/app/id6744539952")!
                     ) {
                         Image(systemName: "square.and.arrow.up")
                     }
@@ -299,24 +284,6 @@ struct AlbumDetailView: View {
                         ])
                     }
                 }
-            }
-        }
-        
-        .task(id: album.id) {
-            guard let artworkURL = album.artwork?.url(width: 500, height: 500) else {
-                return
-            }
-
-            do {
-                let (data, _) = try await URLSession.shared.data(from: artworkURL)
-
-                if let uiImage = UIImage(data: data) {
-                    await MainActor.run {
-                        sharePreviewImage = Image(uiImage: uiImage)
-                    }
-                }
-            } catch {
-                print("Failed to load share artwork: \(error)")
             }
         }
         
@@ -485,5 +452,25 @@ struct AlbumDetailView: View {
             print("Error fetching album tracks: \(error)")
             return []
         }
+    }
+
+    private func makeAppleMusicAlbumAffiliateURL(album: Album) -> URL? {
+        var components = URLComponents()
+        
+        components.scheme = "https"
+        components.host = "geo.music.apple.com"
+        components.path = "/us/album/\(album.id.rawValue)"
+        
+        components.queryItems = [
+            URLQueryItem(name: "itscg", value: "30200"),
+            URLQueryItem(name: "itsct", value: "toolbox_linkbuilder"),
+            URLQueryItem(name: "at", value: partnerID),
+            URLQueryItem(name: "ct", value: "truwordmusic_album_detail"),
+            URLQueryItem(name: "mttnsubad", value: album.id.rawValue),
+            URLQueryItem(name: "ls", value: "1"),
+            URLQueryItem(name: "app", value: "music")
+        ]
+        
+        return components.url
     }
 }
