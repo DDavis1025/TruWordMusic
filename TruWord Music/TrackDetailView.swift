@@ -38,6 +38,14 @@ struct TrackDetailView: View {
         AppleMusicAffiliateManager.makeURL(type: .track, id: song.id)
     }
     
+    private var appleMusicBadge: some View {
+        Image("AppleMusicBadge")
+            .resizable()
+            .scaledToFit()
+            .frame(height: 59) // <- single source of truth
+            .padding(.top, 10)
+    }
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -259,19 +267,22 @@ struct TrackDetailView: View {
                     
                     // Apple Music Link
                     if let appleMusicURL, !appleMusicSubscription {
-                        Link(destination: appleMusicURL) {
+                        Button {
+                            UIApplication.shared.open(appleMusicURL)
+
+                            Analytics.logEvent("apple_music_link_tapped", parameters: [
+                                "source": "track_detail",
+                                "song_id": song.id.rawValue
+                            ])
+                        } label: {
                             Image("AppleMusicBadge")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(height: min(geometry.size.width * 0.09, 59))
                                 .padding(.top, 10)
                         }
+                        .buttonStyle(.plain)
                         .padding()
-                        .simultaneousGesture(TapGesture().onEnded {                            Analytics.logEvent("apple_music_link_tapped", parameters: [
-                                "source": "track_detail",
-                                "song_id": song.id.rawValue
-                            ])
-                        })
                     }
                 }
                 .onPreferenceChange(ButtonPositionKey.self) { frame in
