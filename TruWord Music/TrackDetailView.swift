@@ -38,14 +38,6 @@ struct TrackDetailView: View {
         AppleMusicAffiliateManager.makeURL(type: .track, id: song.id)
     }
     
-    private var appleMusicBadge: some View {
-        Image("AppleMusicBadge")
-            .resizable()
-            .scaledToFit()
-            .frame(height: 59) // <- single source of truth
-            .padding(.top, 10)
-    }
-    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
