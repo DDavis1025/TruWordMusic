@@ -103,6 +103,7 @@ struct SearchView: View {
     @State private var isSearching: Bool = false
     @State private var selectedTab: SearchTab = .all
     @State private var showClearRecentAlert = false
+    @State private var hasSearched = false
     
     @FocusState private var isSearchFocused: Bool
     
@@ -183,7 +184,7 @@ struct SearchView: View {
                             
                         } else if shouldShowRecentSearches {
                             recentSearchView
-                        } else if filteredResults.isEmpty && !searchQuery.isEmpty {
+                        } else if hasSearched && filteredResults.isEmpty {
                             VStack {
                                 Spacer()
                                 
@@ -365,6 +366,7 @@ struct SearchView: View {
                 if newValue.isEmpty {
                     searchResults = []
                     isSearching = false
+                    hasSearched = false
                 }
             }
             
@@ -544,6 +546,8 @@ struct SearchView: View {
         
         guard !searchQuery.isEmpty else { return }
         guard networkMonitor.isConnected else { return }
+        
+        hasSearched = true
         
         isSearching = true
         searchResults = []
