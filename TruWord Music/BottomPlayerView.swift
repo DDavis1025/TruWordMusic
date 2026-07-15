@@ -65,12 +65,5 @@ struct BottomPlayerView: View {
         .shadow(color: .black.opacity(0.24), radius: 8, x: 0, y: 0)
         .padding(.horizontal, 10)
         .padding(.bottom, 5)
-        
-        // 🔥 Track visibility
-        .onAppear {
-            Analytics.logEvent("bottom_player_shown", parameters: [
-                "song_id": song.id.rawValue
-            ])
-        }
     }
 }

@@ -69,6 +69,10 @@ class PlayerManager: ObservableObject {
     private var playbackTimer: Timer?
     private var queueWasExplicitlySet = false
     private var didAutoAdvance = false
+    private var didLogThirtySecondPlayback = false
+    private var didLogSongCompleted = false
+    private var accumulatedPlaybackSeconds: TimeInterval = 0
+    private var lastPlaybackTime: TimeInterval = 0
     
     private let recentlyPlayedKey = "recentlyPlayedAlbums"
     private let maxRecentlyPlayed = 40
@@ -191,18 +195,14 @@ class PlayerManager: ObservableObject {
                     player.pause()
                     await MainActor.run { self.isPlaying = false }
                     Analytics.logEvent("playback_paused", parameters: [
-                        
                         "song_id": self.currentlyPlayingSong?.id.rawValue ?? ""
-                        
                     ])
                 } else {
                     do {
                         try await player.play()
                         await MainActor.run { self.isPlaying = true }
                         Analytics.logEvent("playback_started", parameters: [
-                            
                             "song_id": self.currentlyPlayingSong?.id.rawValue ?? "",
-                            
                             "source": self.isPlayingFromAlbum ? "album" : "list"
                             
                         ])
@@ -210,9 +210,7 @@ class PlayerManager: ObservableObject {
                         print("Failed to play: \(error)")
                         await MainActor.run { self.isPlaying = false }
                         Analytics.logEvent("playback_failed", parameters: [
-                            
                             "song_id": self.currentlyPlayingSong?.id.rawValue ?? ""
-                            
                         ])
                     }
                 }
@@ -226,12 +224,10 @@ class PlayerManager: ObservableObject {
             } else {
                 audioPlayer.play()
                 isPlaying = true
+                print("print: playback started")
                 Analytics.logEvent("playback_started", parameters: [
-                    
                     "song_id": self.currentlyPlayingSong?.id.rawValue ?? "",
-                    
                     "source": "preview"
-                    
                 ])
             }
         }
@@ -301,6 +297,11 @@ class PlayerManager: ObservableObject {
         albumWithTracks: AlbumWithTracks?,
         playFromAlbum: Bool
     ) {
+         didLogThirtySecondPlayback = false
+         didLogSongCompleted = false
+         accumulatedPlaybackSeconds = 0
+         lastPlaybackTime = 0
+        
         let player = ApplicationMusicPlayer.shared
         let queueSongs: [Song]
         
@@ -372,6 +373,11 @@ class PlayerManager: ObservableObject {
             return
         }
         
+        didLogSongCompleted = false
+        didLogThirtySecondPlayback = false
+        accumulatedPlaybackSeconds = 0
+        lastPlaybackTime = 0
+        
         previewDidEnd = false
         audioPlayer?.pause()
         
@@ -416,6 +422,13 @@ class PlayerManager: ObservableObject {
         DispatchQueue.main.async {
             audioPlayer.play()
             ReviewManager.recordSongPlayed()
+            
+            print("print: song_started non sub")
+            
+            Analytics.logEvent("song_started", parameters: [
+                "song_id": song.id.rawValue,
+                "subscription": false
+            ])
         }
         
         startPlaybackTimer()
@@ -446,6 +459,18 @@ class PlayerManager: ObservableObject {
         guard let currentSong = currentlyPlayingSong else { return }
         
         previewDidEnd = true
+        
+        if !didLogSongCompleted {
+
+            didLogSongCompleted = true
+            
+            print("print: song completed preview")
+
+            Analytics.logEvent("song_completed", parameters: [
+                "song_id": currentlyPlayingSong?.id.rawValue ?? "",
+                "subscription": false
+            ])
+        }
         
         // ✅ Determine correct list (album OR last played list like favorites)
         let currentList: [Song] = {
@@ -626,6 +651,12 @@ class PlayerManager: ObservableObject {
             if forcePlay {
                 try await player.play()
                 ReviewManager.recordSongPlayed()
+                
+                print("print:song started for subscription")
+                Analytics.logEvent("song_started", parameters: [
+                    "song_id": self.currentlyPlayingSong?.id.rawValue ?? "",
+                    "subscription": true
+                ])
             }
             
         } catch {
@@ -744,10 +775,23 @@ class PlayerManager: ObservableObject {
                                     }
                                 }
                             }
+                            
+                            // Reset analytics flags for the new song
+                            didLogThirtySecondPlayback = false
+                            didLogSongCompleted = false
+                            accumulatedPlaybackSeconds = 0
+                            lastPlaybackTime = 0
 
                             previousSong = matchedSong
                             currentlyPlayingSong = matchedSong
                             isPlaying = true
+                            
+                            print("print: song started")
+                            
+                            Analytics.logEvent("song_started", parameters: [
+                                "song_id": self.currentlyPlayingSong?.id.rawValue ?? "",
+                                "subscription": true
+                            ])
                         }
                     default:
                         break
@@ -946,6 +990,28 @@ class PlayerManager: ObservableObject {
                 } else if let audioPlayer = self.audioPlayer {
                     self.playbackTime = audioPlayer.currentTime().seconds
                     self.trackDuration = audioPlayer.currentItem?.duration.seconds ?? 30
+                }
+                
+                if self.isPlaying {
+                    let delta = self.playbackTime - self.lastPlaybackTime
+                    
+                    // Only count forward movement (not seeking backwards)
+                    if delta > 0 && delta < 2 {
+                        self.accumulatedPlaybackSeconds += delta
+                    }
+
+                    self.lastPlaybackTime = self.playbackTime
+                }
+
+                if !self.didLogThirtySecondPlayback &&
+                   self.accumulatedPlaybackSeconds >= 30 {
+
+                    self.didLogThirtySecondPlayback = true
+
+                    Analytics.logEvent("song_30_seconds", parameters: [
+                        "song_id": self.currentlyPlayingSong?.id.rawValue ?? "",
+                        "subscription": self.appleMusicSubscription
+                    ])
                 }
             }
         }

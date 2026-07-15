@@ -48,13 +48,6 @@ struct TodaySectionView: View {
 
             // Verse Card
             VerseCardView(verse: verseManager.verse)
-                .onAppear {
-                    if let verse = verseManager.verse {
-                        Analytics.logEvent("daily_verse_viewed", parameters: [
-                            "reference": verse.reference
-                        ])
-                    }
-                }
 
             // Song Card
             SongOfTheDayView(
