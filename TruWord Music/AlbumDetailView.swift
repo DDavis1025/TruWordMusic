@@ -10,6 +10,8 @@ struct AlbumDetailView: View {
     @State private var isArtistPressed = false
     @State private var relatedAlbums: [Album] = []
     @State private var resolvedAlbum: Album?
+    @State private var moreByArtist: Artist?
+    @State private var moreByAlbums: [Album] = []
     @Binding var isPlayingFromAlbum: Bool
     @Binding var albumWithTracks: AlbumWithTracks?
     @ObservedObject var networkMonitor: NetworkMonitor
@@ -256,6 +258,60 @@ struct AlbumDetailView: View {
                             .listRowSeparator(.hidden)
                         }
                     }
+                    if let artist = moreByArtist,
+                       !moreByAlbums.isEmpty {
+
+                        Section {
+
+                            VStack(alignment: .leading, spacing: 12) {
+                                
+                                HStack(spacing: 4) {
+
+                                    Text("More By \(artist.name)")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+
+                                    if moreByAlbums.count > 10 {
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.gray)
+                                    }
+
+                                    Spacer()
+                                }
+                                .padding(.leading, 10)
+                                .padding(.trailing, 5)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    navigationPath.append(
+                                        .artistAlbumGrid(
+                                            title: artist.name,
+                                            albums: moreByAlbums
+                                        )
+                                    )
+                                }
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 16) {
+
+                                        ForEach(moreByAlbums.prefix(10), id: \.id) { album in
+                                            AlbumCarouselItemView(album: album)
+                                                .onTapGesture {
+                                                    albumCache[album.id] = album
+                                                    navigationPath.append(.album(album.id))
+                                                }
+                                        }
+                                    }
+                                    .padding(.leading, 8)
+                                    .padding(.trailing, 16)
+                                }
+                            }
+                            .padding(.bottom, 20)
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                        }
+                    }
                 }
                 .listStyle(.plain)
                 .safeAreaInset(edge: .bottom) {
@@ -291,8 +347,13 @@ struct AlbumDetailView: View {
 
             async let fetchedTracks = fetchAlbumTracks(album: album)
             async let fetchedRelated = fetchRelatedAlbums()
+            async let fetchedMoreBy = fetchMoreByArtist()
 
-            let (tracksResult, _) = await (fetchedTracks, fetchedRelated)
+            let (tracksResult, _, _) = await (
+                fetchedTracks,
+                fetchedRelated,
+                fetchedMoreBy
+            )
 
             await MainActor.run {
                 self.tracks = tracksResult
@@ -449,6 +510,44 @@ struct AlbumDetailView: View {
         } catch {
             print("Error fetching album tracks: \(error)")
             return []
+        }
+    }
+    
+    private func fetchMoreByArtist() async {
+        do {
+            let artist = try await fetchPreferredArtistFromAlbum()
+
+            var request = MusicCatalogResourceRequest<Artist>(
+                matching: \.id,
+                equalTo: artist.id
+            )
+
+            request.properties = [.albums]
+            request.limit = 1
+
+            let response = try await request.response()
+
+            guard let fullArtist = response.items.first else { return }
+
+            let filtered = Array(fullArtist.albums ?? []).filter { album in
+                let isChristian =
+                    album.genreNames.contains("Christian") ||
+                    album.genreNames.contains("Christian & Gospel")
+
+                let isNotExplicit = album.contentRating != .explicit
+
+                let isNotCurrentAlbum = album.id != self.album.id
+
+                return isChristian && isNotExplicit && isNotCurrentAlbum
+            }
+
+            await MainActor.run {
+                self.moreByArtist = artist
+                self.moreByAlbums = filtered
+            }
+
+        } catch {
+            print(error)
         }
     }
 }
