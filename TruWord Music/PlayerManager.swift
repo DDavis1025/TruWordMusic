@@ -234,6 +234,9 @@ class PlayerManager: ObservableObject {
     }
     
     func stopApplicationMusicPlayer() {
+        // Reset analytics flags for the new song
+        resetPlaybackAnalytics()
+        
         currentlyPlayingSong = nil
         clearApplicationMusicPlayer()
         playbackTimer?.invalidate()
@@ -242,6 +245,9 @@ class PlayerManager: ObservableObject {
     
     
     func stopAndReplaceAVPlayer() {
+        // Reset analytics flags for the new song
+        resetPlaybackAnalytics()
+        
         audioPlayer?.pause()
         audioPlayer = nil
         
@@ -297,10 +303,8 @@ class PlayerManager: ObservableObject {
         albumWithTracks: AlbumWithTracks?,
         playFromAlbum: Bool
     ) {
-         didLogThirtySecondPlayback = false
-         didLogSongCompleted = false
-         accumulatedPlaybackSeconds = 0
-         lastPlaybackTime = 0
+        // Reset analytics flags for the new song
+        resetPlaybackAnalytics()
         
         let player = ApplicationMusicPlayer.shared
         let queueSongs: [Song]
@@ -373,10 +377,8 @@ class PlayerManager: ObservableObject {
             return
         }
         
-        didLogSongCompleted = false
-        didLogThirtySecondPlayback = false
-        accumulatedPlaybackSeconds = 0
-        lastPlaybackTime = 0
+        // Reset analytics flags for the new song
+        resetPlaybackAnalytics()
         
         previewDidEnd = false
         audioPlayer?.pause()
@@ -423,7 +425,7 @@ class PlayerManager: ObservableObject {
             audioPlayer.play()
             ReviewManager.recordSongPlayed()
             
-            print("print: song_started non sub")
+            print("print: preview song started")
             
             Analytics.logEvent("song_started", parameters: [
                 "song_id": song.id.rawValue,
@@ -651,12 +653,6 @@ class PlayerManager: ObservableObject {
             if forcePlay {
                 try await player.play()
                 ReviewManager.recordSongPlayed()
-                
-                print("print:song started for subscription")
-                Analytics.logEvent("song_started", parameters: [
-                    "song_id": self.currentlyPlayingSong?.id.rawValue ?? "",
-                    "subscription": true
-                ])
             }
             
         } catch {
@@ -722,20 +718,26 @@ class PlayerManager: ObservableObject {
                     // Song restarted (repeat one / restarted from beginning)
                     let didRestart = currentTime < previousTime
 
-                    if didRestart && !didFireEndForCurrentSong {
-
-                        didFireEndForCurrentSong = true
-
-                        let wasSkip = userSkippedSong
-
-                        userSkippedSong = false
-
-                        if !wasSkip {
-                            if ReviewManager.shouldShowReviewPrompt() {
-                                if UIApplication.shared.applicationState == .active {
-                                    ReviewManager.requestReview()
-                                } else {
-                                    ReviewManager.markReviewPending()
+                    if didRestart {
+                        
+                        // Reset analytics flags for the new song
+                        resetPlaybackAnalytics()
+                        
+                        if !didFireEndForCurrentSong {
+                            
+                            didFireEndForCurrentSong = true
+                            
+                            let wasSkip = userSkippedSong
+                            
+                            userSkippedSong = false
+                            
+                            if !wasSkip {
+                                if ReviewManager.shouldShowReviewPrompt() {
+                                    if UIApplication.shared.applicationState == .active {
+                                        ReviewManager.requestReview()
+                                    } else {
+                                        ReviewManager.markReviewPending()
+                                    }
                                 }
                             }
                         }
@@ -777,21 +779,11 @@ class PlayerManager: ObservableObject {
                             }
                             
                             // Reset analytics flags for the new song
-                            didLogThirtySecondPlayback = false
-                            didLogSongCompleted = false
-                            accumulatedPlaybackSeconds = 0
-                            lastPlaybackTime = 0
+                            resetPlaybackAnalytics()
 
                             previousSong = matchedSong
                             currentlyPlayingSong = matchedSong
                             isPlaying = true
-                            
-                            print("print: song started")
-                            
-                            Analytics.logEvent("song_started", parameters: [
-                                "song_id": self.currentlyPlayingSong?.id.rawValue ?? "",
-                                "subscription": true
-                            ])
                         }
                     default:
                         break
@@ -1007,6 +999,8 @@ class PlayerManager: ObservableObject {
                    self.accumulatedPlaybackSeconds >= 30 {
 
                     self.didLogThirtySecondPlayback = true
+                    
+                    print("print: didLogThirtySecondPlayback")
 
                     Analytics.logEvent("song_30_seconds", parameters: [
                         "song_id": self.currentlyPlayingSong?.id.rawValue ?? "",
@@ -1015,5 +1009,12 @@ class PlayerManager: ObservableObject {
                 }
             }
         }
+    }
+    
+    private func resetPlaybackAnalytics() {
+        didLogThirtySecondPlayback = false
+        didLogSongCompleted = false
+        accumulatedPlaybackSeconds = 0
+        lastPlaybackTime = 0
     }
 }
