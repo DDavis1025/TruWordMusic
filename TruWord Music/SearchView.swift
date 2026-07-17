@@ -442,7 +442,7 @@ struct SearchView: View {
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
                     )
-                case .artistAlbumGrid(let title, let albums, let showAlbumYear):
+                case .artistAlbumGrid(let title, let albums, let showAlbumYear, let source):
                     FullAlbumGridView(
                         albums: albums,
                         title: title,
@@ -451,6 +451,7 @@ struct SearchView: View {
                         },
                         isFromArtist: true,
                         showAlbumYear: showAlbumYear,
+                        source: source,
                         navigationPath: $navigationPath,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager

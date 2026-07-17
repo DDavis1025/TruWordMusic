@@ -13,12 +13,17 @@ struct AlbumWithTracks {
 // MARK: - Route
 
 enum Route: Hashable {
-    case fullAlbumGrid
+    case fullAlbumGrid(source: String)
     case fullTrackList(title: String, songs: [Song], isFromArtist: Bool)
-    case artistAlbumGrid(title: String, albums: [Album], showAlbumYear: Bool)
+    case artistAlbumGrid(
+        title: String,
+        albums: [Album],
+        showAlbumYear: Bool,
+        source: String
+    )
     case album(MusicItemID)
     case artist(MusicItemID)
-    case recentlyPlayedGrid
+    case recentlyPlayedGrid(source: String)
 }
 
 // MARK: - ContentView
@@ -69,7 +74,7 @@ struct ContentView: View {
             .navigationDestination(for: Route.self) { route in
                 switch route {
                     
-                case .fullAlbumGrid:
+                case .fullAlbumGrid(let source):
                     FullAlbumGridView(
                         albums: albums,
                         title: "Top Albums",
@@ -78,6 +83,7 @@ struct ContentView: View {
                         },
                         isFromArtist: false,
                         showAlbumYear: false,
+                        source: source,
                         navigationPath: $navigationPath,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
@@ -138,7 +144,7 @@ struct ContentView: View {
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
                     )
-                case .artistAlbumGrid(let title, let albums, let showAlbumYear):
+                case .artistAlbumGrid(let title, let albums, let showAlbumYear, let source):
                     FullAlbumGridView(
                         albums: albums,
                         title: title,
@@ -147,11 +153,12 @@ struct ContentView: View {
                         },
                         isFromArtist: true,
                         showAlbumYear: showAlbumYear,
+                        source: source,
                         navigationPath: $navigationPath,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
                     )
-                case .recentlyPlayedGrid:
+                case .recentlyPlayedGrid(let source):
                     FullAlbumGridView(
                         albums: playerManager.recentlyPlayedAlbums.compactMap {
                             albumCache[MusicItemID($0.id)]
@@ -162,6 +169,7 @@ struct ContentView: View {
                         },
                         isFromArtist: false,
                         showAlbumYear: false,
+                        source: source,
                         navigationPath: $navigationPath,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
@@ -291,7 +299,9 @@ struct ContentView: View {
                     Spacer()
 
                     if playerManager.recentlyPlayedAlbums.count > 7 {
-                        NavigationLink(value: Route.recentlyPlayedGrid) {
+                        NavigationLink(
+                            value: Route.recentlyPlayedGrid(source: "recently_played")
+                        ) {
                             Text("View More")
                                 .font(.system(size: 15))
                         }
@@ -337,7 +347,9 @@ struct ContentView: View {
                     Spacer()
                     
                     if albums.count > 7 {
-                        NavigationLink(value: Route.fullAlbumGrid) {
+                        NavigationLink(
+                            value: Route.fullAlbumGrid(source: "home_top_christian_albums")
+                        ) {
                             Text("View More")
                         }
                         .simultaneousGesture(TapGesture().onEnded {

@@ -15,6 +15,7 @@ struct TrackDetailView: View {
     @ObservedObject var playerManager: PlayerManager
     @Binding var appleMusicSubscription: Bool
     @Binding var selectedAlbum: Album?
+    @Binding var albumCache: [MusicItemID: Album]
     
     @Binding var activeTab: AppTab
     @Binding var homeNavigationPath: [Route]
@@ -26,13 +27,11 @@ struct TrackDetailView: View {
     
     @State private var animateTitle: Bool = false
     @State private var animateArtist: Bool = false
-    
     @State private var albumStack: [Album] = []
-    
     @State private var showActionsMenu = false
     @State private var menuPosition: CGPoint = .zero
-    
     @State private var showShareSheet = false
+    @State private var preferredAlbum: Album?
     
     private var appleMusicURL: URL? {
         AppleMusicAffiliateManager.makeURL(type: .track, id: song.id)
@@ -350,12 +349,12 @@ struct TrackDetailView: View {
                                 .foregroundStyle(Color.primary)
                         }
                         
-                        if isPlayingFromAlbum {
+                        if preferredAlbum != nil {
                             Divider()
                             
                             Button {
                                 showActionsMenu = false
-                                openAlbum()
+                                openPreferredAlbum()
                             } label: {
                                 Label("View Album", systemImage: "square.stack")
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -383,13 +382,16 @@ struct TrackDetailView: View {
             .padding(.horizontal)
             .frame(width: geometry.size.width, height: geometry.size.height)
             
-            // 🔥 Track screen view
             .onAppear {
                 Analytics.logEvent("track_detail_viewed", parameters: [
                     "song_id": song.id.rawValue,
                     "song_title": song.title,
                     "artist_name": song.artistName
                 ])
+
+                Task {
+                    preferredAlbum = await fetchPreferredAlbum()
+                }
             }
             
             .onChange(of: playerManager.currentlyPlayingSong) {
@@ -405,24 +407,19 @@ struct TrackDetailView: View {
         return nil // Will be handled by preference key
     }
     
-    private func openAlbum() {
+    private func openPreferredAlbum() {
+        guard let album = preferredAlbum else { return }
+
         Analytics.logEvent(
             "view_album_tapped",
             parameters: [
                 "song_id": song.id.rawValue,
-                "album_id": albumWithTracks?.album.id.rawValue ?? ""
+                "album_id": album.id.rawValue
             ]
         )
-        
-        guard let albumWithTracks,
-              albumWithTracks.tracks.contains(where: {
-                  $0.id == song.id
-              }) else {
-            return
-        }
-        
-        let albumID = albumWithTracks.album.id
-        
+
+        let albumID = album.id
+
         let isAlbumOnTop: Bool = {
             switch activeTab {
             case .home:
@@ -430,46 +427,43 @@ struct TrackDetailView: View {
                 if case .album(let routeID) = lastRoute {
                     return routeID == albumID
                 }
-                
+
             case .search:
                 guard let lastRoute = searchNavigationPath.last else { return false }
                 if case .album(let routeID) = lastRoute {
                     return routeID == albumID
                 }
-                
+
             case .favorites:
                 guard let lastRoute = favoritesNavigationPath.last else { return false }
                 if case .album(let routeID) = lastRoute {
                     return routeID == albumID
                 }
             }
-            
+
             return false
         }()
-        
+
         if isAlbumOnTop {
             dismiss()
             return
         }
-        
+
+        selectedAlbum = album
+        albumCache[album.id] = album
+
         switch activeTab {
-            
+
         case .home:
-            homeNavigationPath.append(
-                Route.album(albumWithTracks.album.id)
-            )
-            
+            homeNavigationPath.append(.album(album.id))
+
         case .favorites:
-            favoritesNavigationPath.append(
-                Route.album(albumWithTracks.album.id)
-            )
-            
+            favoritesNavigationPath.append(.album(album.id))
+
         case .search:
-            searchNavigationPath.append(
-                Route.album(albumWithTracks.album.id)
-            )
+            searchNavigationPath.append(.album(album.id))
         }
-        
+
         dismiss()
     }
     
@@ -679,6 +673,55 @@ struct TrackDetailView: View {
         
         return String(format: "%d:%02d", minutes, remainingSeconds)
     }
+    
+    private func fetchPreferredAlbum() async -> Album? {
+        do {
+            var request = MusicCatalogResourceRequest<Song>(
+                matching: \.id,
+                equalTo: song.id
+            )
+
+            request.properties = [.albums]
+            request.limit = 1
+
+            let response = try await request.response()
+
+            guard let fullSong = response.items.first,
+                  let albums = fullSong.albums else {
+                return nil
+            }
+
+            for album in albums {
+                var albumRequest = MusicCatalogResourceRequest<Album>(
+                    matching: \.id,
+                    equalTo: album.id
+                )
+
+                albumRequest.limit = 1
+
+                let albumResponse = try await albumRequest.response()
+
+                guard let fullAlbum = albumResponse.items.first else {
+                    continue
+                }
+
+                let christian =
+                    fullAlbum.genreNames.contains("Christian") ||
+                    fullAlbum.genreNames.contains("Christian & Gospel")
+
+                if christian && fullAlbum.contentRating != .explicit {
+                    return fullAlbum
+                }
+            }
+
+            return nil
+
+        } catch {
+            print(error)
+            return nil
+        }
+    }
+    
 }
 
 // Preference key to track button position

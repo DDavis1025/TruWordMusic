@@ -119,6 +119,7 @@ struct MainAppView: View {
                     playerManager: playerManager,
                     appleMusicSubscription: $playerManager.appleMusicSubscription,
                     selectedAlbum: $playerManager.selectedAlbum,
+                    albumCache: $albumCache,
                     activeTab: $selectedTab,
                     homeNavigationPath: $homeNavigationPath,
                     searchNavigationPath: $searchNavigationPath,

@@ -8,6 +8,7 @@ struct FullAlbumGridView: View {
     let cacheAlbum: (Album) -> Void
     let isFromArtist: Bool
     let showAlbumYear: Bool
+    let source: String
     
     @Binding var navigationPath: [Route]
     
@@ -113,13 +114,15 @@ struct FullAlbumGridView: View {
                             }
                             .simultaneousGesture(TapGesture().onEnded {
                                 
+                                print("print: album_selected_from_grid \(source)")
+                                
                                 Analytics.logEvent(
                                     "album_selected_from_grid",
                                     parameters: [
                                         "album_id": album.id.rawValue,
                                         "album_title": album.title,
                                         "artist_name": album.artistName,
-                                        "source": title == "Recently Played" ? "recently_played" : (isFromArtist ? "artist" : "home")
+                                        "source": source
                                     ]
                                 )
                                 cacheAlbum(album)
@@ -142,11 +145,13 @@ struct FullAlbumGridView: View {
         .onAppear {
             albums.forEach { cacheAlbum($0) }
             
+            print("print: album_grid_viewed \(source)")
+            
             Analytics.logEvent(
                 "album_grid_viewed",
                 parameters: [
                     "album_count": filteredAlbums.count,
-                    "source": isFromArtist ? "artist" : "home"
+                    "source": source
                 ]
             )
         }
@@ -155,11 +160,13 @@ struct FullAlbumGridView: View {
         .onChange(of: searchQuery) { _, newValue in
             guard !newValue.isEmpty else { return }
             
+            print("print: album_grid_searched \(source)")
+            
             Analytics.logEvent(
                 "album_grid_searched",
                 parameters: [
                     "query": newValue,
-                    "source": isFromArtist ? "artist" : "home"
+                    "source": source
                 ]
             )
             

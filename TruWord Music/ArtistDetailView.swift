@@ -146,7 +146,8 @@ struct ArtistDetailView: View {
                                             value: Route.artistAlbumGrid(
                                                 title: "Top Releases",
                                                 albums: topAlbums,
-                                                showAlbumYear: true
+                                                showAlbumYear: true,
+                                                source: "artist_detail_top_releases"
                                             )
                                         ) {
                                             Text("View More")

@@ -108,6 +108,14 @@ struct FavoritesView: View {
                         .id(album.id)
                     } else {
                         Text("Album not found")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .safeAreaInset(edge: .bottom) {
+                                if playerManager.currentlyPlayingSong != nil {
+                                    Color.clear.frame(height: bottomPlayerHeight)
+                                }
+                            }
                     }
                     
                 case .fullAlbumGrid:
@@ -144,7 +152,7 @@ struct FavoritesView: View {
                         playerManager: playerManager
                     )
                     
-                case .artistAlbumGrid(let title, let albums, let showAlbumYear):
+                case .artistAlbumGrid(let title, let albums, let showAlbumYear, let source):
                     FullAlbumGridView(
                         albums: albums,
                         title: title,
@@ -153,6 +161,7 @@ struct FavoritesView: View {
                         },
                         isFromArtist: true,
                         showAlbumYear: showAlbumYear,
+                        source: source,
                         navigationPath: $navigationPath,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager

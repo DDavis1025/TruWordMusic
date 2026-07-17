@@ -288,7 +288,9 @@ struct AlbumDetailView: View {
                                         .artistAlbumGrid(
                                             title: artist.name,
                                             albums: moreByAlbums,
-                                            showAlbumYear: true
+                                            showAlbumYear: true,
+                                            source: "more_by_artist"
+                                            
                                         )
                                     )
                                 }
@@ -301,6 +303,13 @@ struct AlbumDetailView: View {
                                                 .onTapGesture {
                                                     albumCache[album.id] = album
                                                     navigationPath.append(.album(album.id))
+                                                    
+                                                    Analytics.logEvent("more_by_album_opened", parameters: [
+                                                        "album_id": album.id.rawValue,
+                                                        "album_title": album.title,
+                                                        "artist_id": artist.id.rawValue,
+                                                        "artist_name": artist.name
+                                                    ])
                                                 }
                                         }
                                     }
