@@ -287,7 +287,8 @@ struct AlbumDetailView: View {
                                     navigationPath.append(
                                         .artistAlbumGrid(
                                             title: artist.name,
-                                            albums: moreByAlbums
+                                            albums: moreByAlbums,
+                                            showAlbumYear: true
                                         )
                                     )
                                 }
@@ -296,7 +297,7 @@ struct AlbumDetailView: View {
                                     HStack(spacing: 16) {
 
                                         ForEach(moreByAlbums.prefix(10), id: \.id) { album in
-                                            AlbumCarouselItemView(album: album)
+                                            AlbumCarouselItemView(album: album, showAlbumYear: true)
                                                 .onTapGesture {
                                                     albumCache[album.id] = album
                                                     navigationPath.append(.album(album.id))

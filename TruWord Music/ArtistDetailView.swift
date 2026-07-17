@@ -145,7 +145,8 @@ struct ArtistDetailView: View {
                                         NavigationLink(
                                             value: Route.artistAlbumGrid(
                                                 title: "Top Releases",
-                                                albums: topAlbums
+                                                albums: topAlbums,
+                                                showAlbumYear: true
                                             )
                                         ) {
                                             Text("View More")
@@ -161,7 +162,10 @@ struct ArtistDetailView: View {
                                         
                                         ForEach(topAlbums.prefix(7), id: \.id) { album in
                                             
-                                            AlbumCarouselItemView(album: album)
+                                            AlbumCarouselItemView(
+                                                album: album,
+                                                showAlbumYear: true
+                                            )
                                                 .onTapGesture {
                                                     // Cache the album immediately
                                                     albumCache[album.id] = album

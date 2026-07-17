@@ -144,14 +144,15 @@ struct FavoritesView: View {
                         playerManager: playerManager
                     )
                     
-                case .artistAlbumGrid(let title, let albums):
+                case .artistAlbumGrid(let title, let albums, let showAlbumYear):
                     FullAlbumGridView(
                         albums: albums,
                         title: title,
                         cacheAlbum: { album in
                             albumCache[album.id] = album
                         },
-                        isFromArtist: true,   // ✅ Favorites is NOT artist-origin
+                        isFromArtist: true,
+                        showAlbumYear: showAlbumYear,
                         navigationPath: $navigationPath,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager

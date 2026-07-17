@@ -15,7 +15,7 @@ struct AlbumWithTracks {
 enum Route: Hashable {
     case fullAlbumGrid
     case fullTrackList(title: String, songs: [Song], isFromArtist: Bool)
-    case artistAlbumGrid(title: String, albums: [Album])
+    case artistAlbumGrid(title: String, albums: [Album], showAlbumYear: Bool)
     case album(MusicItemID)
     case artist(MusicItemID)
     case recentlyPlayedGrid
@@ -77,6 +77,7 @@ struct ContentView: View {
                             albumCache[album.id] = album
                         },
                         isFromArtist: false,
+                        showAlbumYear: false,
                         navigationPath: $navigationPath,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
@@ -137,7 +138,7 @@ struct ContentView: View {
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
                     )
-                case .artistAlbumGrid(let title, let albums):
+                case .artistAlbumGrid(let title, let albums, let showAlbumYear):
                     FullAlbumGridView(
                         albums: albums,
                         title: title,
@@ -145,6 +146,7 @@ struct ContentView: View {
                             albumCache[album.id] = album
                         },
                         isFromArtist: true,
+                        showAlbumYear: showAlbumYear,
                         navigationPath: $navigationPath,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager
@@ -159,6 +161,7 @@ struct ContentView: View {
                             albumCache[album.id] = album
                         },
                         isFromArtist: false,
+                        showAlbumYear: false,
                         navigationPath: $navigationPath,
                         networkMonitor: networkMonitor,
                         playerManager: playerManager

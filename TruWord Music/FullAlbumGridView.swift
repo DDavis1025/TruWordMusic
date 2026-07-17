@@ -7,6 +7,7 @@ struct FullAlbumGridView: View {
     let title: String
     let cacheAlbum: (Album) -> Void
     let isFromArtist: Bool
+    let showAlbumYear: Bool
     
     @Binding var navigationPath: [Route]
     
@@ -95,11 +96,19 @@ struct FullAlbumGridView: View {
                                         .lineLimit(1)
                                         .frame(width: albumSize - 20)
 
-                                    Text(album.artistName)
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(1)
-                                        .frame(width: albumSize - 20)
+                                    if showAlbumYear {
+                                        Text(album.releaseDate?.formatted(.dateTime.year()) ?? "—")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                            .frame(width: albumSize - 20)
+                                    } else {
+                                        Text(album.artistName)
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                            .frame(width: albumSize - 20)
+                                    }
                                 }
                             }
                             .simultaneousGesture(TapGesture().onEnded {

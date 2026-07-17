@@ -10,15 +10,14 @@ import MusicKit
 
 struct AlbumCarouselItemView: View {
     let album: Album
+    var showAlbumYear: Bool = false
     
     var body: some View {
         let screenWidth = UIScreen.main.bounds.width
         let albumSize = max(min(screenWidth * 0.4, 255), 150)
         
         VStack(spacing: 4) {
-            let screenWidth = UIScreen.main.bounds.width
             let size = min(max(screenWidth * 0.6, 300), 1400)
-
             let pixelSize = Int(size * UIScreen.main.scale * 2)
 
             let artworkURL = album.artwork?.url(width: pixelSize, height: pixelSize)
@@ -26,18 +25,24 @@ struct AlbumCarouselItemView: View {
             CustomAsyncImage(url: artworkURL, isCircle: false)
                 .frame(width: albumSize, height: albumSize)
             
-            // Album Title
             Text(album.title)
                 .font(.caption)
                 .lineLimit(1)
                 .frame(maxWidth: 150)
             
-            // ✅ Artist Name
-            Text(album.artistName)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-                .frame(maxWidth: 150)
+            if showAlbumYear {
+                Text(album.releaseDate?.formatted(.dateTime.year()) ?? "—")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: 150)
+            } else {
+                Text(album.artistName)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: 150)
+            }
         }
         .frame(maxWidth: albumSize)
     }
