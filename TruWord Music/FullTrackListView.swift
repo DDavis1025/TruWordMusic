@@ -76,7 +76,8 @@ struct FullTrackListView: View {
                                 song: song,
                                 currentPlayingSong: $currentPlayingSong,
                                 leftPadding: 8,
-                                rightPadding: 8
+                                rightPadding: 8,
+                                showReleaseYear: isFromArtist
                             )
                             .onTapGesture {
                                 

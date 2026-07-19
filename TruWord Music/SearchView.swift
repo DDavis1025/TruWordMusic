@@ -51,10 +51,10 @@ enum SearchResultItem: Identifiable {
     var artistName: String {
         switch self {
         case .song(let song):
-            return "Song | \(song.artistName)"
+            return "Song · \(song.artistName)"
             
         case .album(let album):
-            return "Album | \(album.artistName)"
+            return "Album · \(album.artistName)"
             
         case .artist:
             return "Artist"
@@ -774,9 +774,9 @@ struct SearchView: View {
                                 artistName: {
                                     switch item {
                                     case .song(_, _, let artist, _):
-                                        return "Song | \(artist)"
+                                        return "Song · \(artist)"
                                     case .album(_, _, let artist, _):
-                                        return "Album | \(artist)"
+                                        return "Album · \(artist)"
                                     case .artist:
                                         return "Artist"
                                     }

@@ -16,6 +16,7 @@ struct SongRowView: View {
     @Binding var currentPlayingSong: Song?
     var leftPadding: CGFloat = 0
     var rightPadding: CGFloat = 0
+    var showReleaseYear: Bool = false
 
     var body: some View {
         HStack {
@@ -39,10 +40,14 @@ struct SongRowView: View {
                     .font(.subheadline)
                     .lineLimit(1)
 
-                Text(song.artistName)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
+                Text(
+                    showReleaseYear
+                    ? "\(song.artistName)\(song.releaseDate.map { " · \($0.formatted(.dateTime.year()))" } ?? "")"
+                    : song.artistName
+                )
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
             }
             .padding(.trailing, rightPadding)
 

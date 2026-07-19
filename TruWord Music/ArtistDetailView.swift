@@ -227,7 +227,8 @@ struct ArtistDetailView: View {
                                         
                                         SongRowView(
                                             song: song,
-                                            currentPlayingSong: $playerManager.currentlyPlayingSong
+                                            currentPlayingSong: $playerManager.currentlyPlayingSong,
+                                            showReleaseYear: true
                                         )
                                         .onTapGesture {
                                             
