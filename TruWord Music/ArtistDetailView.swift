@@ -25,6 +25,7 @@ struct ArtistDetailView: View {
     @State private var topAlbums: [Album] = []
     @State private var topSongs: [Song] = []
     @State private var similarArtists: [Artist] = []
+    @State private var latestRelease: Album?
     
     @State private var isLoading = true
     
@@ -90,9 +91,6 @@ struct ArtistDetailView: View {
                                 Text("Artist")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .multilineTextAlignment(.center)
                             
                             if let appleMusicArtistURL, !playerManager.appleMusicSubscription {
                                 
@@ -103,7 +101,7 @@ struct ArtistDetailView: View {
                                         .resizable()
                                         .scaledToFit()
                                         .frame(height: min(UIScreen.main.bounds.width * 0.1, 65))
-                                        .padding(.top, 20.2)
+                                        .padding(.top, 8)
                                         .onTapGesture {
                                             Analytics.logEvent("apple_music_link_tapped", parameters: [
                                                 "source": "artist_detail",
@@ -116,12 +114,85 @@ struct ArtistDetailView: View {
                                     
                                     Spacer()
                                 }
+                              }
                             }
-                            if !isLoading && topAlbums.isEmpty && topSongs.isEmpty {
+                            .frame(maxWidth: .infinity)
+                            .multilineTextAlignment(.center)
+                            
+                            if !isLoading && topAlbums.isEmpty && topSongs.isEmpty && latestRelease == nil {
                                 Text("No Christian music available")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                     .padding(.top, 35)
+                            }
+                            
+                            if let latestRelease {
+
+                                HStack(alignment: .top, spacing: 16) {
+                                    
+                                    let screenWidth = UIScreen.main.bounds.width
+                                    let artworkSize = min(max(screenWidth * 0.24, 95), 150)
+
+                                    let scale = UIScreen.main.scale
+                                    let pixelSize = Int(artworkSize * scale * 2)
+
+                                    let artworkURL = latestRelease.artwork?.url(
+                                        width: pixelSize,
+                                        height: pixelSize
+                                    )
+
+                                    CustomAsyncImage(url: artworkURL, isCircle: false)
+                                        .frame(width: artworkSize, height: artworkSize)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Spacer()
+
+                                        if let releaseDate = latestRelease.releaseDate {
+                                            Text(releaseDate.formatted(.dateTime.month(.abbreviated).day().year()).uppercased())
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                                .lineLimit(1)
+                                                .truncationMode(.tail)
+                                        }
+
+                                        Text(latestRelease.title)
+                                            .font(.headline)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+
+                                        Text("\(latestRelease.trackCount) \(latestRelease.trackCount == 1 ? "song" : "songs")")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+
+                                        Spacer()
+                                    }
+                                    .frame(height: artworkSize)
+
+                                    Spacer()
+                                }
+                                .padding(.top, 15.5)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    // Cache the album immediately
+                                    albumCache[latestRelease.id] = latestRelease
+
+                                    // Pre-warm album tracks
+                                    Task {
+                                        _ = await prefetchAlbumTracks(album: latestRelease)
+                                    }
+
+                                    navigationPath.append(.album(latestRelease.id))
+
+                                    Analytics.logEvent("latest_release_opened", parameters: [
+                                        "album_name": latestRelease.title,
+                                        "artist_id": artistID.rawValue,
+                                        "artist_name": artist?.name ?? ""
+                                    ])
+                                }
+                                .padding(.top, 12)
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -378,7 +449,8 @@ struct ArtistDetailView: View {
             request.properties = [
                 .albums,
                 .topSongs,
-                .similarArtists
+                .similarArtists,
+                .latestRelease
             ]
             
             request.limit = 1
@@ -433,6 +505,20 @@ struct ArtistDetailView: View {
                     
                     return hasChristianAlbum || hasChristianSong
                 }
+                
+                self.latestRelease = {
+                    guard let album = fetchedArtist.latestRelease else {
+                        return nil
+                    }
+
+                    let isChristian =
+                        album.genreNames.contains("Christian") ||
+                        album.genreNames.contains("Christian & Gospel")
+
+                    return isChristian && album.contentRating != .explicit
+                        ? album
+                        : nil
+                }()
                 
                 self.isLoading = false
             }

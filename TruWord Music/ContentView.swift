@@ -342,7 +342,7 @@ struct ContentView: View {
             VStack(alignment: .leading) {
                 HStack {
                     Text("Top Christian Albums")
-                        .font(.system(size: 18)).bold()
+                        .font(.system(size: 18, weight: .bold))
                     
                     Spacer()
                     
@@ -391,7 +391,7 @@ struct ContentView: View {
             VStack(alignment: .leading) {
                 HStack {
                     Text("Top Christian Songs")
-                        .font(.system(size: 18)).bold()
+                        .font(.system(size: 18, weight: .bold))
                     
                     Spacer()
                     
