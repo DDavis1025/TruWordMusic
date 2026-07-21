@@ -174,7 +174,7 @@ struct ArtistDetailView: View {
                                     Spacer()
                                 }
                                 .padding(.top, 15.5)
-                                .padding(.bottom, 15.5)
+                                .padding(.bottom, 11)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     // Cache the album immediately
@@ -193,7 +193,7 @@ struct ArtistDetailView: View {
                                         "artist_name": artist?.name ?? ""
                                     ])
                                 }
-                                .padding(.top, 12)
+                                .padding(.top, 11)
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -354,6 +354,7 @@ struct ArtistDetailView: View {
                                 }
                                 .padding(.horizontal, -16) // cancels out the parent VStack padding
                             }
+                            .padding(.top, 11)
                         }
                     }
                     .padding()
