@@ -100,7 +100,7 @@ struct ArtistDetailView: View {
                                     Image("AppleMusicBadge")
                                         .resizable()
                                         .scaledToFit()
-                                        .frame(height: min(UIScreen.main.bounds.width * 0.1, 65))
+                                        .frame(height: min(UIScreen.main.bounds.width * 0.095, 62))
                                         .padding(.top, 8)
                                         .onTapGesture {
                                             Analytics.logEvent("apple_music_link_tapped", parameters: [
@@ -174,6 +174,7 @@ struct ArtistDetailView: View {
                                     Spacer()
                                 }
                                 .padding(.top, 15.5)
+                                .padding(.bottom, 15.5)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     // Cache the album immediately
@@ -336,14 +337,12 @@ struct ArtistDetailView: View {
                                 }
                                 
                                 ScrollView(.horizontal, showsIndicators: false) {
-                                    
                                     HStack(spacing: 16) {
-                                        
                                         ForEach(similarArtists, id: \.id) { artist in
                                             SimilarArtistCarouselItemView(artist: artist)
                                                 .onTapGesture {
                                                     navigationPath.append(.artist(artist.id))
-                                                    
+
                                                     Analytics.logEvent("similar_artist_opened", parameters: [
                                                         "artist_id": artist.id.rawValue,
                                                         "artist_name": artist.name
@@ -351,9 +350,9 @@ struct ArtistDetailView: View {
                                                 }
                                         }
                                     }
-                                    .padding(.leading, 8)
-                                    .padding(.trailing, 16)
+                                    .padding(.horizontal, 16) // keeps first/last card aligned with title
                                 }
+                                .padding(.horizontal, -16) // cancels out the parent VStack padding
                             }
                         }
                     }

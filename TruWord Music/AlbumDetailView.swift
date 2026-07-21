@@ -122,7 +122,7 @@ struct AlbumDetailView: View {
                                     Image("AppleMusicBadge")
                                         .resizable()
                                         .scaledToFit()
-                                        .frame(height: min(UIScreen.main.bounds.width * 0.1, 65))
+                                        .frame(height: min(UIScreen.main.bounds.width * 0.095, 62))
                                         .padding(.top, 20.2)
                                         .onTapGesture {
                                             Analytics.logEvent("apple_music_link_tapped", parameters: [

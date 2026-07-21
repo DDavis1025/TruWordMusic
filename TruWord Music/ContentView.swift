@@ -288,7 +288,7 @@ struct ContentView: View {
     @ViewBuilder
     private var recentlyPlayedAlbums: some View {
         if !playerManager.recentlyPlayedAlbums.isEmpty {
-            let items = Array(playerManager.recentlyPlayedAlbums.prefix(7))
+            let items = Array(playerManager.recentlyPlayedAlbums.prefix(10))
 
             VStack(alignment: .leading) {
 
@@ -298,7 +298,7 @@ struct ContentView: View {
 
                     Spacer()
 
-                    if playerManager.recentlyPlayedAlbums.count > 7 {
+                    if playerManager.recentlyPlayedAlbums.count > 10 {
                         NavigationLink(
                             value: Route.recentlyPlayedGrid(source: "recently_played")
                         ) {
@@ -346,7 +346,7 @@ struct ContentView: View {
                     
                     Spacer()
                     
-                    if albums.count > 7 {
+                    if albums.count > 10 {
                         NavigationLink(
                             value: Route.fullAlbumGrid(source: "home_top_christian_albums")
                         ) {
@@ -363,7 +363,7 @@ struct ContentView: View {
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
-                        ForEach(albums.prefix(7), id: \.id) { album in
+                        ForEach(albums.prefix(10), id: \.id) { album in
                             AlbumCarouselItemView(album: album)
                                 .onTapGesture {
                                     navigationPath.append(.album(album.id))
@@ -395,7 +395,7 @@ struct ContentView: View {
                     
                     Spacer()
                     
-                    if songs.count > 5 {
+                    if songs.count > 7 {
                         NavigationLink(
                             value: Route.fullTrackList(
                                 title: "Top Songs",
@@ -414,7 +414,7 @@ struct ContentView: View {
                 }
                 .padding(.vertical, 4)
                 
-                ForEach(songs.prefix(5), id: \.id) { song in
+                ForEach(songs.prefix(7), id: \.id) { song in
                     SongRowView(song: song, currentPlayingSong: $playerManager.currentlyPlayingSong)
                         .onTapGesture {
             
