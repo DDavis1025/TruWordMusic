@@ -129,21 +129,22 @@ struct TrackDetailView: View {
                         .disabled(!networkMonitor.isConnected)
                         
                         ZStack {
-                            if playerIsReady {
-                                Button(action: {
-                                    togglePlayPause()
-                                    
-                                    Analytics.logEvent("track_play_pause_tapped", parameters: [
-                                        "song_id": song.id.rawValue,
-                                        "is_playing": isPlaying
-                                    ])
-                                }) {
-                                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .foregroundColor(.primary)
-                                }
-                            } else {
+                            Button(action: {
+                                togglePlayPause()
+
+                                Analytics.logEvent("track_play_pause_tapped", parameters: [
+                                    "song_id": song.id.rawValue,
+                                    "is_playing": isPlaying
+                                ])
+                            }) {
+                                Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .foregroundColor(.primary)
+                                    .opacity(playerIsReady ? 1 : 0) // Hide while loading
+                            }
+
+                            if !playerIsReady {
                                 ProgressView()
                             }
                         }
@@ -591,15 +592,31 @@ struct TrackDetailView: View {
         }()
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
-        
+
+        // Search forward first
         for nextIndex in (currentIndex + 1)..<currentList.count {
             let nextSong = currentList[nextIndex]
-            let isPlayable = (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date())
-            && nextSong.playParameters != nil
-            
+            let isPlayable =
+                (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date()) &&
+                nextSong.playParameters != nil
+
             if isPlayable {
                 playerManager.playSong(nextSong, from: currentList)
                 return
+            }
+        }
+
+        // If Repeat All, wrap to the first playable song
+        if playerManager.repeatMode == .all {
+            for nextSong in currentList {
+                let isPlayable =
+                    (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date()) &&
+                    nextSong.playParameters != nil
+
+                if isPlayable {
+                    playerManager.playSong(nextSong, from: currentList)
+                    return
+                }
             }
         }
     }

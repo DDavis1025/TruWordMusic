@@ -116,6 +116,7 @@ struct ArtistDetailView: View {
                                 }
                               }
                             }
+                            .padding(.bottom, 15.5)
                             .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
                             
@@ -173,8 +174,7 @@ struct ArtistDetailView: View {
 
                                     Spacer()
                                 }
-                                .padding(.top, 15.5)
-                                .padding(.bottom, 11)
+                                .padding(.bottom, 8)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     // Cache the album immediately
@@ -193,7 +193,7 @@ struct ArtistDetailView: View {
                                         "artist_name": artist?.name ?? ""
                                     ])
                                 }
-                                .padding(.top, 11)
+                                .padding(.top, 9)
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -354,7 +354,7 @@ struct ArtistDetailView: View {
                                 }
                                 .padding(.horizontal, -16) // cancels out the parent VStack padding
                             }
-                            .padding(.top, 11)
+                            .padding(.top, 8)
                         }
                     }
                     .padding()

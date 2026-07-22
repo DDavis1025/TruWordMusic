@@ -500,16 +500,25 @@ class PlayerManager: ObservableObject {
                 )
             } else {
                 
-                if repeatMode == .all,
-                   let firstSong = currentList.first {
-                    
-                    playSong(
-                        firstSong,
-                        from: currentList,
-                        albumWithTracks: isPlayingFromAlbum ? albumWithTracks : nil,
-                        playFromAlbum: isPlayingFromAlbum
-                    )
-                    
+                if repeatMode == .all {
+
+                    if let firstPlayableSong = currentList.first(where: {
+                        ($0.releaseDate == nil || $0.releaseDate! <= Date())
+                        && $0.playParameters != nil
+                    }) {
+
+                        playSong(
+                            firstPlayableSong,
+                            from: currentList,
+                            albumWithTracks: isPlayingFromAlbum ? albumWithTracks : nil,
+                            playFromAlbum: isPlayingFromAlbum
+                        )
+
+                    } else {
+                        isPlaying = false
+                        player.seek(to: .zero)
+                    }
+
                 } else {
                     isPlaying = false
                     player.seek(to: .zero)
