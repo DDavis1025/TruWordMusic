@@ -354,7 +354,7 @@ struct ArtistDetailView: View {
                                 }
                                 .padding(.horizontal, -16) // cancels out the parent VStack padding
                             }
-                            .padding(.top, 8)
+                            .padding(.top, (!topAlbums.isEmpty || !topSongs.isEmpty) ? 8 : 0)
                         }
                     }
                     .padding()

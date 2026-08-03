@@ -104,6 +104,8 @@ struct SearchView: View {
     @State private var selectedTab: SearchTab = .all
     @State private var showClearRecentAlert = false
     @State private var hasSearched = false
+    @State private var activeSearchID = UUID()
+    @State private var cachedSearchResults: [String: [String: [SearchResultItem]]] = [:]
     
     @FocusState private var isSearchFocused: Bool
     
@@ -204,6 +206,10 @@ struct SearchView: View {
                             ScrollViewReader { proxy in
                                 ScrollView(.vertical, showsIndicators: true) {
                                     VStack(spacing: 0) {
+                                        Color.clear
+                                            .frame(height: 0)
+                                            .id("searchResultsTop")
+
                                         ForEach(filteredResults) { item in
                                             SongRowLikeView(
                                                 title: item.title,
@@ -331,11 +337,9 @@ struct SearchView: View {
                                              : 0
                                     )
                                 }
+                                .id(selectedTab)
                                 .onChange(of: selectedTab) {
-                                    guard let first = filteredResults.first else { return }
-                                    withAnimation {
-                                        proxy.scrollTo(first.id, anchor: .top)
-                                    }
+                                    proxy.scrollTo("searchResultsTop", anchor: .top)
                                 }
                             }
                         }
@@ -343,6 +347,12 @@ struct SearchView: View {
                     .searchable(text: $searchQuery, prompt: "Search Christian music")
                     .focused($isSearchFocused)
                     .onSubmit(of: .search) {
+                        Task { await performSearch() }
+                    }
+                    .onChange(of: selectedTab) {
+                        guard !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                            return
+                        }
                         Task { await performSearch() }
                     }
                 }
@@ -363,6 +373,11 @@ struct SearchView: View {
             }
             
             .onChange(of: searchQuery) { oldValue, newValue in
+                if oldValue != newValue {
+                    activeSearchID = UUID()
+                    cachedSearchResults = [:]
+                }
+
                 if newValue.isEmpty {
                     searchResults = []
                     isSearching = false
@@ -544,26 +559,61 @@ struct SearchView: View {
     }
     
     // MARK: - Perform Search
+    private func searchTypes(for tab: SearchTab) -> [any MusicCatalogSearchable.Type] {
+        switch tab {
+        case .all: return [Song.self, Album.self, Artist.self]
+        case .songs: return [Song.self]
+        case .albums: return [Album.self]
+        // Preserve the earlier Apple Music relevance behavior for artist
+        // searches; the Artist tab still displays only valid artist results.
+        case .artists: return [Song.self, Album.self, Artist.self]
+        }
+    }
+
     private func performSearch() async {
         
         guard !searchQuery.isEmpty else { return }
         guard networkMonitor.isConnected else { return }
+
+        let query = searchQuery
+        let tab = selectedTab
+        let cacheKey = query
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let searchID = UUID()
+        activeSearchID = searchID
+
+        if let cachedResults = cachedSearchResults[cacheKey]?[tab.rawValue] {
+            hasSearched = true
+            isSearching = false
+            searchResults = cachedResults
+            return
+        }
         
         hasSearched = true
         
         isSearching = true
         searchResults = []
         
-        defer { isSearching = false }
+        defer {
+            if activeSearchID == searchID {
+                isSearching = false
+            }
+        }
         
         do {
             
             var request = MusicCatalogSearchRequest(
-                term: searchQuery,
-                types: [Song.self, Album.self, Artist.self]
+                term: query,
+                types: searchTypes(for: tab)
             )
             
             request.limit = 25
+
+            if tab == .all, #available(iOS 16.0, *) {
+                // Ask MusicKit for Apple's cross-type, relevance-ranked results.
+                request.includeTopResults = true
+            }
             
             let response = try await request.response()
             
@@ -578,10 +628,6 @@ struct SearchView: View {
                 $0.contentRating != .explicit
             }
             
-            results.append(contentsOf: christianSongs.map {
-                .song($0)
-            })
-            
             // MARK: - Albums
             
             let christianAlbums = response.albums.filter { album in
@@ -591,15 +637,15 @@ struct SearchView: View {
                 album.contentRating != .explicit
             }
             
-            results.append(contentsOf: christianAlbums.map {
-                .album($0)
-            })
-            
             // MARK: - Artists
             
             var validArtists: [Artist] = []
+
+            // Preserve the original complete set and Apple Music's returned
+            // artist order, including associated acts.
+            let artistCandidates = response.artists
             
-            for artist in response.artists {
+            for artist in artistCandidates {
                 
                 do {
                     
@@ -623,15 +669,15 @@ struct SearchView: View {
                     
                     let hasChristianAlbum =
                     fullArtist.albums?.contains(where: {
-                        $0.genreNames.contains("Christian") ||
-                        $0.genreNames.contains("Christian & Gospel") &&
+                        ($0.genreNames.contains("Christian") ||
+                         $0.genreNames.contains("Christian & Gospel")) &&
                         $0.contentRating != .explicit
                     }) ?? false
                     
                     let hasChristianSong =
                     fullArtist.topSongs?.contains(where: {
-                        $0.genreNames.contains("Christian") ||
-                        $0.genreNames.contains("Christian & Gospel") &&
+                        ($0.genreNames.contains("Christian") ||
+                         $0.genreNames.contains("Christian & Gospel")) &&
                         $0.contentRating != .explicit
                     }) ?? false
                     
@@ -644,11 +690,64 @@ struct SearchView: View {
                 }
             }
             
-            results.append(contentsOf: validArtists.map {
-                .artist($0)
-            })
+            guard activeSearchID == searchID else { return }
+
+            switch tab {
+            case .songs:
+                results = christianSongs.map { .song($0) }
+
+            case .albums:
+                results = christianAlbums.map { .album($0) }
+
+            case .artists:
+                results = validArtists.map { .artist($0) }
+
+            case .all:
+                if #available(iOS 16.0, *) {
+                // `topResults` is Apple's own unified relevance order across
+                // songs, albums, and artists. Do not re-sort or interleave it.
+                    for topResult in response.topResults {
+                        switch topResult {
+                        case .song(let song):
+                            guard (song.genreNames.contains("Christian") ||
+                                   song.genreNames.contains("Christian & Gospel")) &&
+                                  song.contentRating != .explicit else {
+                                continue
+                            }
+                            results.append(.song(song))
+
+                        case .album(let album):
+                            guard (album.genreNames.contains("Christian") ||
+                                   album.genreNames.contains("Christian & Gospel")) &&
+                                  album.contentRating != .explicit else {
+                                continue
+                            }
+                            results.append(.album(album))
+
+                        case .artist(let artist):
+                            guard let validArtist = validArtists.first(where: {
+                                $0.id == artist.id
+                            }) else {
+                                continue
+                            }
+                            results.append(.artist(validArtist))
+
+                        default:
+                            continue
+                        }
+                    }
+                } else {
+                    results.append(contentsOf: christianSongs.map { .song($0) })
+                    results.append(contentsOf: christianAlbums.map { .album($0) })
+                    results.append(contentsOf: validArtists.map { .artist($0) })
+                }
+            }
             
             searchResults = results
+
+            var cachedTabs = cachedSearchResults[cacheKey] ?? [:]
+            cachedTabs[tab.rawValue] = results
+            cachedSearchResults[cacheKey] = cachedTabs
             
             for album in christianAlbums {
                 albumCache[album.id] = album
@@ -667,6 +766,8 @@ struct SearchView: View {
             }
             
         } catch {
+
+            guard activeSearchID == searchID else { return }
             
             print("Error searching MusicKit: \(error)")
             searchResults = []
@@ -802,9 +903,13 @@ struct SearchView: View {
                         }
                     }
                 }
-
-                Spacer(minLength: 80)
             }
+            .padding(.bottom,
+                        playerManager.currentlyPlayingSong != nil &&
+                        !keyboardObserver.isKeyboardVisible
+                        ? bottomPlayerHeight
+                        : 0
+                    )
         }
         .alert("Clear recent searches?", isPresented: $showClearRecentAlert) {
             Button("Clear", role: .destructive) {
@@ -858,4 +963,3 @@ struct SongRowLikeView: View {
         .background(Color(.systemBackground))
     }
 }
-
