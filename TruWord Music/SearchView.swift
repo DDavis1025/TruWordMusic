@@ -141,10 +141,10 @@ struct SearchView: View {
                             HStack(spacing: 0) {
                                 ForEach(SearchTab.allCases) { tab in
                                     Button {
-                                        withAnimation(.spring()) {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
                                             selectedTab = tab
                                         }
-                                        
+
                                         Analytics.logEvent("search_tab_changed", parameters: [
                                             "tab": tab.rawValue
                                         ])
@@ -186,6 +186,8 @@ struct SearchView: View {
                             
                         } else if shouldShowRecentSearches {
                             recentSearchView
+                        } else if !searchQuery.isEmpty && !hasSearched && filteredResults.isEmpty {
+                            searchPlaceholderView
                         } else if hasSearched && filteredResults.isEmpty {
                             VStack {
                                 Spacer()
@@ -918,6 +920,34 @@ struct SearchView: View {
             }
             Button("Cancel", role: .cancel) { }
         }
+    }
+    
+    // MARK: - Search Placeholder View
+    private var searchPlaceholderView: some View {
+        VStack(spacing: 12) {
+            Spacer()
+            
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 38.8))
+                .foregroundColor(.secondary)
+            
+            Text("Enter a search to see results")
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            Text("Find Christian songs, albums, and artists")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.bottom,
+                 playerManager.currentlyPlayingSong != nil &&
+                 !keyboardObserver.isKeyboardVisible
+                 ? bottomPlayerHeight
+                 : 0
+        )
     }
 }
 
