@@ -308,7 +308,8 @@ struct AlbumDetailView: View {
                                                         "album_id": album.id.rawValue,
                                                         "album_title": album.title,
                                                         "artist_id": artist.id.rawValue,
-                                                        "artist_name": artist.name
+                                                        "artist_name": artist.name,
+                                                        "source": "album_detail_view"
                                                     ])
                                                 }
                                         }

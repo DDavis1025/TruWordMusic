@@ -125,6 +125,7 @@ struct ArtistDetailView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                     .padding(.top, 35)
+                                    .padding(.bottom, 15)
                             }
                             
                             if let latestRelease {
@@ -205,28 +206,30 @@ struct ArtistDetailView: View {
                             
                             VStack(alignment: .leading) {
                                 
-                                HStack {
-                                    
+                                HStack(spacing: 4) {
                                     Text("Top Releases")
                                         .font(.system(size: 20, weight: .bold))
-                                    
-                                    Spacer()
-                                    
+
                                     if topAlbums.count > 7 {
-                                        
-                                        NavigationLink(
-                                            value: Route.artistAlbumGrid(
-                                                title: "Top Releases",
-                                                albums: topAlbums,
-                                                showAlbumYear: true,
-                                                source: "artist_detail_top_releases"
-                                            )
-                                        ) {
-                                            Text("View More")
-                                        }
-                                        .font(.system(size: 15))
-                                        .foregroundColor(.blue)
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.gray)
                                     }
+
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    guard topAlbums.count > 7 else { return }
+
+                                    navigationPath.append(
+                                        .artistAlbumGrid(
+                                            title: "Top Releases",
+                                            albums: topAlbums,
+                                            showAlbumYear: true,
+                                            source: "artist_detail_top_releases"
+                                        )
+                                    )
                                 }
                                 
                                 ScrollView(.horizontal, showsIndicators: false) {
@@ -269,28 +272,29 @@ struct ArtistDetailView: View {
                             
                             VStack(alignment: .leading) {
                                 
-                                HStack {
-                                    
+                                HStack(spacing: 4) {
                                     Text("Top Songs")
                                         .font(.system(size: 20, weight: .bold))
-                                    
-                                    Spacer()
-                                    
+
                                     if topSongs.count > 10 {
-                                        NavigationLink(
-                                            value: Route.fullTrackList(
-                                                title: "Top Songs",
-                                                songs: topSongs,
-                                                isFromArtist: true
-                                            )
-                                        ) {
-                                            Text("View More")
-                                        }
-                                        .font(.system(size: 15))
-                                        .foregroundColor(.blue)
-                                        .font(.system(size: 15))
-                                        .foregroundColor(.blue)
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.gray)
                                     }
+
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    guard topSongs.count > 10 else { return }
+
+                                    navigationPath.append(
+                                        .fullTrackList(
+                                            title: "Top Songs",
+                                            songs: topSongs,
+                                            isFromArtist: true
+                                        )
+                                    )
                                 }
                                 
                                 VStack(spacing: 0) {

@@ -10,6 +10,11 @@ struct AlbumWithTracks {
     var tracks: [Song]
 }
 
+struct MoreByArtistSection {
+    let artist: Artist
+    let albums: [Album]
+}
+
 // MARK: - Route
 
 enum Route: Hashable {
@@ -41,6 +46,7 @@ struct ContentView: View {
     
     // Songs & Albums
     @State private var songs: [Song] = []
+    @State private var moreByArtistSection: MoreByArtistSection?
     @Binding var albums: [Album]
     @Binding var albumCache: [MusicItemID: Album]
     
@@ -198,6 +204,7 @@ struct ContentView: View {
                     }
 
                     await loadRecentlyPlayedAlbumsIntoCache()
+                    await loadMoreByArtist()
                 }
 
                 isLoading = false
@@ -226,6 +233,7 @@ struct ContentView: View {
                         )
                         Spacer().frame(height: 20)
                         recentlyPlayedAlbums
+                        moreByArtistSectionView
                         albumsSection
                         songsSection
                     }
@@ -292,20 +300,25 @@ struct ContentView: View {
 
             VStack(alignment: .leading) {
 
-                HStack {
+                HStack(spacing: 4) {
                     Text("Recently Played")
                         .font(.system(size: 18, weight: .bold))
 
-                    Spacer()
-
                     if playerManager.recentlyPlayedAlbums.count > 10 {
-                        NavigationLink(
-                            value: Route.recentlyPlayedGrid(source: "recently_played")
-                        ) {
-                            Text("View More")
-                                .font(.system(size: 15))
-                        }
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.gray)
                     }
+
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard playerManager.recentlyPlayedAlbums.count > 10 else { return }
+
+                    navigationPath.append(
+                        .recentlyPlayedGrid(source: "recently_played")
+                    )
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -340,26 +353,28 @@ struct ContentView: View {
         
         return AnyView(
             VStack(alignment: .leading) {
-                HStack {
+                HStack(spacing: 4) {
                     Text("Top Christian Albums")
                         .font(.system(size: 18, weight: .bold))
-                    
-                    Spacer()
-                    
+
                     if albums.count > 10 {
-                        NavigationLink(
-                            value: Route.fullAlbumGrid(source: "home_top_christian_albums")
-                        ) {
-                            Text("View More")
-                        }
-                        .simultaneousGesture(TapGesture().onEnded {
-                            Analytics.logEvent("view_more_albums", parameters: nil)
-                        })
-                        .foregroundColor(.blue)
-                        .font(.system(size: 15))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.gray)
                     }
+
+                    Spacer()
                 }
-                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard albums.count > 10 else { return }
+
+                    navigationPath.append(
+                        .fullAlbumGrid(source: "home_top_christian_albums")
+                    )
+
+                    Analytics.logEvent("view_more_albums", parameters: nil)
+                }
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
@@ -389,30 +404,32 @@ struct ContentView: View {
         
         return AnyView(
             VStack(alignment: .leading) {
-                HStack {
+                HStack(spacing: 4) {
                     Text("Top Christian Songs")
                         .font(.system(size: 18, weight: .bold))
-                    
-                    Spacer()
-                    
+
                     if songs.count > 7 {
-                        NavigationLink(
-                            value: Route.fullTrackList(
-                                title: "Top Songs",
-                                songs: songs,
-                                isFromArtist: false
-                            )
-                        ) {
-                            Text("View More")
-                        }
-                        .simultaneousGesture(TapGesture().onEnded {
-                            Analytics.logEvent("view_more_songs", parameters: nil)
-                        })
-                        .foregroundColor(.blue)
-                        .font(.system(size: 15))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.gray)
                     }
+
+                    Spacer()
                 }
-                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard songs.count > 7 else { return }
+
+                    navigationPath.append(
+                        .fullTrackList(
+                            title: "Top Songs",
+                            songs: songs,
+                            isFromArtist: false
+                        )
+                    )
+
+                    Analytics.logEvent("view_more_songs", parameters: nil)
+                }
                 
                 ForEach(songs.prefix(7), id: \.id) { song in
                     SongRowView(song: song, currentPlayingSong: $playerManager.currentlyPlayingSong)
@@ -439,6 +456,176 @@ struct ContentView: View {
             }
         )
     }
+    
+    @ViewBuilder
+    private var moreByArtistSectionView: some View {
+        if let section = moreByArtistSection,
+           !section.albums.isEmpty {
+
+            VStack(alignment: .leading, spacing: 12) {
+
+                HStack(spacing: 4) {
+
+                    Text("More By \(section.artist.name)")
+                        .font(.system(size: 18, weight: .bold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    if section.albums.count > 10 {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.gray)
+                    }
+
+                    Spacer()
+                }
+                .padding(.leading, 0)
+                .padding(.trailing, 5)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard section.albums.count > 10 else { return }
+
+                    navigationPath.append(
+                        .artistAlbumGrid(
+                            title: section.artist.name,
+                            albums: section.albums,
+                            showAlbumYear: true,
+                            source: "more_by_artist_home"
+                        )
+                    )
+
+                    Analytics.logEvent("more_by_artist_view_more", parameters: [
+                        "artist_id": section.artist.id.rawValue,
+                        "artist_name": section.artist.name
+                    ])
+                }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(section.albums.prefix(10), id: \.id) { album in
+                            AlbumCarouselItemView(
+                                album: album,
+                                showAlbumYear: true
+                            )
+                            .onTapGesture {
+                                albumCache[album.id] = album
+                                navigationPath.append(.album(album.id))
+
+                                Analytics.logEvent("more_by_album_opened", parameters: [
+                                    "album_id": album.id.rawValue,
+                                    "album_title": album.title,
+                                    "artist_id": section.artist.id.rawValue,
+                                    "artist_name": section.artist.name,
+                                    "source": "home_more_by_artist"
+                                ])
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.bottom, 14)
+        }
+    }
+    
+    private func mostPlayedArtistName() -> String? {
+        let counts = Dictionary(
+            grouping: playerManager.recentlyPlayedAlbums,
+            by: { $0.artistName }
+        )
+        .mapValues(\.count)
+
+        guard let highestCount = counts.values.max() else {
+            return nil
+        }
+
+        // Keep the most recently appearing artist when there is a tie.
+        return playerManager.recentlyPlayedAlbums.first {
+            counts[$0.artistName] == highestCount
+        }?.artistName
+    }
+    
+    private func loadMoreByArtist() async {
+        guard let artistName = mostPlayedArtistName() else {
+            await MainActor.run {
+                moreByArtistSection = nil
+            }
+            return
+        }
+
+        do {
+            // Find a recently played album belonging to this artist.
+            guard let recentItem = playerManager.recentlyPlayedAlbums.first(
+                where: { $0.artistName == artistName }
+            ) else {
+                return
+            }
+
+            let albumID = MusicItemID(recentItem.id)
+
+            // Resolve the album so we can get its artist.
+            var albumRequest = MusicCatalogResourceRequest<Album>(
+                matching: \.id,
+                equalTo: albumID
+            )
+
+            albumRequest.properties = [.artists]
+            albumRequest.limit = 1
+
+            let albumResponse = try await albumRequest.response()
+
+            guard let fullAlbum = albumResponse.items.first,
+                  let artists = fullAlbum.artists,
+                  let artist = artists.first else {
+                return
+            }
+
+            // Fetch the artist's albums.
+            var artistRequest = MusicCatalogResourceRequest<Artist>(
+                matching: \.id,
+                equalTo: artist.id
+            )
+
+            artistRequest.properties = [.albums]
+            artistRequest.limit = 1
+
+            let artistResponse = try await artistRequest.response()
+
+            guard let fullArtist = artistResponse.items.first else {
+                return
+            }
+
+            let filteredAlbums = (fullArtist.albums ?? []).filter { album in
+                let isChristian =
+                    album.genreNames.contains("Christian") ||
+                    album.genreNames.contains("Christian & Gospel")
+
+                let isNotExplicit = album.contentRating != .explicit
+
+                return isChristian && isNotExplicit
+            }
+
+            await MainActor.run {
+                moreByArtistSection = MoreByArtistSection(
+                    artist: artist,
+                    albums: filteredAlbums
+                )
+
+                // Cache albums so tapping them works immediately.
+                for album in filteredAlbums {
+                    albumCache[album.id] = album
+                }
+            }
+
+        } catch {
+            print("Failed to load More By Artist: \(error)")
+
+            await MainActor.run {
+                moreByArtistSection = nil
+            }
+        }
+    }
+    
     // MARK: - MusicKit
     
     private func requestMusicAuthorization() async {
