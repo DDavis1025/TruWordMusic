@@ -25,8 +25,9 @@ enum RepeatMode: String {
     case one
 }
 
-struct RecentlyPlayedAlbumItem: Codable, Identifiable {
+struct RecentlyPlayedAlbumItem: Codable, Identifiable, Equatable {
     let id: String
+    let artistID: String?
     let title: String
     let artistName: String
 }
@@ -310,7 +311,9 @@ class PlayerManager: ObservableObject {
             self.lastPlayFromAlbum = playFromAlbum
             
             if playFromAlbum, let albumWithTracks {
-                addRecentlyPlayedAlbum(albumWithTracks.album)
+                Task {
+                    await addRecentlyPlayedAlbum(albumWithTracks.album)
+                }
             }
         }
         
@@ -423,7 +426,9 @@ class PlayerManager: ObservableObject {
                 self.isPlaying = true
                 
                 if let albumWithTracks {
-                    addRecentlyPlayedAlbum(albumWithTracks.album)
+                    Task {
+                        await addRecentlyPlayedAlbum(albumWithTracks.album)
+                    }
                 }
             }
             
@@ -918,21 +923,41 @@ class PlayerManager: ObservableObject {
         }
     }
     
-    private func addRecentlyPlayedAlbum(_ album: Album) {
-        let item = RecentlyPlayedAlbumItem(
-            id: album.id.rawValue,
-            title: album.title,
-            artistName: album.artistName
-        )
+    private func addRecentlyPlayedAlbum(_ album: Album) async {
+        do {
+            var request = MusicCatalogResourceRequest<Album>(
+                matching: \.id,
+                equalTo: album.id
+            )
 
-        recentlyPlayedAlbums.removeAll { $0.id == item.id }
-        recentlyPlayedAlbums.insert(item, at: 0)
+            request.properties = [.artists]
+            request.limit = 1
 
-        if recentlyPlayedAlbums.count > 40 {
-            recentlyPlayedAlbums = Array(recentlyPlayedAlbums.prefix(40))
+            guard let fullAlbum = try await request.response().items.first,
+                  let artist = fullAlbum.artists?.first else {
+                print("⚠️ Could not resolve artist for album: \(album.title)")
+                return
+            }
+
+            let item = RecentlyPlayedAlbumItem(
+                id: album.id.rawValue,
+                artistID: artist.id.rawValue,
+                title: album.title,
+                artistName: artist.name
+            )
+
+            recentlyPlayedAlbums.removeAll { $0.id == item.id }
+            recentlyPlayedAlbums.insert(item, at: 0)
+
+            if recentlyPlayedAlbums.count > maxRecentlyPlayed {
+                recentlyPlayedAlbums = Array(recentlyPlayedAlbums.prefix(maxRecentlyPlayed))
+            }
+
+            saveRecentlyPlayedAlbums()
+
+        } catch {
+            print("Failed to resolve artist for recently played album: \(error)")
         }
-
-        saveRecentlyPlayedAlbums()
     }
     
     private func saveRecentlyPlayedAlbums() {

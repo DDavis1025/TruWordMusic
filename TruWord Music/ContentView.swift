@@ -212,7 +212,15 @@ struct ContentView: View {
             
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
-                    Task { await checkAppleMusicStatus() }
+                    Task {
+                        await checkAppleMusicStatus()
+                    }
+                }
+            }
+
+            .onChange(of: playerManager.recentlyPlayedAlbums) { _, _ in
+                Task {
+                    await loadMoreByArtist()
                 }
             }
         }
@@ -306,7 +314,7 @@ struct ContentView: View {
 
                     if playerManager.recentlyPlayedAlbums.count > 10 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.gray)
                     }
 
@@ -359,7 +367,7 @@ struct ContentView: View {
 
                     if albums.count > 10 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.gray)
                     }
 
@@ -410,7 +418,7 @@ struct ContentView: View {
 
                     if songs.count > 7 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.gray)
                     }
 
@@ -473,7 +481,7 @@ struct ContentView: View {
 
                     if section.albums.count > 10 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.gray)
                     }
 
@@ -528,25 +536,31 @@ struct ContentView: View {
         }
     }
     
-    private func mostPlayedArtistName() -> String? {
-        let counts = Dictionary(
-            grouping: playerManager.recentlyPlayedAlbums,
-            by: { $0.artistName }
-        )
-        .mapValues(\.count)
+    private func mostPlayedArtistID() -> String? {
+        var counts: [String: Int] = [:]
+
+        for item in playerManager.recentlyPlayedAlbums {
+            guard let artistID = item.artistID else { continue }
+            counts[artistID, default: 0] += 1
+        }
 
         guard let highestCount = counts.values.max() else {
             return nil
         }
 
-        // Keep the most recently appearing artist when there is a tie.
-        return playerManager.recentlyPlayedAlbums.first {
-            counts[$0.artistName] == highestCount
-        }?.artistName
+        // Keep the most recently played artist when there's a tie.
+        for item in playerManager.recentlyPlayedAlbums {
+            if let artistID = item.artistID,
+               counts[artistID] == highestCount {
+                return artistID
+            }
+        }
+
+        return nil
     }
     
     private func loadMoreByArtist() async {
-        guard let artistName = mostPlayedArtistName() else {
+        guard let artistIDString = mostPlayedArtistID() else {
             await MainActor.run {
                 moreByArtistSection = nil
             }
@@ -554,36 +568,12 @@ struct ContentView: View {
         }
 
         do {
-            // Find a recently played album belonging to this artist.
-            guard let recentItem = playerManager.recentlyPlayedAlbums.first(
-                where: { $0.artistName == artistName }
-            ) else {
-                return
-            }
+            let artistID = MusicItemID(artistIDString)
 
-            let albumID = MusicItemID(recentItem.id)
-
-            // Resolve the album so we can get its artist.
-            var albumRequest = MusicCatalogResourceRequest<Album>(
-                matching: \.id,
-                equalTo: albumID
-            )
-
-            albumRequest.properties = [.artists]
-            albumRequest.limit = 1
-
-            let albumResponse = try await albumRequest.response()
-
-            guard let fullAlbum = albumResponse.items.first,
-                  let artists = fullAlbum.artists,
-                  let artist = artists.first else {
-                return
-            }
-
-            // Fetch the artist's albums.
+            // Resolve the actual artist directly by ID.
             var artistRequest = MusicCatalogResourceRequest<Artist>(
                 matching: \.id,
-                equalTo: artist.id
+                equalTo: artistID
             )
 
             artistRequest.properties = [.albums]
@@ -607,11 +597,10 @@ struct ContentView: View {
 
             await MainActor.run {
                 moreByArtistSection = MoreByArtistSection(
-                    artist: artist,
+                    artist: fullArtist,
                     albums: filteredAlbums
                 )
 
-                // Cache albums so tapping them works immediately.
                 for album in filteredAlbums {
                     albumCache[album.id] = album
                 }
