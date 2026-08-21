@@ -47,6 +47,8 @@ struct ContentView: View {
     // Songs & Albums
     @State private var songs: [Song] = []
     @State private var moreByArtistSection: MoreByArtistSection?
+    @State private var recommendedAlbums: [Album] = []
+    @State private var recommendedFromAlbum: Album?
     @Binding var albums: [Album]
     @Binding var albumCache: [MusicItemID: Album]
     
@@ -205,6 +207,7 @@ struct ContentView: View {
 
                     await loadRecentlyPlayedAlbumsIntoCache()
                     await loadMoreByArtist()
+                    await loadPersonalizedRecommendations()
                 }
 
                 isLoading = false
@@ -241,6 +244,7 @@ struct ContentView: View {
                         )
                         Spacer().frame(height: 20)
                         recentlyPlayedAlbums
+                        recommendedAlbumsSection
                         moreByArtistSectionView
                         albumsSection
                         songsSection
@@ -312,7 +316,7 @@ struct ContentView: View {
                     Text("Recently Played")
                         .font(.system(size: 18, weight: .bold))
 
-                    if playerManager.recentlyPlayedAlbums.count > 10 {
+                    if playerManager.recentlyPlayedAlbums.count >= 10 {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.gray)
@@ -365,7 +369,7 @@ struct ContentView: View {
                     Text("Top Christian Albums")
                         .font(.system(size: 18, weight: .bold))
 
-                    if albums.count > 10 {
+                    if albums.count >= 10 {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.gray)
@@ -479,7 +483,7 @@ struct ContentView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
 
-                    if section.albums.count > 10 {
+                    if section.albums.count >= 10 {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.gray)
@@ -615,6 +619,85 @@ struct ContentView: View {
         }
     }
     
+    @ViewBuilder
+    private var recommendedAlbumsSection: some View {
+        if !recommendedAlbums.isEmpty,
+           let sourceAlbum = recommendedFromAlbum {
+
+            VStack(alignment: .leading, spacing: 12) {
+
+                HStack(spacing: 4) {
+
+                    Text("You Might Also Like")
+                        .font(.system(size: 18, weight: .bold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    if recommendedAlbums.count >= 10 {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.gray)
+                    }
+
+                    Spacer()
+                }
+                .padding(.leading, 0)
+                .padding(.trailing, 5)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard recommendedAlbums.count >= 10 else { return }
+
+                    navigationPath.append(
+                        .artistAlbumGrid(
+                            title: "You Might Also Like",
+                            albums: recommendedAlbums,
+                            showAlbumYear: false,
+                            source: "you_might_also_like"
+                        )
+                    )
+
+                    Analytics.logEvent("recommended_albums_view_more", parameters: [
+                        "album_count": recommendedAlbums.count,
+                        "source_album_id": sourceAlbum.id.rawValue,
+                        "source_album_title": sourceAlbum.title
+                    ])
+                }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+
+                        ForEach(
+                            recommendedAlbums.prefix(10),
+                            id: \.id
+                        ) { album in
+
+                            AlbumCarouselItemView(
+                                album: album,
+                                showAlbumYear: false
+                            )
+                            .onTapGesture {
+                                albumCache[album.id] = album
+                                navigationPath.append(.album(album.id))
+
+                                Analytics.logEvent(
+                                    "recommended_album_opened_home",
+                                    parameters: [
+                                        "album_id": album.id.rawValue,
+                                        "album_title": album.title,
+                                        "source_album_id": sourceAlbum.id.rawValue,
+                                        "source_album_title": sourceAlbum.title
+                                    ]
+                                )
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.bottom, 14)
+        }
+    }
+    
     // MARK: - MusicKit
     
     private func requestMusicAuthorization() async {
@@ -731,6 +814,51 @@ struct ContentView: View {
             } catch {
                 print("Failed to load album \(item.id): \(error)")
             }
+        }
+    }
+    
+    private func loadPersonalizedRecommendations() async {
+        guard let albumID = playerManager.mostPlayedAlbumID() else {
+            await MainActor.run {
+                recommendedAlbums = []
+                recommendedFromAlbum = nil
+            }
+            return
+        }
+
+        do {
+            var request = MusicCatalogResourceRequest<Album>(
+                matching: \.id,
+                equalTo: albumID
+            )
+
+            request.properties = [.relatedAlbums]
+            request.limit = 1
+
+            let response = try await request.response()
+
+            guard let album = response.items.first,
+                  let relatedAlbums = album.relatedAlbums else {
+                return
+            }
+
+            let filtered = relatedAlbums.filter { album in
+                let isChristian =
+                    album.genreNames.contains("Christian") ||
+                    album.genreNames.contains("Christian & Gospel")
+
+                let isNotExplicit = album.contentRating != .explicit
+
+                return isChristian && isNotExplicit
+            }
+
+            await MainActor.run {
+                recommendedFromAlbum = album
+                recommendedAlbums = filtered
+            }
+
+        } catch {
+            print("Failed to load personalized recommendations: \(error)")
         }
     }
 }

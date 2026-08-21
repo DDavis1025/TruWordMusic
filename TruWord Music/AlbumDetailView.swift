@@ -225,54 +225,11 @@ struct AlbumDetailView: View {
                         Section {
                             VStack(alignment: .leading, spacing: 12) {
 
-                                HStack {
+                                HStack(spacing: 4) {
                                     Text("Related Albums")
                                         .font(.system(size: 20, weight: .bold))
-                                    Spacer()
-                                }
-                                .padding(.leading, 10)
 
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 16) {
-
-                                        ForEach(relatedAlbums, id: \.id) { album in
-                                            AlbumCarouselItemView(album: album)
-                                                .onTapGesture {
-                                                    albumCache[album.id] = album   // 🔥 ADD THIS
-
-                                                    navigationPath.append(.album(album.id))
-
-                                                    Analytics.logEvent("related_album_opened", parameters: [
-                                                        "album_id": album.id.rawValue,
-                                                        "album_title": album.title
-                                                    ])
-                                                }
-                                        }
-                                    }
-                                    .padding(.leading, 8)
-                                    .padding(.trailing, 16)
-                                }
-                            }
-                            .padding(.bottom, 20)
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                        }
-                    }
-                    if let artist = moreByArtist,
-                       !moreByAlbums.isEmpty {
-
-                        Section {
-
-                            VStack(alignment: .leading, spacing: 12) {
-                                
-                                HStack(spacing: 4) {
-
-                                    Text("More By \(artist.name)")
-                                        .font(.system(size: 20, weight: .bold))
-                                        .lineLimit(1)
-                                        .truncationMode(.tail)
-
-                                    if moreByAlbums.count > 10 {
+                                    if relatedAlbums.count >= 10 {
                                         Image(systemName: "chevron.right")
                                             .font(.system(size: 20, weight: .semibold))
                                             .foregroundStyle(.gray)
@@ -284,34 +241,125 @@ struct AlbumDetailView: View {
                                 .padding(.trailing, 5)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
+                                    guard relatedAlbums.count >= 10 else { return }
+
+                                    navigationPath.append(
+                                        .artistAlbumGrid(
+                                            title: "Related Albums",
+                                            albums: relatedAlbums,
+                                            showAlbumYear: false,
+                                            source: "related_albums"
+                                        )
+                                    )
+
+                                    Analytics.logEvent("related_albums_view_more", parameters: [
+                                        "album_count": relatedAlbums.count
+                                    ])
+                                }
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 16) {
+
+                                        ForEach(
+                                            relatedAlbums.prefix(10),
+                                            id: \.id
+                                        ) { album in
+
+                                            AlbumCarouselItemView(
+                                                album: album,
+                                                showAlbumYear: false
+                                            )
+                                            .onTapGesture {
+                                                albumCache[album.id] = album
+
+                                                navigationPath.append(.album(album.id))
+
+                                                Analytics.logEvent("related_album_opened", parameters: [
+                                                    "album_id": album.id.rawValue,
+                                                    "album_title": album.title
+                                                ])
+                                            }
+                                        }
+                                    }
+                                    .padding(.leading, 8)
+                                    .padding(.trailing, 16)
+                                }
+                            }
+                            .padding(.bottom, 20)
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                        }
+                    }
+
+                    if let artist = moreByArtist,
+                       !moreByAlbums.isEmpty {
+
+                        Section {
+
+                            VStack(alignment: .leading, spacing: 12) {
+
+                                HStack(spacing: 4) {
+
+                                    Text("More By \(artist.name)")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+
+                                    if moreByAlbums.count >= 10 {
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 20, weight: .semibold))
+                                            .foregroundStyle(.gray)
+                                    }
+
+                                    Spacer()
+                                }
+                                .padding(.leading, 10)
+                                .padding(.trailing, 5)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    guard moreByAlbums.count >= 10 else { return }
+
                                     navigationPath.append(
                                         .artistAlbumGrid(
                                             title: artist.name,
                                             albums: moreByAlbums,
                                             showAlbumYear: true,
                                             source: "more_by_artist"
-                                            
                                         )
                                     )
+
+                                    Analytics.logEvent("more_by_artist_view_more", parameters: [
+                                        "artist_id": artist.id.rawValue,
+                                        "artist_name": artist.name,
+                                        "album_count": moreByAlbums.count
+                                    ])
                                 }
 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 16) {
 
-                                        ForEach(moreByAlbums.prefix(10), id: \.id) { album in
-                                            AlbumCarouselItemView(album: album, showAlbumYear: true)
-                                                .onTapGesture {
-                                                    albumCache[album.id] = album
-                                                    navigationPath.append(.album(album.id))
-                                                    
-                                                    Analytics.logEvent("more_by_album_opened", parameters: [
-                                                        "album_id": album.id.rawValue,
-                                                        "album_title": album.title,
-                                                        "artist_id": artist.id.rawValue,
-                                                        "artist_name": artist.name,
-                                                        "source": "album_detail_view"
-                                                    ])
-                                                }
+                                        ForEach(
+                                            moreByAlbums.prefix(10),
+                                            id: \.id
+                                        ) { album in
+
+                                            AlbumCarouselItemView(
+                                                album: album,
+                                                showAlbumYear: true
+                                            )
+                                            .onTapGesture {
+                                                albumCache[album.id] = album
+
+                                                navigationPath.append(.album(album.id))
+
+                                                Analytics.logEvent("more_by_album_opened", parameters: [
+                                                    "album_id": album.id.rawValue,
+                                                    "album_title": album.title,
+                                                    "artist_id": artist.id.rawValue,
+                                                    "artist_name": artist.name,
+                                                    "source": "album_detail_view"
+                                                ])
+                                            }
                                         }
                                     }
                                     .padding(.leading, 8)

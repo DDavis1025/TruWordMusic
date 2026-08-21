@@ -54,6 +54,7 @@ class PlayerManager: ObservableObject {
     @Published var playbackTime: TimeInterval = 0
     @Published var trackDuration: TimeInterval = 0
     @Published var userSkippedSong: Bool = false
+    @Published var albumPlayCounts: [String: Int] = [:]
     
     @Published var repeatMode: RepeatMode = .off {
         didSet {
@@ -74,6 +75,7 @@ class PlayerManager: ObservableObject {
     
     private let recentlyPlayedKey = "recentlyPlayedAlbums"
     private let maxRecentlyPlayed = 40
+    private let albumPlayCountsKey = "albumPlayCounts"
     
     private weak var favoritesManager: FavoritesManager?
     
@@ -89,6 +91,7 @@ class PlayerManager: ObservableObject {
         applySavedRepeatMode()
         
         loadRecentlyPlayedAlbums()
+        loadAlbumPlayCounts()
         
         NotificationCenter.default.addObserver(
             self,
@@ -413,6 +416,10 @@ class PlayerManager: ObservableObject {
                 audioPlayer.play()
                 ReviewManager.recordSongPlayed()
                 
+                Task { @MainActor in
+                        await self.recordAlbumPlay(for: song)
+                    }
+                
                 Analytics.logEvent("song_started", parameters: [
                     "song_id": song.id.rawValue,
                     "subscription": false
@@ -648,6 +655,10 @@ class PlayerManager: ObservableObject {
             if forcePlay {
                 try await player.play()
                 ReviewManager.recordSongPlayed()
+                
+                if let currentSong = currentlyPlayingSong {
+                        await recordAlbumPlay(for: currentSong)
+                    }
             }
             
         } catch {
@@ -770,6 +781,9 @@ class PlayerManager: ObservableObject {
                             previousSong = matchedSong
                             currentlyPlayingSong = matchedSong
                             isPlaying = true
+
+                            // The Apple Music player has actually advanced to this song.
+                            await recordAlbumPlay(for: matchedSong)
                         }
                     default:
                         break
@@ -990,6 +1004,58 @@ class PlayerManager: ObservableObject {
                     self.trackDuration = audioPlayer.currentItem?.duration.seconds ?? 30
                 }
             }
+        }
+    }
+    
+    private func loadAlbumPlayCounts() {
+        guard let data = UserDefaults.standard.data(forKey: albumPlayCountsKey),
+              let decoded = try? JSONDecoder().decode([String: Int].self, from: data)
+        else { return }
+
+        albumPlayCounts = decoded
+    }
+    
+    private func saveAlbumPlayCounts() {
+        guard let data = try? JSONEncoder().encode(albumPlayCounts) else { return }
+        UserDefaults.standard.set(data, forKey: albumPlayCountsKey)
+    }
+    
+    func mostPlayedAlbumID() -> MusicItemID? {
+        guard let id = albumPlayCounts.max(by: { $0.value < $1.value })?.key else {
+            return nil
+        }
+
+        return MusicItemID(id)
+    }
+    
+    private func recordAlbumPlay(for song: Song) async {
+        do {
+            var request = MusicCatalogResourceRequest<Song>(
+                matching: \.id,
+                equalTo: song.id
+            )
+
+            request.properties = [.albums]
+            request.limit = 1
+
+            let response = try await request.response()
+
+            guard let fullSong = response.items.first,
+                  let albums = fullSong.albums,
+                  let album = albums.first else {
+                print("⚠️ Could not find album for \(song.title)")
+                return
+            }
+
+            let albumID = album.id.rawValue
+
+            albumPlayCounts[albumID, default: 0] += 1
+            saveAlbumPlayCounts()
+
+            print("recordAlbumPlay: \(album.title) → \(albumPlayCounts[albumID] ?? 0)")
+            
+        } catch {
+            print("❌ Failed to find album for \(song.title): \(error)")
         }
     }
 }
