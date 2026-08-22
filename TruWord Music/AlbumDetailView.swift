@@ -285,7 +285,7 @@ struct AlbumDetailView: View {
                                     .padding(.trailing, 16)
                                 }
                             }
-                            .padding(.bottom, 20)
+                            .padding(.bottom, 29)
                             .listRowInsets(EdgeInsets())
                             .listRowSeparator(.hidden)
                         }
@@ -366,7 +366,7 @@ struct AlbumDetailView: View {
                                     .padding(.trailing, 16)
                                 }
                             }
-                            .padding(.bottom, 20)
+                            .padding(.bottom, 29)
                             .listRowInsets(EdgeInsets())
                             .listRowSeparator(.hidden)
                         }

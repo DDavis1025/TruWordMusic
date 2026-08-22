@@ -354,7 +354,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
             }
-            .padding(.bottom, 14)
+            .padding(.bottom, 30)
         }
     }
     
@@ -405,7 +405,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
             }
-                .padding(.bottom, 14)
+                .padding(.bottom, 30)
         )
     }
     
@@ -536,7 +536,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
             }
-            .padding(.bottom, 14)
+            .padding(.bottom, 30)
         }
     }
     
@@ -694,7 +694,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
             }
-            .padding(.bottom, 14)
+            .padding(.bottom, 30)
         }
     }
     
@@ -818,7 +818,12 @@ struct ContentView: View {
     }
     
     private func loadPersonalizedRecommendations() async {
-        guard let albumID = playerManager.mostPlayedAlbumID() else {
+        // Sort all played albums from most played → least played.
+        let rankedAlbumIDs = playerManager.albumPlayCounts
+            .sorted { $0.value > $1.value }
+            .map { $0.key }
+
+        guard !rankedAlbumIDs.isEmpty else {
             await MainActor.run {
                 recommendedAlbums = []
                 recommendedFromAlbum = nil
@@ -826,39 +831,69 @@ struct ContentView: View {
             return
         }
 
-        do {
-            var request = MusicCatalogResourceRequest<Album>(
-                matching: \.id,
-                equalTo: albumID
-            )
+        // Try each album in play-count order until we find
+        // one with valid related albums.
+        for albumIDString in rankedAlbumIDs {
+            do {
+                let albumID = MusicItemID(albumIDString)
 
-            request.properties = [.relatedAlbums]
-            request.limit = 1
+                var request = MusicCatalogResourceRequest<Album>(
+                    matching: \.id,
+                    equalTo: albumID
+                )
 
-            let response = try await request.response()
+                request.properties = [.relatedAlbums]
+                request.limit = 1
 
-            guard let album = response.items.first,
-                  let relatedAlbums = album.relatedAlbums else {
-                return
+                let response = try await request.response()
+
+                guard let album = response.items.first else {
+                    continue
+                }
+
+                let filtered = (album.relatedAlbums ?? []).filter { album in
+                    let isChristian =
+                        album.genreNames.contains("Christian") ||
+                        album.genreNames.contains("Christian & Gospel")
+
+                    let isNotExplicit = album.contentRating != .explicit
+
+                    return isChristian && isNotExplicit
+                }
+
+                // If this album has valid recommendations, use them.
+                if !filtered.isEmpty {
+                    await MainActor.run {
+                        recommendedFromAlbum = album
+                        recommendedAlbums = filtered
+
+                        // Cache them for navigation.
+                        for album in filtered {
+                            albumCache[album.id] = album
+                        }
+                    }
+
+                    print("You Might Also Like source: \(album.title)")
+                    print("Recommendations found: \(filtered.count)")
+
+                    return
+                }
+
+                // Otherwise, continue to the next most-played album.
+                print("No recommendations for: \(album.title)")
+
+            } catch {
+                print("Failed to load recommendations for album \(albumIDString): \(error)")
+                continue
             }
-
-            let filtered = relatedAlbums.filter { album in
-                let isChristian =
-                    album.genreNames.contains("Christian") ||
-                    album.genreNames.contains("Christian & Gospel")
-
-                let isNotExplicit = album.contentRating != .explicit
-
-                return isChristian && isNotExplicit
-            }
-
-            await MainActor.run {
-                recommendedFromAlbum = album
-                recommendedAlbums = filtered
-            }
-
-        } catch {
-            print("Failed to load personalized recommendations: \(error)")
         }
+
+        // None of the played albums had recommendations.
+        await MainActor.run {
+            recommendedAlbums = []
+            recommendedFromAlbum = nil
+        }
+
+        print("No recommendations found for any played album.")
     }
 }
