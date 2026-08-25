@@ -354,7 +354,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
             }
-            .padding(.bottom, 30)
+            .padding(.bottom, 25)
         }
     }
     
@@ -405,7 +405,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
             }
-                .padding(.bottom, 30)
+                .padding(.bottom, 25)
         )
     }
     
@@ -536,7 +536,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
             }
-            .padding(.bottom, 30)
+            .padding(.bottom, 25)
         }
     }
     
@@ -694,7 +694,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
             }
-            .padding(.bottom, 30)
+            .padding(.bottom, 25)
         }
     }
     
