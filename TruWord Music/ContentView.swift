@@ -221,7 +221,7 @@ struct ContentView: View {
                 }
             }
 
-            .onChange(of: playerManager.recentlyPlayedAlbums) { _, _ in
+            .onChange(of: playerManager.artistPlayCounts) { _, _ in
                 Task {
                     await loadMoreByArtist()
                 }
@@ -541,26 +541,9 @@ struct ContentView: View {
     }
     
     private func mostPlayedArtistID() -> String? {
-        var counts: [String: Int] = [:]
-
-        for item in playerManager.recentlyPlayedAlbums {
-            guard let artistID = item.artistID else { continue }
-            counts[artistID, default: 0] += 1
-        }
-
-        guard let highestCount = counts.values.max() else {
-            return nil
-        }
-
-        // Keep the most recently played artist when there's a tie.
-        for item in playerManager.recentlyPlayedAlbums {
-            if let artistID = item.artistID,
-               counts[artistID] == highestCount {
-                return artistID
-            }
-        }
-
-        return nil
+        playerManager.artistPlayCounts.max {
+            $0.value < $1.value
+        }?.key
     }
     
     private func loadMoreByArtist() async {

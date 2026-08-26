@@ -55,6 +55,7 @@ class PlayerManager: ObservableObject {
     @Published var trackDuration: TimeInterval = 0
     @Published var userSkippedSong: Bool = false
     @Published var albumPlayCounts: [String: Int] = [:]
+    @Published var artistPlayCounts: [String: Int] = [:]
     
     @Published var repeatMode: RepeatMode = .off {
         didSet {
@@ -72,10 +73,16 @@ class PlayerManager: ObservableObject {
     private var queueWasExplicitlySet = false
     private var didAutoAdvance = false
     private var didLogSongCompleted = false
+    private var subscriptionPlayedSeconds: TimeInterval = 0
+    private var subscriptionTrackingSongID: MusicItemID?
+    private var subscriptionTrackingLastDate: Date?
+    private var didRecordSubscription30Seconds = false
+    private var subscriptionHasProgressedInCurrentPlayback = false
     
     private let recentlyPlayedKey = "recentlyPlayedAlbums"
     private let maxRecentlyPlayed = 40
     private let albumPlayCountsKey = "albumPlayCounts"
+    private let artistPlayCountsKey = "artistPlayCounts"
     
     private weak var favoritesManager: FavoritesManager?
     
@@ -92,6 +99,7 @@ class PlayerManager: ObservableObject {
         
         loadRecentlyPlayedAlbums()
         loadAlbumPlayCounts()
+        loadArtistPlayCounts()
         
         NotificationCenter.default.addObserver(
             self,
@@ -247,6 +255,7 @@ class PlayerManager: ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         
         previewDidEnd = false
+        didLogSongCompleted = false
         
         guard let currentSong = currentlyPlayingSong else { return }
         
@@ -416,10 +425,6 @@ class PlayerManager: ObservableObject {
                 audioPlayer.play()
                 ReviewManager.recordSongPlayed()
                 
-                Task { @MainActor in
-                        await self.recordAlbumPlay(for: song)
-                    }
-                
                 Analytics.logEvent("song_started", parameters: [
                     "song_id": song.id.rawValue,
                     "subscription": false
@@ -446,6 +451,7 @@ class PlayerManager: ObservableObject {
             guard networkMonitor.isConnected else {
                 isPlaying = false
                 player.seek(to: .zero)
+                didLogSongCompleted = false
                 return
             }
             
@@ -458,8 +464,12 @@ class PlayerManager: ObservableObject {
             previewDidEnd = true
             
             if !didLogSongCompleted {
-
+                
                 didLogSongCompleted = true
+                
+                Task { @MainActor in
+                        await self.recordAlbumPlay(for: currentSong)
+                    }
 
                 Analytics.logEvent("song_completed", parameters: [
                     "song_id": currentlyPlayingSong?.id.rawValue ?? "",
@@ -529,11 +539,13 @@ class PlayerManager: ObservableObject {
                     } else {
                         isPlaying = false
                         player.seek(to: .zero)
+                        didLogSongCompleted = false
                     }
 
                 } else {
                     isPlaying = false
                     player.seek(to: .zero)
+                    didLogSongCompleted = false
                 }
             }
         }
@@ -655,10 +667,6 @@ class PlayerManager: ObservableObject {
             if forcePlay {
                 try await player.play()
                 ReviewManager.recordSongPlayed()
-                
-                if let currentSong = currentlyPlayingSong {
-                        await recordAlbumPlay(for: currentSong)
-                    }
             }
             
         } catch {
@@ -714,6 +722,8 @@ class PlayerManager: ObservableObject {
             while true {
                 if Task.isCancelled { break }
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
+                
+                await trackSubscriptionPlayback()
 
                 // MARK: - END DETECTION (Apple Music fix)
                 let currentTime = player.playbackTime
@@ -725,11 +735,10 @@ class PlayerManager: ObservableObject {
                     let didRestart = currentTime < previousTime
 
                     if didRestart && !didFireEndForCurrentSong {
-
+                        
                         didFireEndForCurrentSong = true
 
                         let wasSkip = userSkippedSong
-
                         userSkippedSong = false
 
                         if !wasSkip {
@@ -781,9 +790,6 @@ class PlayerManager: ObservableObject {
                             previousSong = matchedSong
                             currentlyPlayingSong = matchedSong
                             isPlaying = true
-
-                            // The Apple Music player has actually advanced to this song.
-                            await recordAlbumPlay(for: matchedSong)
                         }
                     default:
                         break
@@ -1035,7 +1041,7 @@ class PlayerManager: ObservableObject {
                 equalTo: song.id
             )
 
-            request.properties = [.albums]
+            request.properties = [.albums, .artists]
             request.limit = 1
 
             let response = try await request.response()
@@ -1049,13 +1055,125 @@ class PlayerManager: ObservableObject {
 
             let albumID = album.id.rawValue
 
+            // Record album play
             albumPlayCounts[albumID, default: 0] += 1
             saveAlbumPlayCounts()
 
-            print("recordAlbumPlay: \(album.title) → \(albumPlayCounts[albumID] ?? 0)")
+            // Record artist play
+            if let artist = fullSong.artists?.first {
+                let artistID = artist.id.rawValue
+
+                artistPlayCounts[artistID, default: 0] += 1
+                saveArtistPlayCounts()
+
+                print("recordAlbumPlay: \(album.title) → album plays: \(albumPlayCounts[albumID] ?? 0)")
+                print("Artist play: \(artist.name) → \(artistPlayCounts[artistID] ?? 0)")
+            }
             
         } catch {
             print("❌ Failed to find album for \(song.title): \(error)")
         }
+    }
+    
+    @MainActor
+    private func trackSubscriptionPlayback() async {
+        guard appleMusicSubscription else { return }
+
+        let player = ApplicationMusicPlayer.shared
+
+        guard let currentEntry = player.queue.currentEntry else {
+            subscriptionTrackingLastDate = nil
+            return
+        }
+
+        guard case .song(let song) = currentEntry.item else {
+            subscriptionTrackingLastDate = nil
+            return
+        }
+
+        let currentTime = player.playbackTime
+        let duration = song.duration ?? currentlyPlayingSong?.duration ?? 0
+
+        // MARK: - New song
+        if subscriptionTrackingSongID != song.id {
+            subscriptionTrackingSongID = song.id
+            subscriptionPlayedSeconds = 0
+            subscriptionTrackingLastDate = nil
+            didRecordSubscription30Seconds = false
+            subscriptionHasProgressedInCurrentPlayback = false
+        }
+
+        // MARK: - Detect Repeat One restart
+        //
+        // The same queue entry remains current when Repeat One
+        // repeats, so the song ID doesn't change.
+        //
+        // We detect that playback reached the end and then returned
+        // to the beginning.
+        if repeatMode == .one,
+           duration > 0,
+           subscriptionHasProgressedInCurrentPlayback,
+           currentTime < 3.0,
+           subscriptionTrackingLastDate != nil {
+
+            subscriptionPlayedSeconds = 0
+            subscriptionTrackingLastDate = nil
+            didRecordSubscription30Seconds = false
+            subscriptionHasProgressedInCurrentPlayback = false
+
+            print("🔄 Repeat One detected — resetting 30-second tracking for \(song.title)")
+        }
+
+        // Mark that this playback cycle has progressed.
+        if currentTime > 3.0 {
+            subscriptionHasProgressedInCurrentPlayback = true
+        }
+
+        // Only count actual playing time.
+        guard player.state.playbackStatus == .playing else {
+            subscriptionTrackingLastDate = nil
+            return
+        }
+
+        let now = Date()
+
+        if let lastDate = subscriptionTrackingLastDate {
+            let elapsed = now.timeIntervalSince(lastDate)
+
+            if elapsed <= 2.0 {
+                subscriptionPlayedSeconds += elapsed
+            }
+        }
+
+        subscriptionTrackingLastDate = now
+
+        // MARK: - 30 seconds reached
+        if subscriptionPlayedSeconds >= 30,
+           !didRecordSubscription30Seconds {
+
+            didRecordSubscription30Seconds = true
+
+            await recordAlbumPlay(for: song)
+
+            Analytics.logEvent("song_30_seconds_played", parameters: [
+                "song_id": song.id.rawValue,
+                "subscription": true
+            ])
+
+            print("✅ Subscription: 30 seconds played for \(song.title)")
+        }
+    }
+    
+    private func saveArtistPlayCounts() {
+        guard let data = try? JSONEncoder().encode(artistPlayCounts) else { return }
+        UserDefaults.standard.set(data, forKey: artistPlayCountsKey)
+    }
+
+    private func loadArtistPlayCounts() {
+        guard let data = UserDefaults.standard.data(forKey: artistPlayCountsKey),
+              let decoded = try? JSONDecoder().decode([String: Int].self, from: data)
+        else { return }
+
+        artistPlayCounts = decoded
     }
 }
