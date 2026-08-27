@@ -318,7 +318,7 @@ struct ContentView: View {
 
                     if playerManager.recentlyPlayedAlbums.count >= 10 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 20, weight: .bold))
                             .foregroundStyle(.gray)
                     }
 
@@ -371,7 +371,7 @@ struct ContentView: View {
 
                     if albums.count >= 10 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 20, weight: .bold))
                             .foregroundStyle(.gray)
                     }
 
@@ -422,7 +422,7 @@ struct ContentView: View {
 
                     if songs.count > 7 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 20, weight: .bold))
                             .foregroundStyle(.gray)
                     }
 
@@ -485,7 +485,7 @@ struct ContentView: View {
 
                     if section.albums.count >= 10 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 20, weight: .bold))
                             .foregroundStyle(.gray)
                     }
 
@@ -618,7 +618,7 @@ struct ContentView: View {
 
                     if recommendedAlbums.count >= 10 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 20, weight: .bold))
                             .foregroundStyle(.gray)
                     }
 

@@ -231,7 +231,7 @@ struct AlbumDetailView: View {
 
                                     if relatedAlbums.count >= 10 {
                                         Image(systemName: "chevron.right")
-                                            .font(.system(size: 20, weight: .semibold))
+                                            .font(.system(size: 20, weight: .bold))
                                             .foregroundStyle(.gray)
                                     }
 
@@ -285,7 +285,7 @@ struct AlbumDetailView: View {
                                     .padding(.trailing, 16)
                                 }
                             }
-                            .padding(.bottom, 29)
+                            .padding(.bottom, 30)
                             .listRowInsets(EdgeInsets())
                             .listRowSeparator(.hidden)
                         }
@@ -307,7 +307,7 @@ struct AlbumDetailView: View {
 
                                     if moreByAlbums.count >= 10 {
                                         Image(systemName: "chevron.right")
-                                            .font(.system(size: 20, weight: .semibold))
+                                            .font(.system(size: 20, weight: .bold))
                                             .foregroundStyle(.gray)
                                     }
 
@@ -366,7 +366,7 @@ struct AlbumDetailView: View {
                                     .padding(.trailing, 16)
                                 }
                             }
-                            .padding(.bottom, 29)
+                            .padding(.bottom, 30)
                             .listRowInsets(EdgeInsets())
                             .listRowSeparator(.hidden)
                         }

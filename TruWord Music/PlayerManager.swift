@@ -257,6 +257,13 @@ class PlayerManager: ObservableObject {
         previewDidEnd = false
         didLogSongCompleted = false
         
+        // Reset subscription tracking for a new subscription playback session.
+        subscriptionTrackingSongID = nil
+        subscriptionPlayedSeconds = 0
+        subscriptionTrackingLastDate = nil
+        didRecordSubscription30Seconds = false
+        subscriptionHasProgressedInCurrentPlayback = false
+        
         guard let currentSong = currentlyPlayingSong else { return }
         
         Task { @MainActor in
@@ -306,6 +313,7 @@ class PlayerManager: ObservableObject {
         playFromAlbum: Bool
     ) {
         let player = ApplicationMusicPlayer.shared
+        
         let queueSongs: [Song]
         
         if let albumWithTracks,
@@ -367,188 +375,188 @@ class PlayerManager: ObservableObject {
     }
     
     func playWithPreview(
-            _ song: Song,
-            songs: [Song],
-            albumWithTracks: AlbumWithTracks?,
-            networkMonitor: NetworkMonitor?
-        ) {
-            guard let previewURL = song.previewAssets?.first?.url else {
-                print("No preview available for song: \(song.title)")
-                clearApplicationMusicPlayer()
-                return
-            }
-            
-            didLogSongCompleted = false
-            
-            previewDidEnd = false
-            audioPlayer?.pause()
-            
-            self.lastPlayedSongs = songs
-            self.lastPlayFromAlbum = albumWithTracks?.tracks.contains(song) == true
-            self.lastAlbumWithTracks = albumWithTracks
-            
-            if let currentItem = audioPlayer?.currentItem {
-                NotificationCenter.default.removeObserver(
-                    self,
-                    name: .AVPlayerItemDidPlayToEndTime,
-                    object: currentItem
-                )
-            }
-            
-            do {
-                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-                try AVAudioSession.sharedInstance().setActive(true)
-            } catch {
-                print("Failed to activate audio session:", error)
-            }
-            
-            audioPlayer = AVPlayer(url: previewURL)
-            guard let audioPlayer = audioPlayer else {
-                print("Error: AVPlayer failed to initialize.")
-                return
-            }
-            
-            if let playerItem = audioPlayer.currentItem {
-                NotificationCenter.default.addObserver(
-                    forName: .AVPlayerItemDidPlayToEndTime,
-                    object: playerItem,
-                    queue: .main
-                ) { [weak self] _ in
-                    guard let self else { return }
-                    Task { @MainActor in
-                        self.previewDidEnd(player: audioPlayer)
-                    }
-                }
-            }
-            
-            DispatchQueue.main.async {
-                audioPlayer.play()
-                ReviewManager.recordSongPlayed()
-                
-                Analytics.logEvent("song_started", parameters: [
-                    "song_id": song.id.rawValue,
-                    "subscription": false
-                ])
-            }
-            
-            startPlaybackTimer()
-            
-            Task { @MainActor in
-                self.currentlyPlayingSong = song
-                self.isPlaying = true
-                
-                if let albumWithTracks {
-                    Task {
-                        await addRecentlyPlayedAlbum(albumWithTracks.album)
-                    }
-                }
-            }
-            
+        _ song: Song,
+        songs: [Song],
+        albumWithTracks: AlbumWithTracks?,
+        networkMonitor: NetworkMonitor?
+    ) {
+        guard let previewURL = song.previewAssets?.first?.url else {
+            print("No preview available for song: \(song.title)")
             clearApplicationMusicPlayer()
+            return
         }
+        
+        didLogSongCompleted = false
+        
+        previewDidEnd = false
+        audioPlayer?.pause()
+        
+        self.lastPlayedSongs = songs
+        self.lastPlayFromAlbum = albumWithTracks?.tracks.contains(song) == true
+        self.lastAlbumWithTracks = albumWithTracks
+        
+        if let currentItem = audioPlayer?.currentItem {
+            NotificationCenter.default.removeObserver(
+                self,
+                name: .AVPlayerItemDidPlayToEndTime,
+                object: currentItem
+            )
+        }
+        
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("Failed to activate audio session:", error)
+        }
+        
+        audioPlayer = AVPlayer(url: previewURL)
+        guard let audioPlayer = audioPlayer else {
+            print("Error: AVPlayer failed to initialize.")
+            return
+        }
+        
+        if let playerItem = audioPlayer.currentItem {
+            NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: playerItem,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self else { return }
+                Task { @MainActor in
+                    self.previewDidEnd(player: audioPlayer)
+                }
+            }
+        }
+        
+        DispatchQueue.main.async {
+            audioPlayer.play()
+            ReviewManager.recordSongPlayed()
+            
+            Analytics.logEvent("song_started", parameters: [
+                "song_id": song.id.rawValue,
+                "subscription": false
+            ])
+        }
+        
+        startPlaybackTimer()
+        
+        Task { @MainActor in
+            self.currentlyPlayingSong = song
+            self.isPlaying = true
+            
+            if let albumWithTracks {
+                Task {
+                    await addRecentlyPlayedAlbum(albumWithTracks.album)
+                }
+            }
+        }
+        
+        clearApplicationMusicPlayer()
+    }
     
     private func previewDidEnd(player: AVPlayer) {
-            guard networkMonitor.isConnected else {
-                isPlaying = false
-                player.seek(to: .zero)
-                didLogSongCompleted = false
-                return
+        guard networkMonitor.isConnected else {
+            isPlaying = false
+            player.seek(to: .zero)
+            didLogSongCompleted = false
+            return
+        }
+        
+        if ReviewManager.shouldShowReviewPrompt() {
+            ReviewManager.requestReview()
+        }
+        
+        guard let currentSong = currentlyPlayingSong else { return }
+        
+        previewDidEnd = true
+        
+        if !didLogSongCompleted {
+            
+            didLogSongCompleted = true
+            
+            Task { @MainActor in
+                await self.recordAlbumPlay(for: currentSong)
             }
             
-            if ReviewManager.shouldShowReviewPrompt() {
-                ReviewManager.requestReview()
+            Analytics.logEvent("song_completed", parameters: [
+                "song_id": currentlyPlayingSong?.id.rawValue ?? "",
+                "subscription": false
+            ])
+        }
+        
+        // ✅ Determine correct list (album OR last played list like favorites)
+        let currentList: [Song] = {
+            if isPlayingFromAlbum,
+               let albumWithTracks,
+               albumWithTracks.tracks.contains(currentSong) {
+                return albumWithTracks.tracks
+            } else {
+                return lastPlayedSongs
             }
+        }()
+        
+        if repeatMode == .one {
+            playSong(
+                currentSong,
+                from: currentList,
+                albumWithTracks: isPlayingFromAlbum ? albumWithTracks : nil,
+                playFromAlbum: isPlayingFromAlbum
+            )
+            return
+        }
+        
+        // ✅ Find next playable song
+        var nextSong: Song? = nil
+        
+        if let currentIndex = currentList.firstIndex(of: currentSong),
+           currentIndex < currentList.count - 1 {
             
-            guard let currentSong = currentlyPlayingSong else { return }
+            let remainingSongs = currentList[(currentIndex + 1)...]
             
-            previewDidEnd = true
-            
-            if !didLogSongCompleted {
-                
-                didLogSongCompleted = true
-                
-                Task { @MainActor in
-                        await self.recordAlbumPlay(for: currentSong)
-                    }
-
-                Analytics.logEvent("song_completed", parameters: [
-                    "song_id": currentlyPlayingSong?.id.rawValue ?? "",
-                    "subscription": false
-                ])
+            nextSong = remainingSongs.first {
+                ($0.releaseDate == nil || $0.releaseDate! <= Date())
+                && $0.playParameters != nil
             }
+        }
+        
+        // ✅ Play next or stop
+        if let nextSongToPlay = nextSong {
+            playSong(
+                nextSongToPlay,
+                from: currentList,
+                albumWithTracks: isPlayingFromAlbum ? albumWithTracks : nil,
+                playFromAlbum: isPlayingFromAlbum
+            )
+        } else {
             
-            // ✅ Determine correct list (album OR last played list like favorites)
-            let currentList: [Song] = {
-                if isPlayingFromAlbum,
-                   let albumWithTracks,
-                   albumWithTracks.tracks.contains(currentSong) {
-                    return albumWithTracks.tracks
-                } else {
-                    return lastPlayedSongs
-                }
-            }()
-            
-            if repeatMode == .one {
-                playSong(
-                    currentSong,
-                    from: currentList,
-                    albumWithTracks: isPlayingFromAlbum ? albumWithTracks : nil,
-                    playFromAlbum: isPlayingFromAlbum
-                )
-                return
-            }
-            
-            // ✅ Find next playable song
-            var nextSong: Song? = nil
-            
-            if let currentIndex = currentList.firstIndex(of: currentSong),
-               currentIndex < currentList.count - 1 {
+            if repeatMode == .all {
                 
-                let remainingSongs = currentList[(currentIndex + 1)...]
-                
-                nextSong = remainingSongs.first {
+                if let firstPlayableSong = currentList.first(where: {
                     ($0.releaseDate == nil || $0.releaseDate! <= Date())
                     && $0.playParameters != nil
-                }
-            }
-            
-            // ✅ Play next or stop
-            if let nextSongToPlay = nextSong {
-                playSong(
-                    nextSongToPlay,
-                    from: currentList,
-                    albumWithTracks: isPlayingFromAlbum ? albumWithTracks : nil,
-                    playFromAlbum: isPlayingFromAlbum
-                )
-            } else {
-                
-                if repeatMode == .all {
-
-                    if let firstPlayableSong = currentList.first(where: {
-                        ($0.releaseDate == nil || $0.releaseDate! <= Date())
-                        && $0.playParameters != nil
-                    }) {
-
-                        playSong(
-                            firstPlayableSong,
-                            from: currentList,
-                            albumWithTracks: isPlayingFromAlbum ? albumWithTracks : nil,
-                            playFromAlbum: isPlayingFromAlbum
-                        )
-
-                    } else {
-                        isPlaying = false
-                        player.seek(to: .zero)
-                        didLogSongCompleted = false
-                    }
-
+                }) {
+                    
+                    playSong(
+                        firstPlayableSong,
+                        from: currentList,
+                        albumWithTracks: isPlayingFromAlbum ? albumWithTracks : nil,
+                        playFromAlbum: isPlayingFromAlbum
+                    )
+                    
                 } else {
                     isPlaying = false
                     player.seek(to: .zero)
                     didLogSongCompleted = false
                 }
+                
+            } else {
+                isPlaying = false
+                player.seek(to: .zero)
+                didLogSongCompleted = false
             }
         }
+    }
     
     
     @MainActor
@@ -709,38 +717,38 @@ class PlayerManager: ObservableObject {
         albumWithTracks: AlbumWithTracks?,
         playFromAlbum: Bool
     ) {
-
+        
         playbackObservationTask?.cancel()
         playbackObservationTask = Task {
             let player = ApplicationMusicPlayer.shared
             var previousSong: Song? = currentlyPlayingSong
-
+            
             // NEW: track end detection
             var didFireEndForCurrentSong: Bool = false
             var previousTime: TimeInterval = 0
-
+            
             while true {
                 if Task.isCancelled { break }
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 
                 await trackSubscriptionPlayback()
-
+                
                 // MARK: - END DETECTION (Apple Music fix)
                 let currentTime = player.playbackTime
                 let duration = self.currentlyPlayingSong?.duration ?? 0
-
+                
                 if duration > 0 {
-
+                    
                     // Song restarted (repeat one / restarted from beginning)
                     let didRestart = currentTime < previousTime
-
+                    
                     if didRestart && !didFireEndForCurrentSong {
                         
                         didFireEndForCurrentSong = true
-
+                        
                         let wasSkip = userSkippedSong
                         userSkippedSong = false
-
+                        
                         if !wasSkip {
                             if ReviewManager.shouldShowReviewPrompt() {
                                 if UIApplication.shared.applicationState == .active {
@@ -751,32 +759,32 @@ class PlayerManager: ObservableObject {
                             }
                         }
                     }
-
+                    
                     // reset once playback has progressed again
                     if currentTime > 1.0 {
                         didFireEndForCurrentSong = false
                     }
                 }
-
+                
                 previousTime = currentTime
-
+                
                 // MARK: - EXISTING QUEUE TRACKING (UNCHANGED LOGIC)
                 if let currentEntry = player.queue.currentEntry {
                     switch currentEntry.item {
                     case .song(let song):
                         let matchedSong: Song?
-
+                        
                         if playFromAlbum, let albumWithTracks {
                             matchedSong = albumWithTracks.tracks.first(where: { $0.id == song.id })
                         } else {
                             matchedSong = songs.first(where: { $0.id == song.id })
                         }
-
+                        
                         if let matchedSong, matchedSong != previousSong {
-
+                            
                             let wasSkip = userSkippedSong
                             userSkippedSong = false
-
+                            
                             if !wasSkip {
                                 if ReviewManager.shouldShowReviewPrompt() {
                                     if UIApplication.shared.applicationState == .active {
@@ -786,7 +794,7 @@ class PlayerManager: ObservableObject {
                                     }
                                 }
                             }
-
+                            
                             previousSong = matchedSong
                             currentlyPlayingSong = matchedSong
                             isPlaying = true
@@ -949,32 +957,32 @@ class PlayerManager: ObservableObject {
                 matching: \.id,
                 equalTo: album.id
             )
-
+            
             request.properties = [.artists]
             request.limit = 1
-
+            
             guard let fullAlbum = try await request.response().items.first,
                   let artist = fullAlbum.artists?.first else {
                 print("⚠️ Could not resolve artist for album: \(album.title)")
                 return
             }
-
+            
             let item = RecentlyPlayedAlbumItem(
                 id: album.id.rawValue,
                 artistID: artist.id.rawValue,
                 title: album.title,
                 artistName: artist.name
             )
-
+            
             recentlyPlayedAlbums.removeAll { $0.id == item.id }
             recentlyPlayedAlbums.insert(item, at: 0)
-
+            
             if recentlyPlayedAlbums.count > maxRecentlyPlayed {
                 recentlyPlayedAlbums = Array(recentlyPlayedAlbums.prefix(maxRecentlyPlayed))
             }
-
+            
             saveRecentlyPlayedAlbums()
-
+            
         } catch {
             print("Failed to resolve artist for recently played album: \(error)")
         }
@@ -984,23 +992,23 @@ class PlayerManager: ObservableObject {
         let data = try? JSONEncoder().encode(recentlyPlayedAlbums)
         UserDefaults.standard.set(data, forKey: recentlyPlayedKey)
     }
-
+    
     private func loadRecentlyPlayedAlbums() {
         guard let data = UserDefaults.standard.data(forKey: recentlyPlayedKey),
               let decoded = try? JSONDecoder().decode([RecentlyPlayedAlbumItem].self, from: data)
         else { return }
-
+        
         self.recentlyPlayedAlbums = decoded
     }
     
     func startPlaybackTimer() {
         playbackTimer?.invalidate()
-
+        
         playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self else { return }
-
+            
             Task { @MainActor in
-
+                
                 if self.appleMusicSubscription {
                     let player = ApplicationMusicPlayer.shared
                     self.playbackTime = player.playbackTime
@@ -1017,7 +1025,7 @@ class PlayerManager: ObservableObject {
         guard let data = UserDefaults.standard.data(forKey: albumPlayCountsKey),
               let decoded = try? JSONDecoder().decode([String: Int].self, from: data)
         else { return }
-
+        
         albumPlayCounts = decoded
     }
     
@@ -1030,7 +1038,7 @@ class PlayerManager: ObservableObject {
         guard let id = albumPlayCounts.max(by: { $0.value < $1.value })?.key else {
             return nil
         }
-
+        
         return MusicItemID(id)
     }
     
@@ -1040,32 +1048,32 @@ class PlayerManager: ObservableObject {
                 matching: \.id,
                 equalTo: song.id
             )
-
+            
             request.properties = [.albums, .artists]
             request.limit = 1
-
+            
             let response = try await request.response()
-
+            
             guard let fullSong = response.items.first,
                   let albums = fullSong.albums,
                   let album = albums.first else {
                 print("⚠️ Could not find album for \(song.title)")
                 return
             }
-
+            
             let albumID = album.id.rawValue
-
+            
             // Record album play
             albumPlayCounts[albumID, default: 0] += 1
             saveAlbumPlayCounts()
-
+            
             // Record artist play
             if let artist = fullSong.artists?.first {
                 let artistID = artist.id.rawValue
-
+                
                 artistPlayCounts[artistID, default: 0] += 1
                 saveArtistPlayCounts()
-
+                
                 print("recordAlbumPlay: \(album.title) → album plays: \(albumPlayCounts[albumID] ?? 0)")
                 print("Artist play: \(artist.name) → \(artistPlayCounts[artistID] ?? 0)")
             }
@@ -1078,22 +1086,22 @@ class PlayerManager: ObservableObject {
     @MainActor
     private func trackSubscriptionPlayback() async {
         guard appleMusicSubscription else { return }
-
+        
         let player = ApplicationMusicPlayer.shared
-
+        
         guard let currentEntry = player.queue.currentEntry else {
             subscriptionTrackingLastDate = nil
             return
         }
-
+        
         guard case .song(let song) = currentEntry.item else {
             subscriptionTrackingLastDate = nil
             return
         }
-
+        
         let currentTime = player.playbackTime
         let duration = song.duration ?? currentlyPlayingSong?.duration ?? 0
-
+        
         // MARK: - New song
         if subscriptionTrackingSongID != song.id {
             subscriptionTrackingSongID = song.id
@@ -1102,64 +1110,64 @@ class PlayerManager: ObservableObject {
             didRecordSubscription30Seconds = false
             subscriptionHasProgressedInCurrentPlayback = false
         }
-
-        // MARK: - Detect Repeat One restart
+        
+        // MARK: - Detect song restart
         //
-        // The same queue entry remains current when Repeat One
-        // repeats, so the song ID doesn't change.
+        // This handles:
+        // - Repeat One
+        // - Repeat All with one song
+        // - Repeat All when a song eventually comes around again
         //
-        // We detect that playback reached the end and then returned
-        // to the beginning.
-        if repeatMode == .one,
-           duration > 0,
+        // If the song was previously past 3 seconds and is now
+        // back near the beginning, it is a new playback cycle.
+        if duration > 0,
            subscriptionHasProgressedInCurrentPlayback,
-           currentTime < 3.0,
-           subscriptionTrackingLastDate != nil {
-
+           currentTime < 3.0 {
+            
             subscriptionPlayedSeconds = 0
             subscriptionTrackingLastDate = nil
             didRecordSubscription30Seconds = false
             subscriptionHasProgressedInCurrentPlayback = false
-
-            print("🔄 Repeat One detected — resetting 30-second tracking for \(song.title)")
+            
+            print("🔄 Song restarted — resetting 30-second tracking for \(song.title)")
         }
-
+        
         // Mark that this playback cycle has progressed.
         if currentTime > 3.0 {
             subscriptionHasProgressedInCurrentPlayback = true
         }
-
+        
         // Only count actual playing time.
         guard player.state.playbackStatus == .playing else {
             subscriptionTrackingLastDate = nil
             return
         }
-
+        
         let now = Date()
-
+        
         if let lastDate = subscriptionTrackingLastDate {
             let elapsed = now.timeIntervalSince(lastDate)
-
+            
             if elapsed <= 2.0 {
                 subscriptionPlayedSeconds += elapsed
             }
         }
-
+        
         subscriptionTrackingLastDate = now
-
+        
         // MARK: - 30 seconds reached
         if subscriptionPlayedSeconds >= 30,
            !didRecordSubscription30Seconds {
-
+            
             didRecordSubscription30Seconds = true
-
+            
             await recordAlbumPlay(for: song)
-
+            
             Analytics.logEvent("song_30_seconds_played", parameters: [
                 "song_id": song.id.rawValue,
                 "subscription": true
             ])
-
+            
             print("✅ Subscription: 30 seconds played for \(song.title)")
         }
     }
@@ -1168,12 +1176,12 @@ class PlayerManager: ObservableObject {
         guard let data = try? JSONEncoder().encode(artistPlayCounts) else { return }
         UserDefaults.standard.set(data, forKey: artistPlayCountsKey)
     }
-
+    
     private func loadArtistPlayCounts() {
         guard let data = UserDefaults.standard.data(forKey: artistPlayCountsKey),
               let decoded = try? JSONDecoder().decode([String: Int].self, from: data)
         else { return }
-
+        
         artistPlayCounts = decoded
     }
 }
