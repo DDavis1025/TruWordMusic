@@ -33,6 +33,23 @@ struct TrackDetailView: View {
     @State private var showShareSheet = false
     @State private var preferredAlbum: Album?
     
+    private var playbackSourceName: String {
+        switch playerManager.playbackSource {
+        case .album:
+            return "album"
+        case .favorites:
+            return "favorites"
+        case .home:
+            return "home"
+        case .search:
+            return "search"
+        case .artist:
+            return "artist"
+        case .none:
+            return "none"
+        }
+    }
+    
     private var appleMusicURL: URL? {
         AppleMusicAffiliateManager.makeURL(type: .track, id: song.id)
     }
@@ -562,7 +579,8 @@ struct TrackDetailView: View {
     
     private func playNextSong() {
         Analytics.logEvent("track_skipped_next", parameters: [
-            "song_id": song.id.rawValue
+            "song_id": song.id.rawValue,
+            "source": playbackSourceName
         ])
         
         guard networkMonitor.isConnected else { return }
@@ -623,7 +641,8 @@ struct TrackDetailView: View {
     
     private func playPreviousSong() {
         Analytics.logEvent("track_skipped_previous", parameters: [
-            "song_id": song.id.rawValue
+            "song_id": song.id.rawValue,
+            "source": playbackSourceName
         ])
         
         guard networkMonitor.isConnected else { return }

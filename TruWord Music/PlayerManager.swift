@@ -77,7 +77,7 @@ class PlayerManager: ObservableObject {
     private var subscriptionTrackingSongID: MusicItemID?
     private var subscriptionTrackingLastDate: Date?
     private var didRecordSubscription30Seconds = false
-    private var subscriptionHasProgressedInCurrentPlayback = false
+    private var subscriptionTrackingLastPlaybackTime: TimeInterval = 0
     
     private let recentlyPlayedKey = "recentlyPlayedAlbums"
     private let maxRecentlyPlayed = 40
@@ -262,7 +262,6 @@ class PlayerManager: ObservableObject {
         subscriptionPlayedSeconds = 0
         subscriptionTrackingLastDate = nil
         didRecordSubscription30Seconds = false
-        subscriptionHasProgressedInCurrentPlayback = false
         
         guard let currentSong = currentlyPlayingSong else { return }
         
@@ -1108,34 +1107,29 @@ class PlayerManager: ObservableObject {
             subscriptionPlayedSeconds = 0
             subscriptionTrackingLastDate = nil
             didRecordSubscription30Seconds = false
-            subscriptionHasProgressedInCurrentPlayback = false
         }
         
         // MARK: - Detect song restart
         //
-        // This handles:
+        // If playback jumps backward significantly, treat it as a
+        // new playback cycle. This handles:
         // - Repeat One
-        // - Repeat All with one song
-        // - Repeat All when a song eventually comes around again
+        // - Repeat All
+        // - Manually replaying a song
+        // - Restarting before 3 seconds
         //
-        // If the song was previously past 3 seconds and is now
-        // back near the beginning, it is a new playback cycle.
         if duration > 0,
-           subscriptionHasProgressedInCurrentPlayback,
-           currentTime < 3.0 {
+           subscriptionTrackingLastPlaybackTime > 3.0,
+           currentTime < subscriptionTrackingLastPlaybackTime - 1.0 {
             
             subscriptionPlayedSeconds = 0
             subscriptionTrackingLastDate = nil
             didRecordSubscription30Seconds = false
-            subscriptionHasProgressedInCurrentPlayback = false
             
             print("🔄 Song restarted — resetting 30-second tracking for \(song.title)")
         }
-        
-        // Mark that this playback cycle has progressed.
-        if currentTime > 3.0 {
-            subscriptionHasProgressedInCurrentPlayback = true
-        }
+
+        subscriptionTrackingLastPlaybackTime = currentTime
         
         // Only count actual playing time.
         guard player.state.playbackStatus == .playing else {
