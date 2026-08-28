@@ -540,66 +540,84 @@ struct ContentView: View {
         }
     }
     
-    private func mostPlayedArtistID() -> String? {
-        playerManager.artistPlayCounts.max {
-            $0.value < $1.value
-        }?.key
-    }
-    
     private func loadMoreByArtist() async {
-        guard let artistIDString = mostPlayedArtistID() else {
+        // Sort artists from most played → least played.
+        let rankedArtistIDs = playerManager.artistPlayCounts
+            .sorted { $0.value > $1.value }
+            .map { $0.key }
+
+        guard !rankedArtistIDs.isEmpty else {
             await MainActor.run {
                 moreByArtistSection = nil
             }
             return
         }
 
-        do {
-            let artistID = MusicItemID(artistIDString)
+        // Try each artist in play-count order until we find
+        // one with valid Christian, non-explicit albums.
+        for artistIDString in rankedArtistIDs {
+            do {
+                let artistID = MusicItemID(artistIDString)
 
-            // Resolve the actual artist directly by ID.
-            var artistRequest = MusicCatalogResourceRequest<Artist>(
-                matching: \.id,
-                equalTo: artistID
-            )
-
-            artistRequest.properties = [.albums]
-            artistRequest.limit = 1
-
-            let artistResponse = try await artistRequest.response()
-
-            guard let fullArtist = artistResponse.items.first else {
-                return
-            }
-
-            let filteredAlbums = (fullArtist.albums ?? []).filter { album in
-                let isChristian =
-                    album.genreNames.contains("Christian") ||
-                    album.genreNames.contains("Christian & Gospel")
-
-                let isNotExplicit = album.contentRating != .explicit
-
-                return isChristian && isNotExplicit
-            }
-
-            await MainActor.run {
-                moreByArtistSection = MoreByArtistSection(
-                    artist: fullArtist,
-                    albums: filteredAlbums
+                var artistRequest = MusicCatalogResourceRequest<Artist>(
+                    matching: \.id,
+                    equalTo: artistID
                 )
 
-                for album in filteredAlbums {
-                    albumCache[album.id] = album
+                artistRequest.properties = [.albums]
+                artistRequest.limit = 1
+
+                let artistResponse = try await artistRequest.response()
+
+                guard let fullArtist = artistResponse.items.first else {
+                    continue
                 }
-            }
 
-        } catch {
-            print("Failed to load More By Artist: \(error)")
+                let filteredAlbums = (fullArtist.albums ?? []).filter { album in
+                    let isChristian =
+                        album.genreNames.contains("Christian") ||
+                        album.genreNames.contains("Christian & Gospel")
 
-            await MainActor.run {
-                moreByArtistSection = nil
+                    let isNotExplicit = album.contentRating != .explicit
+
+                    return isChristian && isNotExplicit
+                }
+
+                // Found an artist with valid albums.
+                if !filteredAlbums.isEmpty {
+                    await MainActor.run {
+                        moreByArtistSection = MoreByArtistSection(
+                            artist: fullArtist,
+                            albums: filteredAlbums
+                        )
+
+                        for album in filteredAlbums {
+                            albumCache[album.id] = album
+                        }
+                    }
+
+                    print("More By Artist source: \(fullArtist.name)")
+                    print("Albums found: \(filteredAlbums.count)")
+
+                    return
+                }
+
+                // This artist had no valid albums, so try
+                // the next most-played artist.
+                print("No valid Christian albums for: \(fullArtist.name)")
+
+            } catch {
+                print("Failed to load artist \(artistIDString): \(error)")
+                continue
             }
         }
+
+        // No played artist had valid Christian, non-explicit albums.
+        await MainActor.run {
+            moreByArtistSection = nil
+        }
+
+        print("No valid More By Artist found for any played artist.")
     }
     
     @ViewBuilder

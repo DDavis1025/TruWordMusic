@@ -261,6 +261,7 @@ class PlayerManager: ObservableObject {
         subscriptionTrackingSongID = nil
         subscriptionPlayedSeconds = 0
         subscriptionTrackingLastDate = nil
+        subscriptionTrackingLastPlaybackTime = 0
         didRecordSubscription30Seconds = false
         
         guard let currentSong = currentlyPlayingSong else { return }
