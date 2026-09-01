@@ -5,6 +5,8 @@ import FirebaseAnalytics
 struct FavoritesView: View {
     @EnvironmentObject var favoritesManager: FavoritesManager
     
+    @Environment(\.colorScheme) var colorScheme
+    
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var playerManager: PlayerManager
     
@@ -183,54 +185,39 @@ struct FavoritesView: View {
             VStack(spacing: 0) {
 
                 // MARK: - Play All / Shuffle Buttons
-                HStack(spacing: 12) {
-
-                    Button {
-                        let songs = favoritesManager.favoriteSongs
-                        guard let firstSong = songs.first else { return }
-
-                        playbackSongs = songs
-
-                        playerManager.playbackSource = .favorites
-
-                        playerManager.playSong(
-                            firstSong,
-                            from: playbackSongs,
-                            albumWithTracks: nil,
-                            playFromAlbum: false,
-                            networkMonitor: networkMonitor
-                        )
-
-                        isPlayingFromAlbum = false
-
-                    } label: {
-                        Label("Play All", systemImage: "play.fill")
+                if playerManager.appleMusicSubscription {
+                    HStack(spacing: 12) {
+                        
+                        Button {
+                            playAllFavorites()
+                        } label: {
+                            Label("Play All", systemImage: "play.fill")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .frame(width: 120)
+                                .frame(height: 39)
+                                .foregroundStyle(colorScheme == .light ? .white : .black)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.primary)
+                        
+                        Button {
+                            shuffleFavorites()
+                        } label: {
+                            Label("Shuffle", systemImage: "shuffle")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .frame(width: 120)
+                                .frame(height: 39)
+                                .foregroundStyle(.primary)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.secondary)
                     }
-
-                    Button {
-                        let songs = favoritesManager.favoriteSongs.shuffled()
-                        guard let firstSong = songs.first else { return }
-
-                        playbackSongs = songs
-
-                        playerManager.playbackSource = .favorites
-
-                        playerManager.playSong(
-                            firstSong,
-                            from: playbackSongs,
-                            albumWithTracks: nil,
-                            playFromAlbum: false,
-                            networkMonitor: networkMonitor
-                        )
-
-                        isPlayingFromAlbum = false
-
-                    } label: {
-                        Label("Shuffle", systemImage: "shuffle")
-                    }
+                    .padding(.horizontal, 28)
+                    .padding(.top, 10)
+                    .padding(.bottom, 15.99)
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 12)
 
                 // MARK: - Favorites List
                 ForEach(filteredSongs, id: \.id) { song in
@@ -254,33 +241,31 @@ struct FavoritesView: View {
                             }
 
                             // Remove just the specific entry from queue
-                            if wasFavorite &&
-                                playerManager.appleMusicSubscription &&
-                                playerManager.playbackSource == .favorites {
+                            if wasFavorite {
+                                if playerManager.appleMusicSubscription &&
+                                    playerManager.playbackSource == .favorites &&
+                                    !playerManager.favoritesShuffleActive {
 
-                                let player = ApplicationMusicPlayer.shared
+                                    // Regular Favorites
+                                    let player = ApplicationMusicPlayer.shared
 
-                                if let entryToRemove = player.queue.entries.first(where: { entry in
-                                    if case .song(let queueSong) = entry.item {
-                                        return queueSong.id == song.id
+                                    player.queue.entries.removeAll { entry in
+                                        if case .song(let queueSong) = entry.item {
+                                            return queueSong.id == song.id
+                                        }
+                                        return false
                                     }
-                                    return false
-                                }) {
-                                    player.queue.entries.removeAll {
-                                        $0.id == entryToRemove.id
-                                    }
-                                }
-                            }
 
-                            // Handle preview mode removal
-                            if wasFavorite && !playerManager.appleMusicSubscription {
-                                Task { @MainActor in
-                                    playerManager.handleCurrentFavoriteRemoved(
-                                        removedSong: song,
-                                        removedIndex: removedIndex,
-                                        favoritesManager: favoritesManager,
-                                        networkMonitor: networkMonitor
-                                    )
+                                } else {
+                                    // Shuffle / Preview
+                                    Task { @MainActor in
+                                        playerManager.handleCurrentFavoriteRemoved(
+                                            removedSong: song,
+                                            removedIndex: removedIndex,
+                                            favoritesManager: favoritesManager,
+                                            networkMonitor: networkMonitor
+                                        )
+                                    }
                                 }
                             }
 
@@ -310,6 +295,7 @@ struct FavoritesView: View {
                             "artist": song.artistName
                         ])
 
+                        playerManager.stopFavoritesShuffle()
                         playerManager.playbackSource = .favorites
 
                         // Individual song taps use the normal Favorites order
@@ -382,11 +368,17 @@ struct FavoritesView: View {
     }
     
     private func playAllFavorites() {
+        UIApplication.shared.dismissKeyboard()
+        
         let songs = favoritesManager.favoriteSongs
         guard let firstSong = songs.first else { return }
+        
+        Analytics.logEvent("favorites_play_all_pressed",
+                           parameters: [ "favorite_count": songs.count ])
 
         playbackSongs = songs
 
+        playerManager.stopFavoritesShuffle()
         playerManager.playbackSource = .favorites
 
         playerManager.playSong(
@@ -401,11 +393,17 @@ struct FavoritesView: View {
     }
     
     private func shuffleFavorites() {
+        UIApplication.shared.dismissKeyboard()
+        
         let songs = favoritesManager.favoriteSongs.shuffled()
         guard let firstSong = songs.first else { return }
+        
+        Analytics.logEvent("favorites_shuffle_pressed",
+                           parameters: [ "favorite_count": songs.count ])
 
         playbackSongs = songs
 
+        playerManager.startFavoritesShuffle()
         playerManager.playbackSource = .favorites
 
         playerManager.playSong(
