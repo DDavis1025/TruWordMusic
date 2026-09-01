@@ -858,48 +858,105 @@ class PlayerManager: ObservableObject {
             
             let oldQueue = lastPlayedSongs
             
-            guard oldQueue.contains(where: {
+            guard let removedQueueIndex = oldQueue.firstIndex(where: {
                 $0.id == removedSong.id
             }) else {
                 return
             }
             
-            // Remove the song from our stored shuffle order.
-            lastPlayedSongs = oldQueue.filter {
+            // Remove the song from the existing shuffled order.
+            let updatedShuffleQueue = oldQueue.filter {
                 $0.id != removedSong.id
             }
             
-            guard !lastPlayedSongs.isEmpty else {
+            lastPlayedSongs = updatedShuffleQueue
+            
+            guard !updatedShuffleQueue.isEmpty else {
                 currentlyPlayingSong = nil
                 isPlaying = false
-                ApplicationMusicPlayer.shared.stop()
+                
+                if appleMusicSubscription {
+                    ApplicationMusicPlayer.shared.stop()
+                } else {
+                    audioPlayer?.pause()
+                }
+                
                 return
             }
             
-            let player = ApplicationMusicPlayer.shared
-            
-            // Remove the song from the actual MusicKit queue.
-            player.queue.entries.removeAll { entry in
-                if case .song(let queueSong) = entry.item {
-                    return queueSong.id == removedSong.id
+            // If the removed song was NOT playing,
+            // simply remove it from the queue and preserve the order.
+            guard currentlyPlayingSong?.id == removedSong.id else {
+                
+                if appleMusicSubscription {
+                    let player = ApplicationMusicPlayer.shared
+                    
+                    player.queue.entries.removeAll { entry in
+                        if case .song(let queueSong) = entry.item {
+                            return queueSong.id == removedSong.id
+                        }
+                        return false
+                    }
                 }
-                return false
+                
+                return
             }
             
-            // If the removed song was playing,
-            // simply skip to the next queue entry.
-            if currentlyPlayingSong?.id == removedSong.id {
-                Task {
-                    try? await player.skipToNextEntry()
-                }
+            // The current song was removed.
+            // Find the next song in the SAME shuffled order.
+            let nextSong: Song?
+            
+            if removedQueueIndex < updatedShuffleQueue.count {
+                nextSong = updatedShuffleQueue[removedQueueIndex]
+            } else {
+                nextSong = nil
             }
+            
+            guard let nextSong else {
+                currentlyPlayingSong = nil
+                isPlaying = false
+                
+                if appleMusicSubscription {
+                    ApplicationMusicPlayer.shared.stop()
+                } else {
+                    audioPlayer?.pause()
+                }
+                
+                return
+            }
+            
+            playSong(
+                nextSong,
+                from: updatedShuffleQueue,
+                albumWithTracks: nil,
+                playFromAlbum: false,
+                networkMonitor: networkMonitor
+            )
             
             return
         }
         
         // MARK: - NORMAL FAVORITES
+        // Existing behavior stays unchanged.
         
-        guard playbackSource == .favorites else {
+        if appleMusicSubscription {
+            let player = ApplicationMusicPlayer.shared
+            
+            let updatedFavorites = favoritesManager.favoriteSongs
+            
+            guard !updatedFavorites.isEmpty else {
+                player.stop()
+                currentlyPlayingSong = nil
+                isPlaying = false
+                return
+            }
+            
+            player.queue = ApplicationMusicPlayer.Queue(for: updatedFavorites)
+        }
+        
+        guard playbackSource == .favorites,
+              currentlyPlayingSong?.id == removedSong.id
+        else {
             return
         }
         
@@ -918,48 +975,24 @@ class PlayerManager: ObservableObject {
             return
         }
         
-        // Only act on the currently playing song.
-        guard currentlyPlayingSong?.id == removedSong.id else {
-            return
+        var nextSong: Song?
+        
+        if let index = removedIndex {
+            let safeIndex = min(index, updatedFavorites.count - 1)
+            nextSong = updatedFavorites[safeIndex]
+        } else {
+            nextSong = updatedFavorites.first
         }
         
-        if appleMusicSubscription {
-            let player = ApplicationMusicPlayer.shared
-            
-            // Remove the current song from the existing queue.
-            player.queue.entries.removeAll { entry in
-                if case .song(let queueSong) = entry.item {
-                    return queueSong.id == removedSong.id
-                }
-                return false
-            }
-            
-            // Let MusicKit advance to the next queue entry.
-            Task {
-                try? await player.skipToNextEntry()
-            }
-        } else {
-            // Preview mode doesn't have a MusicKit queue.
-            // Keep the existing fallback behavior.
-            var nextSong: Song?
-            
-            if let index = removedIndex {
-                let safeIndex = min(index, updatedFavorites.count - 1)
-                nextSong = updatedFavorites[safeIndex]
-            } else {
-                nextSong = updatedFavorites.first
-            }
-            
-            guard let nextSong else { return }
-            
-            playSong(
-                nextSong,
-                from: updatedFavorites,
-                albumWithTracks: nil,
-                playFromAlbum: false,
-                networkMonitor: networkMonitor
-            )
-        }
+        guard let nextSong else { return }
+        
+        playSong(
+            nextSong,
+            from: updatedFavorites,
+            albumWithTracks: nil,
+            playFromAlbum: false,
+            networkMonitor: networkMonitor
+        )
     }
     
     func toggleRepeatMode() {
