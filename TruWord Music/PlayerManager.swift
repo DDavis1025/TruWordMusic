@@ -96,7 +96,7 @@ class PlayerManager: ObservableObject {
             return "artist"
         }
     }
-
+    
     private let recentlyPlayedKey = "recentlyPlayedAlbums"
     private let maxRecentlyPlayed = 40
     private let albumPlayCountsKey = "albumPlayCounts"
@@ -507,7 +507,7 @@ class PlayerManager: ObservableObject {
                 "subscription": false,
                 "source": playbackSourceName
             ])
-
+            
         }
         
         // ✅ Determine correct list (album OR last played list like favorites)
@@ -853,113 +853,43 @@ class PlayerManager: ObservableObject {
         networkMonitor: NetworkMonitor
     ) {
         
-        // MARK: - SHUFFLE FAVORITES
-        if playbackSource == .favorites && isFavoritesShuffle {
+        // MARK: - REGULAR FAVORITES + SUBSCRIPTION
+        if playbackSource == .favorites &&
+            appleMusicSubscription {
             
-            let oldQueue = lastPlayedSongs
-            
-            guard let removedQueueIndex = oldQueue.firstIndex(where: {
-                $0.id == removedSong.id
-            }) else {
-                return
-            }
-            
-            // Remove the song from the existing shuffled order.
-            let updatedShuffleQueue = oldQueue.filter {
-                $0.id != removedSong.id
-            }
-            
-            lastPlayedSongs = updatedShuffleQueue
-            
-            guard !updatedShuffleQueue.isEmpty else {
-                currentlyPlayingSong = nil
-                isPlaying = false
-                
-                if appleMusicSubscription {
-                    ApplicationMusicPlayer.shared.stop()
-                } else {
-                    audioPlayer?.pause()
-                }
-                
-                return
-            }
-            
-            // If the removed song was NOT playing,
-            // simply remove it from the queue and preserve the order.
-            guard currentlyPlayingSong?.id == removedSong.id else {
-                
-                if appleMusicSubscription {
-                    let player = ApplicationMusicPlayer.shared
-                    
-                    player.queue.entries.removeAll { entry in
-                        if case .song(let queueSong) = entry.item {
-                            return queueSong.id == removedSong.id
-                        }
-                        return false
-                    }
-                }
-                
-                return
-            }
-            
-            // The current song was removed.
-            // Find the next song in the SAME shuffled order.
-            let nextSong: Song?
-            
-            if removedQueueIndex < updatedShuffleQueue.count {
-                nextSong = updatedShuffleQueue[removedQueueIndex]
-            } else {
-                nextSong = nil
-            }
-            
-            guard let nextSong else {
-                currentlyPlayingSong = nil
-                isPlaying = false
-                
-                if appleMusicSubscription {
-                    ApplicationMusicPlayer.shared.stop()
-                } else {
-                    audioPlayer?.pause()
-                }
-                
-                return
-            }
-            
-            playSong(
-                nextSong,
-                from: updatedShuffleQueue,
-                albumWithTracks: nil,
-                playFromAlbum: false,
-                networkMonitor: networkMonitor
-            )
-            
-            return
-        }
-        
-        // MARK: - NORMAL FAVORITES
-        // Existing behavior stays unchanged.
-        
-        if appleMusicSubscription {
             let player = ApplicationMusicPlayer.shared
             
-            let updatedFavorites = favoritesManager.favoriteSongs
+            // Only handle the currently playing song
+            guard currentlyPlayingSong?.id == removedSong.id else {
+                return
+            }
             
-            guard !updatedFavorites.isEmpty else {
+            // No favorites left
+            guard !favoritesManager.favoriteSongs.isEmpty else {
                 player.stop()
                 currentlyPlayingSong = nil
                 isPlaying = false
                 return
             }
             
-            player.queue = ApplicationMusicPlayer.Queue(for: updatedFavorites)
-        }
-        
-        guard playbackSource == .favorites,
-              currentlyPlayingSong?.id == removedSong.id
-        else {
+            // Skip first, while the current song is still the
+            // current queue entry
+            Task {
+                try? await player.skipToNextEntry()
+                
+                // Then remove the unfavorited song
+                player.queue.entries.removeAll { entry in
+                    if case .song(let queueSong) = entry.item {
+                        return queueSong.id == removedSong.id
+                    }
+                    return false
+                }
+            }
+            
             return
         }
         
+        // MARK: - PREVIEW MODE / EXISTING BEHAVIOR
         let updatedFavorites = favoritesManager.favoriteSongs
         
         guard !updatedFavorites.isEmpty else {
@@ -971,7 +901,6 @@ class PlayerManager: ObservableObject {
             } else {
                 audioPlayer?.pause()
             }
-            
             return
         }
         
@@ -1184,9 +1113,6 @@ class PlayerManager: ObservableObject {
                 
                 artistPlayCounts[artistID, default: 0] += 1
                 saveArtistPlayCounts()
-                
-                print("recordAlbumPlay: \(album.title) → album plays: \(albumPlayCounts[albumID] ?? 0)")
-                print("Artist play: \(artist.name) → \(artistPlayCounts[artistID] ?? 0)")
             }
             
         } catch {
@@ -1237,10 +1163,8 @@ class PlayerManager: ObservableObject {
             subscriptionPlayedSeconds = 0
             subscriptionTrackingLastDate = nil
             didRecordSubscription30Seconds = false
-            
-            print("🔄 Song restarted — resetting 30-second tracking for \(song.title)")
         }
-
+        
         subscriptionTrackingLastPlaybackTime = currentTime
         
         // Only count actual playing time.
@@ -1274,8 +1198,6 @@ class PlayerManager: ObservableObject {
                 "subscription": true,
                 "source": playbackSourceName
             ])
-   
-            print("✅ Subscription: 30 seconds played for \(song.title)")
         }
     }
     
@@ -1295,7 +1217,7 @@ class PlayerManager: ObservableObject {
     func startFavoritesShuffle() {
         isFavoritesShuffle = true
     }
-
+    
     func stopFavoritesShuffle() {
         isFavoritesShuffle = false
     }

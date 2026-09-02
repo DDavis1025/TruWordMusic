@@ -148,7 +148,7 @@ struct TrackDetailView: View {
                         ZStack {
                             Button(action: {
                                 togglePlayPause()
-
+                                
                                 Analytics.logEvent("track_play_pause_tapped", parameters: [
                                     "song_id": song.id.rawValue,
                                     "is_playing": isPlaying
@@ -160,7 +160,7 @@ struct TrackDetailView: View {
                                     .foregroundColor(.primary)
                                     .opacity(playerIsReady ? 1 : 0) // Hide while loading
                             }
-
+                            
                             if !playerIsReady {
                                 ProgressView()
                             }
@@ -278,7 +278,7 @@ struct TrackDetailView: View {
                     if let appleMusicURL, !appleMusicSubscription {
                         Button {
                             UIApplication.shared.open(appleMusicURL)
-
+                            
                             Analytics.logEvent("apple_music_link_tapped", parameters: [
                                 "source": "track_detail",
                                 "song_id": song.id.rawValue
@@ -406,7 +406,7 @@ struct TrackDetailView: View {
                     "song_title": song.title,
                     "artist_name": song.artistName
                 ])
-
+                
                 Task {
                     preferredAlbum = await fetchPreferredAlbum()
                 }
@@ -427,7 +427,7 @@ struct TrackDetailView: View {
     
     private func openPreferredAlbum() {
         guard let album = preferredAlbum else { return }
-
+        
         Analytics.logEvent(
             "view_album_tapped",
             parameters: [
@@ -435,9 +435,9 @@ struct TrackDetailView: View {
                 "album_id": album.id.rawValue
             ]
         )
-
+        
         let albumID = album.id
-
+        
         let isAlbumOnTop: Bool = {
             switch activeTab {
             case .home:
@@ -445,43 +445,43 @@ struct TrackDetailView: View {
                 if case .album(let routeID) = lastRoute {
                     return routeID == albumID
                 }
-
+                
             case .search:
                 guard let lastRoute = searchNavigationPath.last else { return false }
                 if case .album(let routeID) = lastRoute {
                     return routeID == albumID
                 }
-
+                
             case .favorites:
                 guard let lastRoute = favoritesNavigationPath.last else { return false }
                 if case .album(let routeID) = lastRoute {
                     return routeID == albumID
                 }
             }
-
+            
             return false
         }()
-
+        
         if isAlbumOnTop {
             dismiss()
             return
         }
-
+        
         selectedAlbum = album
         albumCache[album.id] = album
-
+        
         switch activeTab {
-
+            
         case .home:
             homeNavigationPath.append(.album(album.id))
-
+            
         case .favorites:
             favoritesNavigationPath.append(.album(album.id))
-
+            
         case .search:
             searchNavigationPath.append(.album(album.id))
         }
-
+        
         dismiss()
     }
     
@@ -610,27 +610,27 @@ struct TrackDetailView: View {
         }()
         
         guard let currentIndex = currentList.firstIndex(where: { $0.id == song.id }) else { return }
-
+        
         // Search forward first
         for nextIndex in (currentIndex + 1)..<currentList.count {
             let nextSong = currentList[nextIndex]
             let isPlayable =
-                (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date()) &&
-                nextSong.playParameters != nil
-
+            (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date()) &&
+            nextSong.playParameters != nil
+            
             if isPlayable {
                 playerManager.playSong(nextSong, from: currentList)
                 return
             }
         }
-
+        
         // If Repeat All, wrap to the first playable song
         if playerManager.repeatMode == .all {
             for nextSong in currentList {
                 let isPlayable =
-                    (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date()) &&
-                    nextSong.playParameters != nil
-
+                (nextSong.releaseDate == nil || nextSong.releaseDate! <= Date()) &&
+                nextSong.playParameters != nil
+                
                 if isPlayable {
                     playerManager.playSong(nextSong, from: currentList)
                     return
@@ -716,42 +716,42 @@ struct TrackDetailView: View {
                 matching: \.id,
                 equalTo: song.id
             )
-
+            
             request.properties = [.albums]
             request.limit = 1
-
+            
             let response = try await request.response()
-
+            
             guard let fullSong = response.items.first,
                   let albums = fullSong.albums else {
                 return nil
             }
-
+            
             for album in albums {
                 var albumRequest = MusicCatalogResourceRequest<Album>(
                     matching: \.id,
                     equalTo: album.id
                 )
-
+                
                 albumRequest.limit = 1
-
+                
                 let albumResponse = try await albumRequest.response()
-
+                
                 guard let fullAlbum = albumResponse.items.first else {
                     continue
                 }
-
+                
                 let christian =
-                    fullAlbum.genreNames.contains("Christian") ||
-                    fullAlbum.genreNames.contains("Christian & Gospel")
-
+                fullAlbum.genreNames.contains("Christian") ||
+                fullAlbum.genreNames.contains("Christian & Gospel")
+                
                 if christian && fullAlbum.contentRating != .explicit {
                     return fullAlbum
                 }
             }
-
+            
             return nil
-
+            
         } catch {
             print(error)
             return nil
