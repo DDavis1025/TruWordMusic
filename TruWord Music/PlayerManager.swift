@@ -279,7 +279,6 @@ class PlayerManager: ObservableObject {
         
         previewDidEnd = false
         didLogSongCompleted = false
-        isPlaying = false
         
         // Reset subscription tracking for a new subscription playback session.
         subscriptionTrackingSongID = nil
