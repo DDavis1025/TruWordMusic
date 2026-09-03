@@ -429,6 +429,11 @@ struct TrackDetailView: View {
                     dismiss()
                 }
             }
+            .onChange(of: appleMusicSubscription) { _, isSubscribed in
+                if isSubscribed {
+                    showPreviewInfo = false
+                }
+            }
             
             .alert("Preview Mode", isPresented: $showPreviewInfo) {
                 if let appleMusicURL {
