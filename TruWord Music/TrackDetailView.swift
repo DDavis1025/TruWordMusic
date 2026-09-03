@@ -32,6 +32,7 @@ struct TrackDetailView: View {
     @State private var menuPosition: CGPoint = .zero
     @State private var showShareSheet = false
     @State private var preferredAlbum: Album?
+    @State private var showPreviewInfo = false
     
     private var playbackSourceName: String {
         switch playerManager.playbackSource {
@@ -76,10 +77,21 @@ struct TrackDetailView: View {
                             .id(song.id)
                         
                         if !appleMusicSubscription {
-                            Text("Preview")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .offset(y: -25)
+                            Button {
+                                showPreviewInfo = true
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Text("Preview")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+
+                                    Image(systemName: "questionmark.circle")
+                                        .font(.title3.weight(.bold))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .offset(y: -38)
                         }
                     }
                     
@@ -416,6 +428,23 @@ struct TrackDetailView: View {
                 if playerManager.currentlyPlayingSong == nil {
                     dismiss()
                 }
+            }
+            
+            .alert("Preview Mode", isPresented: $showPreviewInfo) {
+                if let appleMusicURL {
+                    Button("Listen on Apple Music") {
+                        UIApplication.shared.open(appleMusicURL)
+                        
+                        Analytics.logEvent("apple_music_link_tapped", parameters: [
+                            "source": "preview_info",
+                            "song_id": song.id.rawValue
+                        ])
+                    }
+                }
+                
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Full song playback requires an Apple Music subscription.")
             }
         }
     }
