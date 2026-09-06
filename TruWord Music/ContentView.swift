@@ -196,21 +196,56 @@ struct ContentView: View {
             
             .task {
                 isLoading = true
+
                 await requestMusicAuthorization()
 
                 if musicAuthorized {
-                    await withTaskGroup(of: Void.self) { group in
-                        group.addTask { await checkAppleMusicStatus() }
-                        group.addTask { await fetchChristianSongs() }
-                        group.addTask { await fetchChristianAlbums() }
+                    do {
+                        guard let genre = try await fetchChristianGenre() else {
+                            isLoading = false
+                            return
+                        }
+
+                        await withTaskGroup(of: Void.self) { group in
+                            group.addTask {
+                                await checkAppleMusicStatus()
+                            }
+
+                            group.addTask {
+                                await fetchChristianSongs(genre: genre)
+                            }
+
+                            group.addTask {
+                                await fetchChristianAlbums(genre: genre)
+                            }
+                        }
+
+                    } catch {
+                        print("Error fetching Christian genre: \(error)")
                     }
 
-                    await loadRecentlyPlayedAlbumsIntoCache()
-                    await loadMoreByArtist()
-                    await loadPersonalizedRecommendations()
-                }
+                    isLoading = false
 
-                isLoading = false
+                    // Load personalized sections after the main Home content appears
+                    Task {
+                        await withTaskGroup(of: Void.self) { group in
+                            group.addTask {
+                                await loadRecentlyPlayedAlbumsIntoCache()
+                            }
+
+                            group.addTask {
+                                await loadPersonalizedRecommendations()
+                            }
+
+                            group.addTask {
+                                await loadMoreByArtist()
+                            }
+                        }
+                    }
+
+                } else {
+                    isLoading = false
+                }
             }
             
             .onChange(of: scenePhase) { _, newPhase in
@@ -242,12 +277,12 @@ struct ContentView: View {
                             playerManager: playerManager,
                             songs: songs
                         )
-                        Spacer().frame(height: 20)
+                        Spacer().frame(height: 25)
+                        albumsSection
+                        songsSection
                         recentlyPlayedAlbums
                         recommendedAlbumsSection
                         moreByArtistSectionView
-                        albumsSection
-                        songsSection
                     }
                     .padding(.horizontal, 16)
                 }
@@ -420,7 +455,7 @@ struct ContentView: View {
                     Text("Top Christian Songs")
                         .font(.system(size: 18, weight: .bold))
 
-                    if songs.count > 7 {
+                    if songs.count > 5 {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 20, weight: .bold))
                             .foregroundStyle(.gray)
@@ -430,7 +465,7 @@ struct ContentView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    guard songs.count > 7 else { return }
+                    guard songs.count > 5 else { return }
 
                     navigationPath.append(
                         .fullTrackList(
@@ -443,7 +478,7 @@ struct ContentView: View {
                     Analytics.logEvent("view_more_songs", parameters: nil)
                 }
                 
-                ForEach(songs.prefix(7), id: \.id) { song in
+                ForEach(songs.prefix(5), id: \.id) { song in
                     SongRowView(song: song, currentPlayingSong: $playerManager.currentlyPlayingSong)
                         .onTapGesture {
             
@@ -466,6 +501,7 @@ struct ContentView: View {
                         }
                 }
             }
+            .padding(.bottom, 28)
         )
     }
     
@@ -536,7 +572,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
             }
-            .padding(.bottom, 25)
+            .padding(.bottom, 18)
         }
     }
     
@@ -729,60 +765,55 @@ struct ContentView: View {
         return try await request.response().items.first
     }
     
-    private func fetchChristianSongs() async {
+    private func fetchChristianSongs(genre: Genre) async {
         do {
-            guard let genre = try await fetchChristianGenre() else { return }
-            
             var request = MusicCatalogChartsRequest(
                 genre: genre,
                 types: [Song.self]
             )
-            
+
             request.limit = 70
-            
+
             let fetchedSongs = (try await request.response())
                 .songCharts
                 .flatMap { $0.items }
                 .filter { $0.contentRating != .explicit }
-            
+
             await MainActor.run {
                 self.songs = fetchedSongs
                 self.playerManager.songs = fetchedSongs
-                
+
                 songOfDayManager.loadSongs(fetchedSongs)
             }
-            
+
         } catch {
             print("Error fetching songs: \(error)")
         }
     }
     
-    private func fetchChristianAlbums() async {
+    private func fetchChristianAlbums(genre: Genre) async {
         do {
-            guard let genre = try await fetchChristianGenre() else { return }
-            
             var request = MusicCatalogChartsRequest(
                 genre: genre,
                 types: [Album.self]
             )
-            
+
             request.limit = 70
-            
+
             let response = try await request.response()
+
             let fetchedAlbums = response.albumCharts
                 .flatMap { $0.items }
                 .filter { $0.contentRating != .explicit }
-            
+
             await MainActor.run {
-                
                 self.albums = fetchedAlbums
-                // also push into cache
+
                 for album in fetchedAlbums {
                     albumCache[album.id] = album
                 }
-                
             }
-            
+
         } catch {
             print("Error fetching albums: \(error)")
         }
