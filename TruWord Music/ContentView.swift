@@ -255,12 +255,6 @@ struct ContentView: View {
                     }
                 }
             }
-
-            .onChange(of: playerManager.artistPlayCounts) { _, _ in
-                Task {
-                    await loadMoreByArtist()
-                }
-            }
         }
     }
     
@@ -311,7 +305,7 @@ struct ContentView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if playerManager.currentlyPlayingSong != nil {
-                Color.clear.frame(height: bottomPlayerHeight)
+                Color.clear.frame(height: bottomPlayerHeight - 5.5)
             }
         }
     }
@@ -353,7 +347,7 @@ struct ContentView: View {
 
                     if playerManager.recentlyPlayedAlbums.count >= 10 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.gray)
                     }
 
@@ -406,7 +400,7 @@ struct ContentView: View {
 
                     if albums.count >= 10 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.gray)
                     }
 
@@ -457,7 +451,7 @@ struct ContentView: View {
 
                     if songs.count > 5 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.gray)
                     }
 
@@ -501,7 +495,7 @@ struct ContentView: View {
                         }
                 }
             }
-            .padding(.bottom, 28)
+            .padding(.bottom, 25)
         )
     }
     
@@ -521,7 +515,7 @@ struct ContentView: View {
 
                     if section.albums.count >= 10 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.gray)
                     }
 
@@ -572,7 +566,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
             }
-            .padding(.bottom, 18)
+            .padding(.bottom, 25)
         }
     }
     
@@ -672,7 +666,7 @@ struct ContentView: View {
 
                     if recommendedAlbums.count >= 10 {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.gray)
                     }
 

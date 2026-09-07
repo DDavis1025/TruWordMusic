@@ -231,7 +231,7 @@ struct AlbumDetailView: View {
 
                                     if relatedAlbums.count >= 10 {
                                         Image(systemName: "chevron.right")
-                                            .font(.system(size: 20, weight: .bold))
+                                            .font(.system(size: 18, weight: .bold))
                                             .foregroundStyle(.gray)
                                     }
 
@@ -307,7 +307,7 @@ struct AlbumDetailView: View {
 
                                     if moreByAlbums.count >= 10 {
                                         Image(systemName: "chevron.right")
-                                            .font(.system(size: 20, weight: .bold))
+                                            .font(.system(size: 18, weight: .bold))
                                             .foregroundStyle(.gray)
                                     }
 

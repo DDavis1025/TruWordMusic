@@ -212,7 +212,7 @@ struct ArtistDetailView: View {
 
                                     if topAlbums.count > 7 {
                                         Image(systemName: "chevron.right")
-                                            .font(.system(size: 20, weight: .bold))
+                                            .font(.system(size: 18, weight: .bold))
                                             .foregroundStyle(.gray)
                                     }
 
@@ -278,7 +278,7 @@ struct ArtistDetailView: View {
 
                                     if topSongs.count > 10 {
                                         Image(systemName: "chevron.right")
-                                            .font(.system(size: 20, weight: .bold))
+                                            .font(.system(size: 18, weight: .bold))
                                             .foregroundStyle(.gray)
                                     }
 
