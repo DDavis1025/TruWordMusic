@@ -32,6 +32,12 @@ struct RecentlyPlayedAlbumItem: Codable, Identifiable, Equatable {
     let artistName: String
 }
 
+@MainActor
+final class PlaybackProgress: ObservableObject {
+    @Published var playbackTime: TimeInterval = 0
+    @Published var trackDuration: TimeInterval = 0
+}
+
 
 @MainActor
 class PlayerManager: ObservableObject {
@@ -51,8 +57,6 @@ class PlayerManager: ObservableObject {
     @Published var lastPlayFromAlbum: Bool = false
     @Published var playbackSource: PlaybackSource = .none
     @Published var recentlyPlayedAlbums: [RecentlyPlayedAlbumItem] = []
-    @Published var playbackTime: TimeInterval = 0
-    @Published var trackDuration: TimeInterval = 0
     @Published var userSkippedSong: Bool = false
     @Published var albumPlayCounts: [String: Int] = [:]
     @Published var artistPlayCounts: [String: Int] = [:]
@@ -101,6 +105,8 @@ class PlayerManager: ObservableObject {
     private let maxRecentlyPlayed = 40
     private let albumPlayCountsKey = "albumPlayCounts"
     private let artistPlayCountsKey = "artistPlayCounts"
+    
+    let playbackProgress = PlaybackProgress()
     
     private weak var favoritesManager: FavoritesManager?
     
@@ -301,15 +307,26 @@ class PlayerManager: ObservableObject {
     
     func monitorMusicPlayerState() {
         playerStateTask?.cancel()
-        playerStateTask = Task {
+        
+        playerStateTask = Task { @MainActor in
             let player = ApplicationMusicPlayer.shared
+            var lastPlaybackStatus = player.state.playbackStatus
+            
             while true {
                 if Task.isCancelled { break }
                 
-                let state = player.state
-                DispatchQueue.main.async {
-                    self.isPlaying = (state.playbackStatus == .playing)
+                let status = player.state.playbackStatus
+                
+                if status != lastPlaybackStatus {
+                    lastPlaybackStatus = status
+                    
+                    let newIsPlaying = status == .playing
+                    
+                    if self.isPlaying != newIsPlaying {
+                        self.isPlaying = newIsPlaying
+                    }
                 }
+                
                 try? await Task.sleep(nanoseconds: 500_000_000)
             }
         }
@@ -1048,14 +1065,23 @@ class PlayerManager: ObservableObject {
             guard let self else { return }
             
             Task { @MainActor in
-                
                 if self.appleMusicSubscription {
                     let player = ApplicationMusicPlayer.shared
-                    self.playbackTime = player.playbackTime
-                    self.trackDuration = self.currentlyPlayingSong?.duration ?? 0
+                    
+                    self.playbackProgress.playbackTime = player.playbackTime
+                    
+                    let newDuration = self.currentlyPlayingSong?.duration ?? 0
+                    if self.playbackProgress.trackDuration != newDuration {
+                        self.playbackProgress.trackDuration = newDuration
+                    }
+                    
                 } else if let audioPlayer = self.audioPlayer {
-                    self.playbackTime = audioPlayer.currentTime().seconds
-                    self.trackDuration = audioPlayer.currentItem?.duration.seconds ?? 30
+                    self.playbackProgress.playbackTime = audioPlayer.currentTime().seconds
+                    
+                    let newDuration = audioPlayer.currentItem?.duration.seconds ?? 30
+                    if self.playbackProgress.trackDuration != newDuration {
+                        self.playbackProgress.trackDuration = newDuration
+                    }
                 }
             }
         }

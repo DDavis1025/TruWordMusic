@@ -121,32 +121,7 @@ struct TrackDetailView: View {
                     
                     Spacer().frame(height: 30)
                     
-                    // Progress + Time
-                    VStack(spacing: 6) {
-                        
-                        let safeDuration = max(playerManager.trackDuration, 0.1)
-                        let safeProgress = min(max(playerManager.playbackTime, 0), safeDuration)
-                        
-                        ProgressView(
-                            value: safeProgress,
-                            total: safeDuration
-                        )
-                        .tint(.primary)
-                        .frame(maxWidth: .infinity)
-                        
-                        HStack {
-                            Text(formatTime(playerManager.playbackTime))
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            
-                            Spacer()
-                            
-                            Text(formatTime(playerManager.trackDuration))
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.horizontal, 27)
+                    PlaybackProgressView(progress: playerManager.playbackProgress)
                     
                     // Controls
                     HStack(spacing: 40) {
@@ -800,5 +775,50 @@ struct ButtonPositionKey: PreferenceKey {
     
     static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
         value = nextValue() ?? value
+    }
+}
+
+struct PlaybackProgressView: View {
+    @ObservedObject var progress: PlaybackProgress
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            let safeDuration = max(progress.trackDuration, 0.1)
+            let safeProgress = min(
+                max(progress.playbackTime, 0),
+                safeDuration
+            )
+            
+            ProgressView(
+                value: safeProgress,
+                total: safeDuration
+            )
+            .tint(.primary)
+            .frame(maxWidth: .infinity)
+            
+            HStack {
+                Text(formatTime(progress.playbackTime))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Text(formatTime(progress.trackDuration))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 27)
+    }
+    
+    private func formatTime(_ seconds: Double) -> String {
+        guard seconds.isFinite && seconds > 0 else {
+            return "0:00"
+        }
+        
+        let minutes = Int(seconds) / 60
+        let remainingSeconds = Int(seconds) % 60
+        
+        return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 }
