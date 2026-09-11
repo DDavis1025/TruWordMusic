@@ -15,13 +15,15 @@ struct AlbumCarouselItemView: View {
     var body: some View {
         let screenWidth = UIScreen.main.bounds.width
         let albumSize = max(min(screenWidth * 0.4, 255), 150)
-        
+
+        let pixelSize = Int(albumSize * UIScreen.main.scale)
+
+        let artworkURL = album.artwork?.url(
+            width: pixelSize,
+            height: pixelSize
+        )
+
         VStack(spacing: 4) {
-            let size = min(max(screenWidth * 0.6, 300), 1400)
-            let pixelSize = Int(size * UIScreen.main.scale * 2)
-
-            let artworkURL = album.artwork?.url(width: pixelSize, height: pixelSize)
-
             CustomAsyncImage(url: artworkURL, isCircle: false)
                 .frame(width: albumSize, height: albumSize)
             

@@ -64,7 +64,7 @@ enum SearchResultItem: Identifiable {
     var artworkURL: URL? {
         let baseSize: CGFloat = 60 // matches your SongRowLikeView image frame
         let scale = UIScreen.main.scale
-        let pixelSize = Int(baseSize * scale * 2)
+        let pixelSize = Int(baseSize * scale)
 
         switch self {
         case .song(let song):
@@ -275,7 +275,7 @@ struct SearchView: View {
                                                     
                                                     let baseSize: CGFloat = 60
                                                     let scale = UIScreen.main.scale
-                                                    let pixelSize = Int(baseSize * scale * 2)
+                                                    let pixelSize = Int(baseSize * scale)
                                                     
                                                     addRecentSearch(.song(
                                                         id: song.id,
@@ -296,7 +296,7 @@ struct SearchView: View {
                                                     
                                                     let baseSize: CGFloat = 60
                                                     let scale = UIScreen.main.scale
-                                                    let pixelSize = Int(baseSize * scale * 2)
+                                                    let pixelSize = Int(baseSize * scale)
                                                     
                                                     addRecentSearch(.album(
                                                         id: album.id,
@@ -317,7 +317,7 @@ struct SearchView: View {
                                                     
                                                     let baseSize: CGFloat = 60
                                                     let scale = UIScreen.main.scale
-                                                    let pixelSize = Int(baseSize * scale * 2)
+                                                    let pixelSize = Int(baseSize * scale)
                                                     
                                                     addRecentSearch(.artist(
                                                         id: artist.id,
@@ -966,10 +966,7 @@ struct SongRowLikeView: View {
             let screenWidth = UIScreen.main.bounds.width
             let artworkSize = min(max(screenWidth * 0.15, 50), 100)
 
-            // If you control URL creation upstream, prefer passing a pre-sized URL.
-            let highResURL = artworkURL
-
-            CustomAsyncImage(url: highResURL, isCircle: isArtist)
+            CustomAsyncImage(url: artworkURL, isCircle: isArtist)
                 .frame(width: artworkSize, height: artworkSize)
 
             VStack(alignment: .leading, spacing: 4) {

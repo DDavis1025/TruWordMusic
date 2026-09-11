@@ -23,7 +23,7 @@ struct SongOfTheDayView: View {
                 
                 let imageSize: CGFloat = 57
                 let scale = UIScreen.main.scale
-                let pixelSize = Int(imageSize * scale * 2)
+                let pixelSize = Int(imageSize * scale)
 
                 let artworkURL = song.artwork?.url(width: pixelSize, height: pixelSize)
 

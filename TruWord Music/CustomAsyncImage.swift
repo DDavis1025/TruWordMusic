@@ -1,24 +1,19 @@
-//
-//  CustomAsyncImage.swift
-//  TruWord Music
-//
-//  Created by Dillon Davis on 3/4/25.
-//
-
 import SwiftUI
 import UIKit
 
-// Create a global cache for images
 class ImageCache {
     static let shared = ImageCache()
+
     private let cache = NSCache<NSURL, UIImage>()
-    
-    private init() {}
-    
-    func getImage(for url: URL) -> UIImage? {
-        return cache.object(forKey: url as NSURL)
+
+    private init() {
+        cache.countLimit = 100
     }
-    
+
+    func getImage(for url: URL) -> UIImage? {
+        cache.object(forKey: url as NSURL)
+    }
+
     func setImage(_ image: UIImage, for url: URL) {
         cache.setObject(image, forKey: url as NSURL)
     }
@@ -26,10 +21,10 @@ class ImageCache {
 
 struct CustomAsyncImage: View {
     let url: URL?
-    let isCircle: Bool   // 👈 add this
+    let isCircle: Bool
 
-    @State private var image: UIImage? = nil
-    @State private var isLoading: Bool = false
+    @State private var image: UIImage?
+    @State private var isLoading = false
 
     @Environment(\.colorScheme) var colorScheme
 
@@ -43,7 +38,12 @@ struct CustomAsyncImage: View {
             } else if isLoading {
                 ZStack {
                     Color(.secondarySystemBackground)
-                        .clipShape(isCircle ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 8)))
+                        .clipShape(
+                            isCircle
+                            ? AnyShape(Circle())
+                            : AnyShape(RoundedRectangle(cornerRadius: 8))
+                        )
+
                     ProgressView()
                 }
             } else {
@@ -55,8 +55,8 @@ struct CustomAsyncImage: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipShape(
             isCircle
-                ? AnyShape(Circle())
-                : AnyShape(RoundedRectangle(cornerRadius: 8))
+            ? AnyShape(Circle())
+            : AnyShape(RoundedRectangle(cornerRadius: 8))
         )
         .overlay {
             if isCircle {
@@ -71,31 +71,35 @@ struct CustomAsyncImage: View {
             loadImage()
         }
     }
-    
+
     private func loadImage() {
         guard let url = url else { return }
-        
-        // Check if the image is already cached
+
         if let cachedImage = ImageCache.shared.getImage(for: url) {
-            self.image = cachedImage
+            image = cachedImage
             return
         }
-        
+
+        guard !isLoading else { return }
+
         isLoading = true
-        
-        URLSession.shared.dataTask(with: url) { data, response, error in
-            if let data = data, let uiImage = UIImage(data: data) {
-                // Cache the image
-                ImageCache.shared.setImage(uiImage, for: url)
-                
+
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard
+                let data = data,
+                let uiImage = UIImage(data: data)
+            else {
                 DispatchQueue.main.async {
-                    self.image = uiImage
-                    self.isLoading = false
+                    isLoading = false
                 }
-            } else {
-                DispatchQueue.main.async {
-                    self.isLoading = false
-                }
+                return
+            }
+
+            ImageCache.shared.setImage(uiImage, for: url)
+
+            DispatchQueue.main.async {
+                image = uiImage
+                isLoading = false
             }
         }.resume()
     }

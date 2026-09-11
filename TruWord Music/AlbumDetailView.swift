@@ -74,9 +74,16 @@ struct AlbumDetailView: View {
                     Section {
                         VStack(spacing: 8) {
                             
-                            let artworkURL = album.artwork?.url(width: 1400, height: 1400)
                             let screenWidth = UIScreen.main.bounds.width
                             let albumSize = min(max(screenWidth * 0.5, 150), 300)
+
+                            let scale = UIScreen.main.scale
+                            let pixelSize = Int(albumSize * scale)
+
+                            let artworkURL = album.artwork?.url(
+                                width: pixelSize,
+                                height: pixelSize
+                            )
                             
                             CustomAsyncImage(url: artworkURL, isCircle: false)
                                 .frame(width: albumSize, height: albumSize)

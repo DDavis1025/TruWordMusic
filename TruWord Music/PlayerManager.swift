@@ -637,8 +637,10 @@ class PlayerManager: ObservableObject {
                 return await startPlaybackAndMarkReady()
             }
             
-            let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
-            player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
+            player.queue = ApplicationMusicPlayer.Queue(
+                for: queueSongs,
+                startingAt: queueSongs[startIndex]
+            )
             
             observePlaybackState(
                 songs: queueSongs,
@@ -686,8 +688,10 @@ class PlayerManager: ObservableObject {
                 return
             }
             
-            let orderedQueue = Array(queueSongs[startIndex...]) + Array(queueSongs[..<startIndex])
-            player.queue = ApplicationMusicPlayer.Queue(for: orderedQueue)
+            player.queue = ApplicationMusicPlayer.Queue(
+                for: queueSongs,
+                startingAt: queueSongs[startIndex]
+            )
             
             observePlaybackState(
                 songs: queueSongs,

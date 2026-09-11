@@ -24,7 +24,7 @@ struct SongRowView: View {
             let songArtworkSize = min(max(screenWidth * 0.15, 50), 100)
 
             let scale = UIScreen.main.scale
-            let pixelSize = Int(songArtworkSize * scale * 2)
+            let pixelSize = Int(songArtworkSize * scale)
 
             let artworkURL = song.artwork?.url(
                 width: pixelSize,

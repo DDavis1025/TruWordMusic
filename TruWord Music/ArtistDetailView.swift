@@ -78,7 +78,7 @@ struct ArtistDetailView: View {
                         VStack(spacing: 7) {
                             let displaySize: CGFloat = 160
                             let scale = UIScreen.main.scale
-                            let pixelSize = Int(displaySize * scale * 2) // extra sharp (2x retina)
+                            let pixelSize = Int(displaySize * scale)
                             let artworkURL = artist?.artwork?.url(width: pixelSize, height: pixelSize)
                             
                             CustomAsyncImage(url: artworkURL, isCircle: true)
@@ -136,7 +136,7 @@ struct ArtistDetailView: View {
                                     let artworkSize = min(max(screenWidth * 0.24, 95), 150)
 
                                     let scale = UIScreen.main.scale
-                                    let pixelSize = Int(artworkSize * scale * 2)
+                                    let pixelSize = Int(artworkSize * scale)
 
                                     let artworkURL = latestRelease.artwork?.url(
                                         width: pixelSize,

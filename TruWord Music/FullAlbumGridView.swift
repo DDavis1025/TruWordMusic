@@ -83,7 +83,7 @@ struct FullAlbumGridView: View {
                             NavigationLink(value: Route.album(album.id)) {
                                 
                                 VStack {
-                                    let pixelSize = Int(albumSize * UIScreen.main.scale * 2)
+                                    let pixelSize = Int(albumSize * UIScreen.main.scale)
 
                                     let artworkURL = album.artwork?.url(width: pixelSize, height: pixelSize)
 

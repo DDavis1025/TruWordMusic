@@ -67,8 +67,8 @@ struct TrackDetailView: View {
                         let scale = UIScreen.main.scale
                         
                         let artworkURL = song.artwork?.url(
-                            width: Int(displaySize * scale * 2),
-                            height: Int(displaySize * scale * 2)
+                            width: Int(displaySize * scale),
+                            height: Int(displaySize * scale)
                         )
                         
                         CustomAsyncImage(url: artworkURL, isCircle: false)
@@ -780,29 +780,33 @@ struct ButtonPositionKey: PreferenceKey {
 
 struct PlaybackProgressView: View {
     @ObservedObject var progress: PlaybackProgress
-    
+
     var body: some View {
         VStack(spacing: 6) {
-            let safeDuration = max(progress.trackDuration, 0.1)
-            let safeProgress = min(
-                max(progress.playbackTime, 0),
-                safeDuration
-            )
-            
+            let duration = progress.trackDuration > 0
+                ? progress.trackDuration
+                : 1.0
+
+            let currentTime = progress.trackDuration > 0
+                ? min(max(progress.playbackTime, 0), progress.trackDuration)
+                : 0.0
+
+            // Always use the determinate horizontal progress bar.
             ProgressView(
-                value: safeProgress,
-                total: safeDuration
+                value: currentTime,
+                total: duration
             )
             .tint(.primary)
             .frame(maxWidth: .infinity)
-            
+            .frame(height: 4)
+
             HStack {
                 Text(formatTime(progress.playbackTime))
                     .font(.caption2)
                     .foregroundColor(.secondary)
-                
+
                 Spacer()
-                
+
                 Text(formatTime(progress.trackDuration))
                     .font(.caption2)
                     .foregroundColor(.secondary)
@@ -810,15 +814,15 @@ struct PlaybackProgressView: View {
         }
         .padding(.horizontal, 27)
     }
-    
+
     private func formatTime(_ seconds: Double) -> String {
         guard seconds.isFinite && seconds > 0 else {
             return "0:00"
         }
-        
+
         let minutes = Int(seconds) / 60
         let remainingSeconds = Int(seconds) % 60
-        
+
         return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 }
