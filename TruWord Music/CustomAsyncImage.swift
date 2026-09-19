@@ -33,7 +33,7 @@ struct CustomAsyncImage: View {
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .scaledToFit()
 
             } else if isLoading {
                 ZStack {
@@ -49,7 +49,7 @@ struct CustomAsyncImage: View {
             } else {
                 Image(colorScheme == .dark ? "placeholder_dark" : "placeholder")
                     .resizable()
-                    .scaledToFill()
+                    .scaledToFit()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

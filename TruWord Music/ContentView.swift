@@ -355,7 +355,7 @@ struct ContentView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    guard playerManager.recentlyPlayedAlbums.count > 10 else { return }
+                    guard playerManager.recentlyPlayedAlbums.count >= 10 else { return }
 
                     navigationPath.append(
                         .recentlyPlayedGrid(source: "recently_played")
@@ -408,7 +408,7 @@ struct ContentView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    guard albums.count > 10 else { return }
+                    guard albums.count >= 10 else { return }
 
                     navigationPath.append(
                         .fullAlbumGrid(source: "home_top_christian_albums")
@@ -525,7 +525,7 @@ struct ContentView: View {
                 .padding(.trailing, 5)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    guard section.albums.count > 10 else { return }
+                    guard section.albums.count >= 10 else { return }
 
                     navigationPath.append(
                         .artistAlbumGrid(
@@ -571,7 +571,7 @@ struct ContentView: View {
     }
     
     private func loadMoreByArtist() async {
-        // Sort artists from most played → least played.
+        // Sort artists by play count, most played → least played.
         let rankedArtistIDs = playerManager.artistPlayCounts
             .sorted { $0.value > $1.value }
             .map { $0.key }
@@ -583,71 +583,88 @@ struct ContentView: View {
             return
         }
 
+        // IDs of albums currently shown in Recently Played.
+        let recentlyPlayedIDs = Set(
+            playerManager.recentlyPlayedAlbums.map { $0.id }
+        )
+
         // Try each artist in play-count order until we find
-        // one with valid Christian, non-explicit albums.
+        // one with valid Christian/non-explicit albums.
         for artistIDString in rankedArtistIDs {
             do {
                 let artistID = MusicItemID(artistIDString)
 
-                var artistRequest = MusicCatalogResourceRequest<Artist>(
+                var request = MusicCatalogResourceRequest<Artist>(
                     matching: \.id,
                     equalTo: artistID
                 )
 
-                artistRequest.properties = [.albums]
-                artistRequest.limit = 1
+                request.properties = [.albums]
+                request.limit = 1
 
-                let artistResponse = try await artistRequest.response()
+                let response = try await request.response()
 
-                guard let fullArtist = artistResponse.items.first else {
+                guard let artist = response.items.first else {
                     continue
                 }
 
-                let filteredAlbums = (fullArtist.albums ?? []).filter { album in
+                let filteredAlbums = (artist.albums ?? []).filter { album in
                     let isChristian =
                         album.genreNames.contains("Christian") ||
                         album.genreNames.contains("Christian & Gospel")
 
-                    let isNotExplicit = album.contentRating != .explicit
+                    let isNotExplicit =
+                        album.contentRating != .explicit
 
                     return isChristian && isNotExplicit
                 }
 
-                // Found an artist with valid albums.
+                // If this artist has valid albums, use them.
                 if !filteredAlbums.isEmpty {
+
+                    // Prefer albums that are NOT recently played,
+                    // but keep recently played albums as fallback.
+                    let notRecentlyPlayed = filteredAlbums.filter {
+                        !recentlyPlayedIDs.contains($0.id.rawValue)
+                    }
+
+                    let recentlyPlayed = filteredAlbums.filter {
+                        recentlyPlayedIDs.contains($0.id.rawValue)
+                    }
+
+                    // Fresh albums first, recently played albums afterward.
+                    let orderedAlbums =
+                        notRecentlyPlayed + recentlyPlayed
+
                     await MainActor.run {
                         moreByArtistSection = MoreByArtistSection(
-                            artist: fullArtist,
-                            albums: filteredAlbums
+                            artist: artist,
+                            albums: orderedAlbums
                         )
 
-                        for album in filteredAlbums {
+                        // Cache albums for navigation.
+                        for album in orderedAlbums {
                             albumCache[album.id] = album
                         }
                     }
 
-                    print("More By Artist source: \(fullArtist.name)")
-                    print("Albums found: \(filteredAlbums.count)")
-
                     return
                 }
 
-                // This artist had no valid albums, so try
-                // the next most-played artist.
-                print("No valid Christian albums for: \(fullArtist.name)")
-
             } catch {
-                print("Failed to load artist \(artistIDString): \(error)")
+                print(
+                    "Failed to load albums for artist \(artistIDString): \(error)"
+                )
                 continue
             }
         }
 
-        // No played artist had valid Christian, non-explicit albums.
+        // None of the played artists had valid albums.
         await MainActor.run {
             moreByArtistSection = nil
         }
 
-        print("No valid More By Artist found for any played artist.")
+        print("No More By Artist albums found.")
     }
     
     @ViewBuilder
@@ -857,6 +874,11 @@ struct ContentView: View {
             return
         }
 
+        // IDs of albums currently shown in Recently Played.
+        let recentlyPlayedIDs = Set(
+            playerManager.recentlyPlayedAlbums.map { $0.id }
+        )
+
         // Try each album in play-count order until we find
         // one with valid related albums.
         for albumIDString in rankedAlbumIDs {
@@ -889,24 +911,35 @@ struct ContentView: View {
 
                 // If this album has valid recommendations, use them.
                 if !filtered.isEmpty {
+
+                    // Prefer albums that are NOT recently played,
+                    // but keep recently played albums as fallback.
+                    let notRecentlyPlayed = filtered.filter {
+                        !recentlyPlayedIDs.contains($0.id.rawValue)
+                    }
+
+                    let recentlyPlayed = filtered.filter {
+                        recentlyPlayedIDs.contains($0.id.rawValue)
+                    }
+
+                    // Put fresh recommendations first.
+                    // Recently played recommendations remain available
+                    // so the section doesn't become unnecessarily small.
+                    let orderedRecommendations =
+                        notRecentlyPlayed + recentlyPlayed
+
                     await MainActor.run {
                         recommendedFromAlbum = album
-                        recommendedAlbums = filtered
+                        recommendedAlbums = orderedRecommendations
 
                         // Cache them for navigation.
-                        for album in filtered {
+                        for album in orderedRecommendations {
                             albumCache[album.id] = album
                         }
                     }
 
-                    print("You Might Also Like source: \(album.title)")
-                    print("Recommendations found: \(filtered.count)")
-
                     return
                 }
-
-                // Otherwise, continue to the next most-played album.
-                print("No recommendations for: \(album.title)")
 
             } catch {
                 print("Failed to load recommendations for album \(albumIDString): \(error)")

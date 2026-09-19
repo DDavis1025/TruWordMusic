@@ -227,11 +227,10 @@ struct TrackDetailView: View {
                                 
                                 favoritesManager.toggleFavorite(song)
                                 
-                                if wasFavorite {
-                                    
+                                if wasFavorite && playerManager.playbackSource == .favorites {
                                     Task {
                                         try? await Task.sleep(nanoseconds: 200_000_000)
-                                        
+
                                         await MainActor.run {
                                             playerManager.handleCurrentFavoriteRemoved(
                                                 removedSong: song,
