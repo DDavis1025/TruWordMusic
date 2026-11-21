@@ -408,6 +408,11 @@ struct TrackDetailView: View {
                     showPreviewInfo = false
                 }
             }
+            .onChange(of: playerManager.currentlyPlayingSong) {
+                Task {
+                    preferredAlbum = await fetchPreferredAlbum()
+                }
+            }
             
             .alert("Preview Mode", isPresented: $showPreviewInfo) {
                 if let appleMusicURL {
@@ -434,15 +439,18 @@ struct TrackDetailView: View {
     }
     
     private func openPreferredAlbum() {
-        guard let album = preferredAlbum else { return }
-        
-        Analytics.logEvent(
-            "view_album_tapped",
-            parameters: [
-                "song_id": song.id.rawValue,
-                "album_id": album.id.rawValue
-            ]
-        )
+        guard let album = preferredAlbum,
+                 let currentSong = playerManager.currentlyPlayingSong else {
+               return
+           }
+
+           Analytics.logEvent(
+               "view_album_tapped",
+               parameters: [
+                   "song_id": currentSong.id.rawValue,
+                   "album_id": album.id.rawValue
+               ]
+           )
         
         let albumID = album.id
         
@@ -719,47 +727,51 @@ struct TrackDetailView: View {
     }
     
     private func fetchPreferredAlbum() async -> Album? {
+        guard let currentSong = playerManager.currentlyPlayingSong else {
+            return nil
+        }
+
         do {
             var request = MusicCatalogResourceRequest<Song>(
                 matching: \.id,
-                equalTo: song.id
+                equalTo: currentSong.id
             )
-            
+
             request.properties = [.albums]
             request.limit = 1
-            
+
             let response = try await request.response()
-            
+
             guard let fullSong = response.items.first,
                   let albums = fullSong.albums else {
                 return nil
             }
-            
+
             for album in albums {
                 var albumRequest = MusicCatalogResourceRequest<Album>(
                     matching: \.id,
                     equalTo: album.id
                 )
-                
+
                 albumRequest.limit = 1
-                
+
                 let albumResponse = try await albumRequest.response()
-                
+
                 guard let fullAlbum = albumResponse.items.first else {
                     continue
                 }
-                
+
                 let christian =
-                fullAlbum.genreNames.contains("Christian") ||
-                fullAlbum.genreNames.contains("Christian & Gospel")
-                
+                    fullAlbum.genreNames.contains("Christian") ||
+                    fullAlbum.genreNames.contains("Christian & Gospel")
+
                 if christian && fullAlbum.contentRating != .explicit {
                     return fullAlbum
                 }
             }
-            
+
             return nil
-            
+
         } catch {
             print(error)
             return nil

@@ -66,32 +66,34 @@ class FavoritesManager: ObservableObject {
     }
     
     
+    
     func fetchFavoriteSongs() async {
         guard !favoriteIDs.isEmpty else {
             favoriteSongs = []
             return
         }
-        
+
         do {
             let idStrings = favoriteOrder
             let ids = idStrings.map { MusicItemID($0) }
-            
+
             let request = MusicCatalogResourceRequest<Song>(
                 matching: \.id,
                 memberOf: ids
             )
-            
+
             let response = try await request.response()
             let songs = response.items
-            
-            // Preserve saved order
-            favoriteSongs = idStrings.compactMap { id in
+
+            // Preserve saved order, with newest favorites first
+            favoriteSongs = idStrings.reversed().compactMap { id in
                 songs.first(where: { $0.id.rawValue == id })
             }
-            
+
         } catch {
             print("ERROR fetching favorites: \(error)")
         }
     }
+
 }
 

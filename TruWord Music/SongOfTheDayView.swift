@@ -56,8 +56,9 @@ struct SongOfTheDayView: View {
                 Spacer(minLength: 8)
                 
                 Button {
-                    playerManager.playSong(song, from: songs)
+                    playerManager.playbackSource = .home
                     playerManager.isPlayingFromAlbum = false
+                    playerManager.playSong(song, from: songs)
                     
                     Analytics.logEvent("song_of_day_played", parameters: [
                         "song_id": song.id.rawValue,

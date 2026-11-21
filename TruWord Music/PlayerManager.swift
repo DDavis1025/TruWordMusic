@@ -873,18 +873,40 @@ class PlayerManager: ObservableObject {
         favoritesManager: FavoritesManager,
         networkMonitor: NetworkMonitor
     ) {
-        
+
         // MARK: - REGULAR FAVORITES + SUBSCRIPTION
         if playbackSource == .favorites &&
             appleMusicSubscription {
-            
+
             let player = ApplicationMusicPlayer.shared
-            
-            // Only handle the currently playing song
+
+            // MARK: - FAVORITES SHUFFLE
+            if isFavoritesShuffle {
+
+                // Remove the song from the stored playback list,
+                // even if it has already played.
+                lastPlayedSongs.removeAll {
+                    $0.id == removedSong.id
+                }
+
+                // If this is not the currently playing song,
+                // simply remove it from the shuffle queue.
+                guard currentlyPlayingSong?.id == removedSong.id else {
+                    player.queue.entries.removeAll { entry in
+                        if case .song(let queueSong) = entry.item {
+                            return queueSong.id == removedSong.id
+                        }
+                        return false
+                    }
+                    return
+                }
+            }
+
+            // Only handle the currently playing song in regular Favorites.
             guard currentlyPlayingSong?.id == removedSong.id else {
                 return
             }
-            
+
             // No favorites left
             guard !favoritesManager.favoriteSongs.isEmpty else {
                 player.stop()
@@ -892,13 +914,13 @@ class PlayerManager: ObservableObject {
                 isPlaying = false
                 return
             }
-            
+
             // Skip first, while the current song is still the
-            // current queue entry
+            // current queue entry.
             Task {
                 try? await player.skipToNextEntry()
-                
-                // Then remove the unfavorited song
+
+                // Then remove the unfavorited song.
                 player.queue.entries.removeAll { entry in
                     if case .song(let queueSong) = entry.item {
                         return queueSong.id == removedSong.id
@@ -906,36 +928,56 @@ class PlayerManager: ObservableObject {
                     return false
                 }
             }
-            
+
+            return
+        }
+
+        // MARK: - PREVIEW MODE / SHUFFLE
+        if playbackSource == .favorites &&
+            isFavoritesShuffle &&
+            currentlyPlayingSong?.id != removedSong.id {
+
+            // Keep the remaining shuffled playback list updated.
+            lastPlayedSongs.removeAll {
+                $0.id == removedSong.id
+            }
+
             return
         }
         
+        // Only advance playback if the song being removed
+        // is the song currently playing.
+        guard currentlyPlayingSong?.id == removedSong.id else {
+            return
+        }
+
         // MARK: - PREVIEW MODE / EXISTING BEHAVIOR
         let updatedFavorites = favoritesManager.favoriteSongs
-        
+
         guard !updatedFavorites.isEmpty else {
             currentlyPlayingSong = nil
             isPlaying = false
-            
+
             if appleMusicSubscription {
                 ApplicationMusicPlayer.shared.stop()
             } else {
                 audioPlayer?.pause()
             }
+
             return
         }
-        
+
         var nextSong: Song?
-        
+
         if let index = removedIndex {
             let safeIndex = min(index, updatedFavorites.count - 1)
             nextSong = updatedFavorites[safeIndex]
         } else {
             nextSong = updatedFavorites.first
         }
-        
+
         guard let nextSong else { return }
-        
+
         playSong(
             nextSong,
             from: updatedFavorites,
@@ -944,6 +986,7 @@ class PlayerManager: ObservableObject {
             networkMonitor: networkMonitor
         )
     }
+
     
     func toggleRepeatMode() {
         switch repeatMode {

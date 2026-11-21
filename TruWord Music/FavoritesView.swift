@@ -240,22 +240,23 @@ struct FavoritesView: View {
                                 favoritesManager.toggleFavorite(song)
                             }
                             
-                            // Remove just the specific entry from queue
-                            if wasFavorite {
+                            // Only modify playback if the current queue is Favorites
+                            if wasFavorite &&
+                                playerManager.playbackSource == .favorites {
+
                                 if playerManager.appleMusicSubscription &&
-                                    playerManager.playbackSource == .favorites &&
                                     !playerManager.favoritesShuffleActive {
-                                    
+
                                     // Regular Favorites
                                     let player = ApplicationMusicPlayer.shared
-                                    
+
                                     player.queue.entries.removeAll { entry in
                                         if case .song(let queueSong) = entry.item {
                                             return queueSong.id == song.id
                                         }
                                         return false
                                     }
-                                    
+
                                 } else {
                                     // Shuffle / Preview
                                     Task { @MainActor in
