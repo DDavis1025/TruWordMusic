@@ -79,7 +79,9 @@ struct FavoritesView: View {
             }
             
             
-            .if(networkMonitor.isConnected && musicAuthorized) { view in
+            .if(networkMonitor.isConnected &&
+                musicAuthorized &&
+                !favoritesManager.favoriteSongs.isEmpty) { view in
                 view.searchable(text: $searchQuery, prompt: "Search Favorites")
             }
             
