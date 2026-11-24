@@ -106,7 +106,6 @@ struct SearchView: View {
     @State private var hasSearched = false
     @State private var activeSearchID = UUID()
     @State private var cachedSearchResults: [String: [String: [SearchResultItem]]] = [:]
-    @State private var isSearchActive = false
     
     @FocusState private var isSearchFocused: Bool
     
@@ -119,9 +118,7 @@ struct SearchView: View {
     private let bottomPlayerHeight: CGFloat = 77
     
     private var shouldShowRecentSearches: Bool {
-        searchQuery.isEmpty &&
-        searchResults.isEmpty &&
-        !recentSearches.isEmpty
+        searchQuery.isEmpty && searchResults.isEmpty
     }
     
     var body: some View {
@@ -138,59 +135,7 @@ struct SearchView: View {
                     .padding(.horizontal, 16)
                 } else {
                     VStack(spacing: 0) {
-                        // MARK: - Search Bar
-
-                        HStack(spacing: 8) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "magnifyingglass")
-                                    .foregroundColor(.secondary)
-
-                                TextField("Search Christian music", text: $searchQuery)
-                                    .focused($isSearchFocused)
-                                    .submitLabel(.search)
-                                    .onSubmit {
-                                        Task {
-                                            await performSearch()
-                                        }
-                                    }
-
-                                if !searchQuery.isEmpty {
-                                    Button {
-                                        searchQuery = ""
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 11)
-                            .background(Color(.systemGray6))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .frame(maxWidth: .infinity)
-
-                            if isSearchActive {
-                                Button("Cancel") {
-                                    activeSearchID = UUID()
-                                    searchQuery = ""
-                                    searchResults = []
-                                    hasSearched = false
-                                    isSearching = false
-                                    selectedTab = .all
-                                    isSearchFocused = false
-                                    isSearchActive = false
-                                }
-                                .foregroundColor(.accentColor)
-                                .fixedSize()
-                                .transition(.move(edge: .trailing).combined(with: .opacity))
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                        .padding(.bottom, 8)
-                        .animation(.easeInOut(duration: 0.2), value: isSearchActive)
-
+                        
                         // MARK: - Tab Bar
                         if hasSearched {
                             HStack(spacing: 0) {
@@ -199,7 +144,7 @@ struct SearchView: View {
                                         withAnimation(.easeInOut(duration: 0.3)) {
                                             selectedTab = tab
                                         }
-                                        
+
                                         Analytics.logEvent("search_tab_changed", parameters: [
                                             "tab": tab.rawValue
                                         ])
@@ -241,11 +186,9 @@ struct SearchView: View {
                             
                         } else if shouldShowRecentSearches {
                             recentSearchView
-                        } else if searchQuery.isEmpty && recentSearches.isEmpty {
-                            searchPlaceholderView
                         } else if !searchQuery.isEmpty && !hasSearched && filteredResults.isEmpty {
                             searchPlaceholderView
-                        } else if hasSearched && !isSearching && filteredResults.isEmpty {
+                        } else if hasSearched && filteredResults.isEmpty {
                             VStack {
                                 Spacer()
                                 
@@ -403,13 +346,14 @@ struct SearchView: View {
                             }
                         }
                     }
+                    .searchable(
+                        text: $searchQuery,
+                        placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "Christian songs, albums & artists"
+                    )
+                    .focused($isSearchFocused)
                     .onSubmit(of: .search) {
                         Task { await performSearch() }
-                    }
-                    .onChange(of: isSearchFocused) { _, isFocused in
-                        if isFocused {
-                            isSearchActive = true
-                        }
                     }
                     .onChange(of: selectedTab) {
                         guard !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -425,6 +369,13 @@ struct SearchView: View {
             .onAppear {
                 loadRecentSearches()
                 Analytics.logEvent("search_viewed", parameters: nil)
+            }
+            
+            .onChange(of: isSearchFocused) { oldValue, newValue in
+                if newValue == false {
+                    searchResults = []
+                    isSearching = false
+                }
             }
             
             .onChange(of: searchQuery) { oldValue, newValue in
@@ -645,9 +596,10 @@ struct SearchView: View {
             return
         }
         
+        hasSearched = true
+        
         isSearching = true
         searchResults = []
-        hasSearched = true
         
         defer {
             if activeSearchID == searchID {
