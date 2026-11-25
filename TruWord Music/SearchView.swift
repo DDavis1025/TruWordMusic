@@ -353,6 +353,7 @@ struct SearchView: View {
                     )
                     .focused($isSearchFocused)
                     .onSubmit(of: .search) {
+                        selectedTab = .all
                         Task { await performSearch() }
                     }
                     .onChange(of: selectedTab) {
@@ -841,87 +842,114 @@ struct SearchView: View {
     }
     
     private var recentSearchView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+        Group {
+            if recentSearches.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Recent Searches")
+                            .font(.headline)
 
-                HStack {
-                    Text("Recent Searches")
-                        .font(.headline)
-
-                    Spacer()
-
-                    if !recentSearches.isEmpty {
-                        Button("Clear") {
-                            showClearRecentAlert = true
-                        }
-                        .font(.footnote)
-                        .foregroundColor(.red)
+                        Spacer()
                     }
-                }
-                .padding(.horizontal)
-                .padding(.top, 10)
+                    .padding(.horizontal)
+                    .padding(.top, 10)
 
-                if recentSearches.isEmpty {
                     Text("No recent searches")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .padding(.horizontal)
                         .padding(.top, 10)
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(recentSearches) { item in
-                            SongRowLikeView(
-                                title: {
-                                    switch item {
-                                    case .song(_, let title, _, _): return title
-                                    case .album(_, let title, _, _): return title
-                                    case .artist(_, let name, _): return name
-                                    }
-                                }(),
-                                artistName: {
-                                    switch item {
-                                    case .song(_, _, let artist, _):
-                                        return "Song · \(artist)"
-                                    case .album(_, _, let artist, _):
-                                        return "Album · \(artist)"
-                                    case .artist:
-                                        return "Artist"
-                                    }
-                                }(),
-                                artworkURL: {
-                                    switch item {
-                                    case .song(_, _, _, let url),
-                                         .album(_, _, _, let url),
-                                         .artist(_, _, let url):
-                                        return url
-                                    }
-                                }(),
-                                isArtist: {
-                                    if case .artist = item { return true }
-                                    return false
-                                }(),
-                                currentlyPlayingSong: $playerManager.currentlyPlayingSong
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                handleRecentSearchTap(item)
+
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+
+                        HStack {
+                            Text("Recent Searches")
+                                .font(.headline)
+
+                            Spacer()
+
+                            Button("Clear") {
+                                showClearRecentAlert = true
+                            }
+                            .font(.footnote)
+                            .foregroundColor(.red)
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 10)
+
+                        VStack(spacing: 0) {
+                            ForEach(recentSearches) { item in
+                                SongRowLikeView(
+                                    title: {
+                                        switch item {
+                                        case .song(_, let title, _, _):
+                                            return title
+                                        case .album(_, let title, _, _):
+                                            return title
+                                        case .artist(_, let name, _):
+                                            return name
+                                        }
+                                    }(),
+                                    artistName: {
+                                        switch item {
+                                        case .song(_, _, let artist, _):
+                                            return "Song · \(artist)"
+                                        case .album(_, _, let artist, _):
+                                            return "Album · \(artist)"
+                                        case .artist:
+                                            return "Artist"
+                                        }
+                                    }(),
+                                    artworkURL: {
+                                        switch item {
+                                        case .song(_, _, _, let url),
+                                             .album(_, _, _, let url),
+                                             .artist(_, _, let url):
+                                            return url
+                                        }
+                                    }(),
+                                    isArtist: {
+                                        if case .artist = item {
+                                            return true
+                                        }
+                                        return false
+                                    }(),
+                                    currentlyPlayingSong: $playerManager.currentlyPlayingSong
+                                )
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    handleRecentSearchTap(item)
+                                }
                             }
                         }
                     }
-                }
-            }
-            .padding(.bottom,
+                    .padding(.bottom,
                         playerManager.currentlyPlayingSong != nil &&
                         !keyboardObserver.isKeyboardVisible
                         ? bottomPlayerHeight
                         : 0
                     )
+                }
+            }
         }
+        .padding(.bottom,
+            playerManager.currentlyPlayingSong != nil &&
+            !keyboardObserver.isKeyboardVisible
+            ? bottomPlayerHeight
+            : 0
+        )
         .alert("Clear recent searches?", isPresented: $showClearRecentAlert) {
             Button("Clear", role: .destructive) {
                 recentSearches = []
                 recentSearchData = Data()
             }
+
             Button("Cancel", role: .cancel) { }
         }
     }
