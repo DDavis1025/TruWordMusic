@@ -938,12 +938,6 @@ struct SearchView: View {
                 }
             }
         }
-        .padding(.bottom,
-            playerManager.currentlyPlayingSong != nil &&
-            !keyboardObserver.isKeyboardVisible
-            ? bottomPlayerHeight
-            : 0
-        )
         .alert("Clear recent searches?", isPresented: $showClearRecentAlert) {
             Button("Clear", role: .destructive) {
                 recentSearches = []
@@ -953,6 +947,7 @@ struct SearchView: View {
             Button("Cancel", role: .cancel) { }
         }
     }
+
     
     // MARK: - Search Placeholder View
     private var searchPlaceholderView: some View {
