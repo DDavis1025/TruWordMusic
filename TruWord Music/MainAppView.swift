@@ -101,6 +101,7 @@ struct MainAppView: View {
                 .padding(.bottom, hasBottomTabBar ? tabBarHeight : 0)
             }
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         // MARK: - Track Detail Full Screen Cover
         .fullScreenCover(item: $selectedSongForDetail) { _ in
             if let song = playerManager.currentlyPlayingSong {
@@ -127,9 +128,7 @@ struct MainAppView: View {
                 )
             }
         }
-        
         .animation(.spring(), value: playerManager.currentlyPlayingSong)
-        .animation(.spring(), value: keyboardObserver.isKeyboardVisible)
     }
 }
 
