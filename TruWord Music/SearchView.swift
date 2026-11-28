@@ -841,48 +841,36 @@ struct SearchView: View {
         }
     }
     
+    
     private var recentSearchView: some View {
         Group {
-            if recentSearches.isEmpty {
+            ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+
                     HStack {
                         Text("Recent Searches")
                             .font(.headline)
 
                         Spacer()
+
+                        if !recentSearches.isEmpty {
+                            Button("Clear") {
+                                showClearRecentAlert = true
+                            }
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                        }
                     }
                     .padding(.horizontal)
                     .padding(.top, 10)
 
-                    Text("No recent searches")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal)
-                        .padding(.top, 10)
-
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-
-                        HStack {
-                            Text("Recent Searches")
-                                .font(.headline)
-
-                            Spacer()
-
-                            Button("Clear") {
-                                showClearRecentAlert = true
-                            }
-                            .font(.footnote)
-                            .foregroundColor(.red)
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 10)
-
+                    if recentSearches.isEmpty {
+                        Text("No recent searches")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                            .padding(.top, 10)
+                    } else {
                         VStack(spacing: 0) {
                             ForEach(recentSearches) { item in
                                 SongRowLikeView(
@@ -929,13 +917,14 @@ struct SearchView: View {
                             }
                         }
                     }
-                    .padding(.bottom,
-                        playerManager.currentlyPlayingSong != nil &&
-                        !keyboardObserver.isKeyboardVisible
-                        ? bottomPlayerHeight
-                        : 0
-                    )
                 }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(.bottom,
+                    playerManager.currentlyPlayingSong != nil &&
+                    !keyboardObserver.isKeyboardVisible
+                    ? bottomPlayerHeight
+                    : 0
+                )
             }
         }
         .alert("Clear recent searches?", isPresented: $showClearRecentAlert) {
@@ -943,10 +932,10 @@ struct SearchView: View {
                 recentSearches = []
                 recentSearchData = Data()
             }
-
             Button("Cancel", role: .cancel) { }
         }
     }
+
 
     
     // MARK: - Search Placeholder View
